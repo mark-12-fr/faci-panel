@@ -54,7 +54,7 @@
             padding: 4px;
             background: linear-gradient(135deg, #1e3a8a, #3b82f6);
             box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
-            cursor: pointer; /* Clickable */
+            cursor: pointer;
             overflow: hidden;
         }
 
@@ -68,7 +68,6 @@
             transition: 0.3s;
         }
 
-        /* Hover overlay sang "Change" */
         .profile-overlay {
             position: absolute;
             top: 4px; left: 4px; right: 4px; bottom: 4px;
@@ -91,15 +90,12 @@
         .profile-avatar-container:hover .profile-avatar {
             transform: scale(1.05);
         }
-        /* -------------------------------------- */
 
         .profile-name { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
         .profile-role { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 15px; font-weight: 500;}
 
         .badge-container { display: flex; justify-content: center; gap: 10px; }
-        .badge {
-            padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
-        }
+        .badge { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
         .badge-blue { background: #eff6ff; color: #3b82f6; }
         .badge-purple { background: #faf5ff; color: #a855f7; }
 
@@ -244,63 +240,49 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Fetch from LocalStorage
-            let fullName = localStorage.getItem('faci_name');
+            let fullName = localStorage.getItem('faci_name') || 'Loading...';
             const section = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject') || 'Subject';
-            const faciId = localStorage.getItem('faci_id'); // Kina hanglan ini para sa profile linking
+            const faciId = localStorage.getItem('faci_id'); 
 
-            // Security Check
             if (!faciId || !section) {
                 window.location.href = 'login.html'; 
                 return;
             }
 
-            // Populate UI Text (Cached)
             document.getElementById('badgeSection').textContent = section;
             document.getElementById('badgeSubject').textContent = subject.substring(0, 10);
             document.getElementById('cardSection').textContent = section;
             document.getElementById('cardSubject').textContent = subject;
 
-            // 🌟 LIVE DATA FETCH (Para sa updated Name kag Profile Picture) 🌟
+            // 🌟 LIVE DATA FETCH HALIN SA FACILITATORS TABLE 🌟
             try {
-                // Get updated name halin sa facilitators table
                 const { data: faciData } = await supabaseClient
                     .from('facilitators')
-                    .select('full_name')
+                    .select('full_name, avatar_url')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
                     .single();
 
                 if (faciData) {
                     fullName = faciData.full_name;
-                    localStorage.setItem('faci_name', fullName); // Update cache
+                    localStorage.setItem('faci_name', fullName); 
+                    
+                    // Display Avatar
+                    if (faciData.avatar_url) {
+                        document.getElementById('faciAvatar').src = faciData.avatar_url;
+                    } else {
+                        const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
+                        document.getElementById('faciAvatar').src = avatarUrl;
+                    }
                 }
                 document.getElementById('faciName').textContent = fullName;
-
-                // PROFILE PICTURE DISPLAY LOGIC
-                // I-check anay sa profiles table kon may custom avatar_url
-                const { data: profileData } = await supabaseClient
-                    .from('profiles')
-                    .select('avatar_url')
-                    .eq('id', faciId)
-                    .single();
-
-                if (profileData && profileData.avatar_url) {
-                    // Gamiton ang custom upload
-                    document.getElementById('faciAvatar').src = profileData.avatar_url;
-                } else {
-                    // Mabalik sa default UI Avatar base sa Name
-                    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
-                    document.getElementById('faciAvatar').src = avatarUrl;
-                }
             } catch (err) {
                 console.error("Error loading profile details:", err);
-                // Fallback to name avatar on error
                 const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
                 document.getElementById('faciAvatar').src = avatarUrl;
+                document.getElementById('faciName').textContent = fullName;
             }
 
-            // 4. Fetch Stats (Count attendance sessions)
             try {
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
@@ -319,23 +301,21 @@
             }
         });
 
-        // 🌟 UPLOAD PROFILE PICTURE FUNCTION 🌟
+        // 🌟 UPLOAD PROFILE PICTURE FUNCTION (SAVING TO FACILITATORS) 🌟
         function uploadAvatar(event) {
             const file = event.target.files[0];
             if (!file) return;
             const faciId = localStorage.getItem('faci_id');
             const imgElement = document.getElementById('faciAvatar');
             
-            // Show loading state
             imgElement.style.opacity = '0.5';
 
             const reader = new FileReader();
             reader.onload = function(e) {
-                // I-compress anay ang image para madasig i-save sa base64
                 const img = new Image();
                 img.onload = async function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 150; // Size sang display
+                    const MAX_WIDTH = 150; 
                     const MAX_HEIGHT = 150;
                     let width = img.width;
                     let height = img.height;
@@ -349,23 +329,22 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // I-convert sa base64 string
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); 
 
                     try {
-                        // I-upsert (save/update) sa Supabase 'profiles' table
+                        // Mag update diritso sa facilitators table
                         const { error } = await supabaseClient
-                            .from('profiles')
-                            .upsert({ id: faciId, avatar_url: compressedBase64 });
+                            .from('facilitators')
+                            .update({ avatar_url: compressedBase64 })
+                            .or(`id.eq.${faciId},account_id.eq.${faciId}`);
 
                         if (error) throw error;
 
-                        // Update UI dayon
                         imgElement.src = compressedBase64;
                         alert("Profile picture updated successfully!");
                     } catch (err) {
                         console.error("Error uploading picture:", err);
-                        alert("Failed to update profile picture. Ensure Supabase 'profiles' table allows public uploads or backend handles it.");
+                        alert("Failed to update profile picture. Please check your connection.");
                     } finally {
                         imgElement.style.opacity = '1';
                     }
@@ -375,7 +354,6 @@
             reader.readAsDataURL(file);
         }
 
-        // Logout Function
         function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
                 localStorage.removeItem('faci_id');
