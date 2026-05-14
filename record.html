@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Record</title>
+    <!-- PWA MANIFEST & FAVICON -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --primary-bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --accent-blue: #3b82f6;
+            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --border-radius: 12px;
+            --hover-bg: #f1f5f9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--primary-bg); color: var(--text-main); padding: 15px; padding-bottom: 90px; }
+
+        .header-section { margin-bottom: 20px; position: relative; }
+        .status-lock { background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: bold; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; }
+        .header-flex h1 { font-size: 1.5rem; font-weight: 800; }
+
+        .info-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; border-top: 4px solid var(--accent-blue); }
+        .info-box p { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;}
+        .info-box h3 { font-size: 0.95rem; font-weight: 700; margin-top: 0; }
+        
+        .section-tag { 
+            background: #eff6ff; 
+            color: var(--accent-blue); 
+            padding: 4px 10px; 
+            border-radius: 15px; 
+            font-size: 0.75rem; 
+            display: inline-block; 
+            font-weight: 800;
+        }
+
+        .search-bar { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        .search-bar input { border: none; outline: none; width: 100%; font-size: 0.9rem; font-family: 'Inter', sans-serif;}
+
+        .table-label { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 0 5px 10px; }
+
+        .table-scroll-container { background: var(--panel-bg); border-radius: var(--border-radius); box-shadow: var(--premium-shadow); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;}
+        .horizontal-scroll { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+        table { border-collapse: collapse; width: 100%; white-space: nowrap; min-width: 2200px; }
+        
+        th { background: #f8fafc; color: var(--text-sub); font-size: 0.7rem; text-transform: uppercase; padding: 12px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+        td { padding: 6px 4px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; text-align: center; }
+
+        .sticky-col-1 { position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 40px; }
+        .sticky-col-2 { position: sticky; left: 40px; background: #f8fafc; z-index: 10; width: 180px; text-align: left; }
+        thead .sticky-col-1, thead .sticky-col-2 { z-index: 11; border-bottom: 2px solid #e2e8f0; }
+        .td-sticky-1 { position: sticky; left: 0; background: white; z-index: 5; }
+        .td-sticky-2 { position: sticky; left: 40px; background: white; z-index: 5; text-align: left; padding-left: 10px; }
+
+        .gender-row td { background: #e2e8f0; font-weight: 800; font-size: 0.7rem; color: var(--accent-blue); text-align: left; padding: 10px 20px;}
+        .gender-row .td-sticky-1, .gender-row .td-sticky-2 { background: #e2e8f0; }
+
+        .score-input {
+            width: 35px;
+            text-align: center;
+            border: 1px solid transparent;
+            background: transparent;
+            font-weight: 800;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            outline: none;
+            transition: 0.2s;
+            border-radius: 4px;
+            padding: 5px 0;
+            font-family: 'Inter', sans-serif;
+        }
+        .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
+
+        .submit-btn {
+            width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none;
+            border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 5px; margin-bottom: 25px;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: 0.2s; font-family: 'Inter', sans-serif;
+        }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <div class="status-lock"><i class="fa-solid fa-lock"></i> Class Record</div>
+        <div class="header-flex">
+            <div>
+                <h1>Class Record</h1>
+                <p style="font-size: 0.8rem; color: var(--text-sub);">All scores — <span id="headerSection">...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-card">
+        <div class="info-box">
+            <p>Semester</p>
+            <h3 id="infoSemester">...</h3>
+        </div>
+        <div class="info-box">
+            <p>Subject</p>
+            <h3 id="infoSubject">...</h3>
+        </div>
+        <div class="info-box">
+            <p>Total Students</p>
+            <h3 id="infoTotal">0</h3>
+        </div>
+        <div class="info-box">
+            <p>Section</p>
+            <span class="section-tag" id="infoSection">...</span>
+        </div>
+    </div>
+
+    <div class="search-bar">
+        <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
+        <input type="text" id="searchInput" placeholder="Search student name...">
+    </div>
+
+    <div class="table-label">
+        <span>SCORE TABLE</span>
+        <span style="color: var(--accent-blue);"><i class="fa-solid fa-arrow-left-right"></i> scroll</span>
+    </div>
+
+    <div class="table-scroll-container">
+        <div class="horizontal-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="sticky-col-1" rowspan="2">#</th>
+                        <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
+                        <th colspan="25" style="background: #f1f5f9;">MODULES</th>
+                        <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
+                        <th rowspan="2" style="background: #f8fafc;">AT</th>
+                        <th rowspan="2" style="background: #f8fafc;">PT 1</th>
+                        <th rowspan="2" style="background: #f8fafc;">PT 2</th>
+                        <th rowspan="2" style="background: #f8fafc;">QE</th>
+                    </tr>
+                    <tr style="font-size: 0.6rem;">
+                        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+                        <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
+                        <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th>
+                        <th style="background: #f0f9ff;">1</th><th style="background: #f0f9ff;">2</th><th style="background: #f0f9ff;">3</th><th style="background: #f0f9ff;">4</th><th style="background: #f0f9ff;">5</th>
+                        <th style="background: #f0f9ff;">6</th><th style="background: #f0f9ff;">7</th><th style="background: #f0f9ff;">8</th><th style="background: #f0f9ff;">9</th><th style="background: #f0f9ff;">10</th>
+                    </tr>
+                </thead>
+                <tbody id="recordTableBody">
+                    <tr><td colspan="41" style="text-align: center; padding: 30px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color:var(--text-muted);"></i></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn">
+        <i class="fa-solid fa-paper-plane"></i> Submit Records
+    </button>
+
+    <nav class="bottom-nav">
+        <!-- FIXED: changed faci-dashboard.html to index.html -->
+        <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i>Home</a>
+        <a href="attendance.html" class="nav-item"><i class="fa-solid fa-calendar-check"></i>Attendance</a>
+        <a href="record.html" class="nav-item active"><i class="fa-solid fa-chart-column"></i>Records</a>
+        <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
+    </nav>
+
+    <script>
+        const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentSectionId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const sectionTitle = localStorage.getItem('faci_section');
+            const subject = localStorage.getItem('faci_subject') || 'Subject';
+            const faciId = localStorage.getItem('faci_id'); // SECURITY CHECK
+
+            // FIXED: Ensure strict redirection if unauthorized
+            if(!sectionTitle || !faciId) {
+                alert("Please log in again.");
+                window.location.href = "login.html";
+                return;
+            }
+
+            document.getElementById('headerSection').textContent = sectionTitle;
+            document.getElementById('infoSection').textContent = sectionTitle;
+            document.getElementById('infoSubject').textContent = subject.substring(0, 15);
+
+            await loadClassRecordData(sectionTitle);
+        });
+
+        async function loadClassRecordData(sectionTitle) {
+            const tbody = document.getElementById('recordTableBody');
+            
+            try {
+                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', sectionTitle).single();
+                if(sectionData) {
+                    document.getElementById('infoSemester').textContent = sectionData.semester || '1st Sem';
+                    currentSectionId = sectionData.id;
+                }
+
+                let students = [];
+                if (currentSectionId) {
+                    const { data: fetchedStudents } = await supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true });
+                    students = fetchedStudents || [];
+                }
+                document.getElementById('infoTotal').textContent = students.length;
+
+                const { data: existingRecords } = await supabaseClient.from('class_records').select('*').eq('section_id', currentSectionId);
+
+                tbody.innerHTML = '';
+                if (students.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    return;
+                }
+
+                const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
+                const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
+                let rowCount = 1;
+
+                if (males.length > 0) {
+                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2"><i class="fa-solid fa-mars"></i> MALE</td><td colspan="39"></td></tr>`;
+                    males.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
+                }
+
+                if (females.length > 0) {
+                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2" style="color: #ec4899;"><i class="fa-solid fa-venus"></i> FEMALE</td><td colspan="39"></td></tr>`;
+                    females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
+                }
+
+            } catch (error) {
+                console.error("Error loading records:", error);
+                tbody.innerHTML = `<tr><td colspan="41" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
+            }
+        }
+
+        function createInputRow(student, index, existingRecords) {
+            const tr = document.createElement('tr');
+            tr.className = 'student-data-row';
+            tr.dataset.uuid = student.id; 
+
+            const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
+            
+            let html = `
+                <td class="td-sticky-1">${index}</td>
+                <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
+            `;
+
+            // Modules 1-25
+            for(let i=1; i<=25; i++) {
+                let val = record ? record[`module_${i}`] : '';
+                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}"></td>`;
+            }
+            // Activities 1-10
+            for(let i=1; i<=10; i++) {
+                let val = record ? record[`activity_${i}`] : '';
+                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}"></td>`;
+            }
+            // AT, PT1, PT2, QE
+            const fields = { 'at': 'at', 'pt_1': 'pt_1', 'pt_2': 'pt_2', 'qe': 'qe' };
+            Object.keys(fields).forEach(f => {
+                let val = record ? record[f] : '';
+                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}"></td>`;
+            });
+
+            tr.innerHTML = html;
+            return tr;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.student-data-row').forEach(row => {
+                const nameCell = row.querySelector('.search-target');
+                if(nameCell) row.style.display = nameCell.innerText.toLowerCase().includes(term) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('submitBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('submitBtn');
+            const sectionTitle = localStorage.getItem('faci_section');
+            const faciId = localStorage.getItem('faci_id');
+
+            if (!currentSectionId || !faciId) {
+                alert("Session invalid or Section ID not found. Refresh the page.");
+                return;
+            }
+
+            let recordData = [];
+            document.querySelectorAll('.student-data-row').forEach(row => {
+                const studUuid = row.dataset.uuid;
+                let dataObj = {
+                    student_id: studUuid,
+                    section_id: currentSectionId
+                };
+
+                row.querySelectorAll('.score-input').forEach(input => {
+                    const val = input.value.trim();
+                    dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
+                });
+                recordData.push(dataObj);
+            });
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+            btn.disabled = true;
+
+            try {
+                // 1. Delete old records for this section
+                const { error: deleteError } = await supabaseClient
+                    .from('class_records')
+                    .delete()
+                    .eq('section_id', currentSectionId);
+
+                if (deleteError) throw deleteError;
+
+                // 2. Insert new records
+                const { error: insertError } = await supabaseClient
+                    .from('class_records')
+                    .insert(recordData);
+
+                if (insertError) throw insertError;
+
+                btn.style.background = '#10b981';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
+                setTimeout(() => { 
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
+                    btn.style.background = 'var(--accent-blue)';
+                    btn.disabled = false;
+                }, 2000);
+
+            } catch (error) {
+                console.error("Error saving:", error);
+                alert("Error: " + error.message);
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
+                btn.style.background = 'var(--accent-blue)';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

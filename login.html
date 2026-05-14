@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator Login | Management System</title>
+    <!-- PWA MANIFEST & FAVICON -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            /* MATCHING THE IMAGE DESIGN VARIABLES */
+            --main-bg: #e8f0fe;       /* Soft light blue background */
+            --card-bg: #ffffff;       /* Pure white card */
+            --text-main: #111827;     /* Dark text */
+            --text-muted: #6b7280;    /* Muted text for subtitle */
+            --label-color: #3b82f6;   /* Blueish label color like in the image */
+            --border-color: #e5e7eb;  /* Light gray border */
+            --input-bg: #ffffff;      
+            --input-bg-focus: #f8fafc;
+            
+            --accent-blue: #3b82f6;   /* Main button blue */
+            --accent-hover: #2563eb;  
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e4effe 0%, #f0f5ff 100%);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            overflow: hidden; /* Prevent scrollbar during splash */
+        }
+
+        /* --- SPLASH SCREEN STYLES --- */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+        }
+
+        .splash-content {
+            text-align: center;
+            color: white;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .splash-logo-container {
+            width: 90px;
+            height: 90px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .splash-logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .splash-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .splash-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .splash-loader {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            margin: 0 auto;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .splash-loader::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -20px;
+            width: 20px;
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            animation: loading 1s infinite ease-in-out;
+        }
+
+        @keyframes loading {
+            0% { left: -20px; }
+            100% { left: 100%; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Clean White Card */
+        .login-container {
+            background: var(--card-bg);
+            padding: 45px 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .login-header h2 {
+            font-size: 1.6rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+            color: var(--label-color);
+            font-weight: 600;
+        }
+
+        /* Wrapper for the password eye icon */
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* HIDE DEFAULT BROWSER EYE ICON (Edge/IE) */
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear {
+            display: none;
+        }
+
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-blue);
+            background: var(--input-bg-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
+        }
+
+        /* Eye Icon Styling */
+        .toggle-password {
+            position: absolute;
+            right: 16px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: var(--accent-blue);
+        }
+
+        /* Remember me & Forgot Password Row */
+        .options-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            font-size: 0.8rem;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .remember-me input {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent-blue);
+        }
+
+        .forgot-password {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s;
+        }
+
+        .login-btn:hover {
+            background-color: var(--accent-hover);
+        }
+        
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Error Notification */
+        .error-message {
+            background-color: #fef2f2; 
+            color: #b91c1c;            
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: none;
+            border: 1px solid #fecaca;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+        }
+        
+        .error-message i {
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 🌟 SPLASH SCREEN INTRO 🌟 -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo-container">
+                <img src="logo.jpg" alt="Logo">
+            </div>
+            <h1 class="splash-title">Management System</h1>
+            <p class="splash-subtitle">PHINMA University of Iloilo</p>
+            <div class="splash-loader"></div>
+        </div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h2>Welcome Facilitator</h2>
+            <p>Login to your account</p>
+        </div>
+
+        <div id="errorMessage" class="error-message">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="errorText">Error message goes here</span>
+        </div>
+
+        <form id="faciLoginForm">
+            <div class="input-group">
+                <label for="accountId">Faci ID</label>
+                <input type="text" id="accountId" placeholder="e.g. FACI-1234" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                    <i class="fa-solid fa-eye toggle-password" id="togglePassword" title="Show/Hide Password"></i>
+                </div>
+            </div>
+
+            <div class="options-row">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe"> Remember me
+                </label>
+                <a href="#" class="forgot-password">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">Login</button>
+        </form>
+    </div>
+
+    <script>
+        // 🌟 SPLASH SCREEN LOGIC 🌟
+        window.addEventListener('load', function() {
+            const splashScreen = document.getElementById('splashScreen');
+            setTimeout(() => {
+                splashScreen.style.opacity = '0';
+                splashScreen.style.visibility = 'hidden';
+                document.body.style.overflow = 'auto'; // Restore scrolling after splash
+            }, 1500); 
+        });
+
+        // UPDATED: Render Backend URL
+        const API_URL = 'https://teacher-panel-d1kw.onrender.com'; 
+
+        // Password Visibility Toggle Logic
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        togglePassword.addEventListener('click', function () {
+            // Check kon password ukon text ang type
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // I-ilis ang icon (mata nga bukas vs mata nga may slash)
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // Check if Faci ID was remembered
+        window.addEventListener('DOMContentLoaded', () => {
+            const rememberedId = localStorage.getItem('remembered_faci_id');
+            if (rememberedId) {
+                document.getElementById('accountId').value = rememberedId;
+                document.getElementById('rememberMe').checked = true;
+            }
+        });
+
+        // Login Logic
+        document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); 
+
+            const accountId = document.getElementById('accountId').value.trim();
+            const password = passwordInput.value.trim();
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            const loginBtn = document.getElementById('loginBtn');
+
+            // Reset error state
+            errorDiv.style.display = 'none';
+            loginBtn.textContent = 'Verifying...';
+            loginBtn.disabled = true;
+
+            try {
+                // Ma-connect ini sa imo Flask Backend /api/faci/login
+                const response = await fetch(`${API_URL}/api/faci/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_id: accountId,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Remember Me logic
+                    if (rememberMe) {
+                        localStorage.setItem('remembered_faci_id', accountId);
+                    } else {
+                        localStorage.removeItem('remembered_faci_id');
+                    }
+
+                    // SECURITY UPDATE: I-clear ang Teacher Auth tokens para indi mag-conflict
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('cached_user_name');
+                    localStorage.removeItem('cached_user_avatar');
+
+                    // Save Faci Details sa localStorage para magamit sa Dashboard
+                    localStorage.setItem('faci_id', data.faci.id);
+                    localStorage.setItem('faci_name', data.faci.full_name);
+                    localStorage.setItem('faci_section', data.faci.section);
+                    localStorage.setItem('faci_subject', data.faci.subject);
+
+                    // Green button sa success
+                    loginBtn.style.backgroundColor = '#10b981'; 
+                    loginBtn.textContent = 'Login Successful!';
+                    
+                    setTimeout(() => {
+                        // Ma-direct na sa dashboard sang faci (index.html para sa Vercel deployment)
+                        window.location.href = 'index.html'; 
+                    }, 1000);
+
+                } else {
+                    errorText.textContent = data.error || 'Invalid Faci ID or password.';
+                    errorDiv.style.display = 'flex'; 
+                    loginBtn.textContent = 'Login';
+                    loginBtn.disabled = false;
+                }
+
+            } catch (error) {
+                console.error('Login request failed:', error);
+                errorText.textContent = 'Connection error. Please try again.';
+                errorDiv.style.display = 'flex';
+                loginBtn.textContent = 'Login';
+                loginBtn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator Profile</title>
+    <!-- PWA MANIFEST & FAVICON -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --primary-bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --accent-blue: #3b82f6;
+            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --border-radius: 12px;
+            --hover-bg: #f1f5f9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--primary-bg); 
+            color: var(--text-main); 
+            padding-bottom: 90px; 
+        }
+
+        /* --- Profile Header --- */
+        .profile-header {
+            background: var(--panel-bg);
+            padding: 40px 20px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            margin-bottom: 20px;
+        }
+
+        /* --- PROFILE PICTURE UPLOAD CHANGES --- */
+        .profile-avatar-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            padding: 4px;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+            cursor: pointer; /* Clickable */
+            overflow: hidden;
+        }
+
+        .profile-avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid white;
+            object-fit: cover;
+            background: white;
+            transition: 0.3s;
+        }
+
+        /* Hover overlay sang "Change" */
+        .profile-overlay {
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: 0.3s;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .profile-avatar-container:hover .profile-overlay {
+            opacity: 1;
+        }
+        .profile-avatar-container:hover .profile-avatar {
+            transform: scale(1.05);
+        }
+        /* -------------------------------------- */
+
+        .profile-name { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+        .profile-role { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 15px; font-weight: 500;}
+
+        .badge-container { display: flex; justify-content: center; gap: 10px; }
+        .badge {
+            padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        }
+        .badge-blue { background: #eff6ff; color: #3b82f6; }
+        .badge-purple { background: #faf5ff; color: #a855f7; }
+
+        /* --- Info Sections --- */
+        .content-container { padding: 0 15px; }
+
+        .section-title { font-size: 0.8rem; font-weight: 800; color: var(--text-sub); margin-bottom: 10px; margin-left: 5px; text-transform: uppercase; letter-spacing: 0.5px;}
+
+        .info-card {
+            background: var(--panel-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--premium-shadow);
+            padding: 5px 20px;
+            margin-bottom: 25px;
+        }
+
+        .info-row {
+            display: flex; align-items: center; gap: 15px; padding: 15px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .info-row:last-child { border-bottom: none; }
+
+        .icon-box {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; flex-shrink: 0;
+        }
+        .bg-blue-light { background: #eff6ff; color: #3b82f6; }
+
+        .info-text { flex-grow: 1; }
+        .info-label { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 2px;}
+        .info-value { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+
+        .logout-btn {
+            width: 100%; padding: 16px; background: #fee2e2; color: #dc2626; border: none;
+            border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 10px;
+            cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .logout-btn:hover { background: #fca5a5; }
+
+        /* --- Fixed Bottom Nav --- */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="profile-header">
+        <div class="profile-avatar-container" onclick="document.getElementById('avatarUpload').click()" title="Click to change profile picture">
+            <img src="" id="faciAvatar" class="profile-avatar" alt="Avatar">
+            <div class="profile-overlay">
+                <i class="fa-solid fa-camera" style="margin-bottom: 3px;"></i> Change
+            </div>
+            <input type="file" id="avatarUpload" style="display: none;" accept="image/png, image/jpeg" onchange="uploadAvatar(event)">
+        </div>
+        <h2 class="profile-name" id="faciName">Loading...</h2>
+        <p class="profile-role">Student Facilitator</p>
+        <div class="badge-container">
+            <span class="badge badge-blue" id="badgeSection">...</span>
+            <span class="badge badge-purple" id="badgeSubject">...</span>
+        </div>
+    </div>
+
+    <div class="content-container">
+        
+        <h3 class="section-title">My Information</h3>
+        <div class="info-card">
+            <div class="info-row">
+                <div class="icon-box bg-blue-light"><i class="fa-solid fa-graduation-cap"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Role</p>
+                    <p class="info-value">Student Facilitator</p>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="icon-box bg-blue-light"><i class="fa-solid fa-thumbtack"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Assigned Section</p>
+                    <p class="info-value" id="cardSection">...</p>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="icon-box bg-blue-light"><i class="fa-solid fa-book"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Subject</p>
+                    <p class="info-value" id="cardSubject">...</p>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="icon-box bg-blue-light"><i class="fa-solid fa-school"></i></div>
+                <div class="info-text">
+                    <p class="info-label">School</p>
+                    <p class="info-value">PHINMA University of Iloilo</p>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="section-title">My Stats</h3>
+        <div class="info-card">
+            <div class="info-row">
+                <div class="icon-box bg-blue-light" style="color: #6366f1; background: #e0e7ff;"><i class="fa-solid fa-clipboard-user"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Attendance Sessions Recorded</p>
+                    <p class="info-value" id="statAttendance">Loading...</p>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="icon-box bg-blue-light" style="color: #10b981; background: #d1fae5;"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Modules Checked</p>
+                    <p class="info-value" id="statModules">Ready</p>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="icon-box bg-blue-light" style="color: #f59e0b; background: #fef3c7;"><i class="fa-solid fa-pen-nib"></i></div>
+                <div class="info-text">
+                    <p class="info-label">Activities Recorded</p>
+                    <p class="info-value" id="statActivities">Ready</p>
+                </div>
+            </div>
+        </div>
+
+        <button class="logout-btn" onclick="faciLogout()">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> Log out
+        </button>
+
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i>Home</a>
+        <a href="attendance.html" class="nav-item"><i class="fa-solid fa-calendar-check"></i>Attendance</a>
+        <a href="record.html" class="nav-item"><i class="fa-solid fa-chart-column"></i>Records</a>
+        <a href="profile.html" class="nav-item active"><i class="fa-solid fa-circle-user"></i>Profile</a>
+    </nav>
+
+    <script>
+        const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Fetch from LocalStorage
+            let fullName = localStorage.getItem('faci_name');
+            const section = localStorage.getItem('faci_section');
+            const subject = localStorage.getItem('faci_subject') || 'Subject';
+            const faciId = localStorage.getItem('faci_id'); // Kina hanglan ini para sa profile linking
+
+            // Security Check
+            if (!faciId || !section) {
+                window.location.href = 'login.html'; 
+                return;
+            }
+
+            // Populate UI Text (Cached)
+            document.getElementById('badgeSection').textContent = section;
+            document.getElementById('badgeSubject').textContent = subject.substring(0, 10);
+            document.getElementById('cardSection').textContent = section;
+            document.getElementById('cardSubject').textContent = subject;
+
+            // 🌟 LIVE DATA FETCH (Para sa updated Name kag Profile Picture) 🌟
+            try {
+                // Get updated name halin sa facilitators table
+                const { data: faciData } = await supabaseClient
+                    .from('facilitators')
+                    .select('full_name')
+                    .or(`id.eq.${faciId},account_id.eq.${faciId}`)
+                    .single();
+
+                if (faciData) {
+                    fullName = faciData.full_name;
+                    localStorage.setItem('faci_name', fullName); // Update cache
+                }
+                document.getElementById('faciName').textContent = fullName;
+
+                // PROFILE PICTURE DISPLAY LOGIC
+                // I-check anay sa profiles table kon may custom avatar_url
+                const { data: profileData } = await supabaseClient
+                    .from('profiles')
+                    .select('avatar_url')
+                    .eq('id', faciId)
+                    .single();
+
+                if (profileData && profileData.avatar_url) {
+                    // Gamiton ang custom upload
+                    document.getElementById('faciAvatar').src = profileData.avatar_url;
+                } else {
+                    // Mabalik sa default UI Avatar base sa Name
+                    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
+                    document.getElementById('faciAvatar').src = avatarUrl;
+                }
+            } catch (err) {
+                console.error("Error loading profile details:", err);
+                // Fallback to name avatar on error
+                const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
+                document.getElementById('faciAvatar').src = avatarUrl;
+            }
+
+            // 4. Fetch Stats (Count attendance sessions)
+            try {
+                const { data: attendanceData } = await supabaseClient
+                    .from('attendance')
+                    .select('date')
+                    .eq('section', section);
+
+                if (attendanceData) {
+                    const uniqueDates = [...new Set(attendanceData.map(item => item.date))];
+                    document.getElementById('statAttendance').textContent = `${uniqueDates.length} sessions`;
+                } else {
+                    document.getElementById('statAttendance').textContent = "0 sessions";
+                }
+            } catch (error) {
+                console.error("Error fetching stats:", error);
+                document.getElementById('statAttendance').textContent = "0 sessions";
+            }
+        });
+
+        // 🌟 UPLOAD PROFILE PICTURE FUNCTION 🌟
+        function uploadAvatar(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const faciId = localStorage.getItem('faci_id');
+            const imgElement = document.getElementById('faciAvatar');
+            
+            // Show loading state
+            imgElement.style.opacity = '0.5';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // I-compress anay ang image para madasig i-save sa base64
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 150; // Size sang display
+                    const MAX_HEIGHT = 150;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // I-convert sa base64 string
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
+
+                    try {
+                        // I-upsert (save/update) sa Supabase 'profiles' table
+                        const { error } = await supabaseClient
+                            .from('profiles')
+                            .upsert({ id: faciId, avatar_url: compressedBase64 });
+
+                        if (error) throw error;
+
+                        // Update UI dayon
+                        imgElement.src = compressedBase64;
+                        alert("Profile picture updated successfully!");
+                    } catch (err) {
+                        console.error("Error uploading picture:", err);
+                        alert("Failed to update profile picture. Ensure Supabase 'profiles' table allows public uploads or backend handles it.");
+                    } finally {
+                        imgElement.style.opacity = '1';
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Logout Function
+        function faciLogout() {
+            if(confirm("Are you sure you want to sign out?")) {
+                localStorage.removeItem('faci_id');
+                localStorage.removeItem('faci_name');
+                localStorage.removeItem('faci_section');
+                localStorage.removeItem('faci_subject');
+                window.location.href = 'login.html'; 
+            }
+        }
+    </script>
+</body>
+</html>

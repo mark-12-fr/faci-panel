@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator Attendance</title>
+    <!-- PWA MANIFEST & FAVICON -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-pink: #d946ef;
+            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --border-radius: 12px;
+            --hover-bg: #f1f5f9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-main);
+            padding: 15px;
+            padding-bottom: 90px;
+        }
+
+        .attendance-header { margin-bottom: 20px; }
+        .status-lock { background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: 600; }
+        .attendance-header h1 { font-size: 1.5rem; font-weight: 800; }
+        .attendance-header p { font-size: 0.85rem; color: var(--text-sub); }
+
+        .controls-row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; margin-bottom: 15px; }
+        .date-input, .subject-select { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); }
+        .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px;}
+        .date-input div { font-weight: 700; font-size: 0.9rem; }
+
+        /* Date Navigator Buttons */
+        .nav-btn {
+            background: var(--input-bg); border: 1px solid #e2e8f0; color: var(--text-main);
+            border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .nav-btn:hover { background: var(--hover-bg); border-color: var(--accent-blue); color: var(--accent-blue); }
+
+        .mini-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+        .mini-card { background: var(--panel-bg); padding: 12px 5px; text-align: center; border-radius: 10px; box-shadow: var(--premium-shadow); border-bottom: 3px solid #cbd5e1; transition: 0.3s; }
+        .mini-card h3 { font-size: 1.2rem; }
+        .mini-card p { font-size: 0.65rem; color: var(--text-sub); font-weight: bold; }
+        .total h3 { color: var(--text-main); }
+        .present { border-color: #22c55e; } .present h3 { color: #15803d; }
+        .absent { border-color: #ef4444; } .absent h3 { color: #b91c1c; }
+        .late { border-color: #f59e0b; } .late h3 { color: #b45309; }
+
+        .search-container { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
+
+        .gender-divider { font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 15px 0 10px 5px; }
+        .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; }
+        .student-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .student-name h4 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; }
+        .student-name p { font-size: 0.75rem; color: var(--text-sub); }
+        .gender-tag { font-size: 0.7rem; color: var(--accent-blue); background: #eff6ff; padding: 2px 8px; border-radius: 5px; font-weight: bold; height: fit-content; }
+        .fem-gen-tag { font-size: 0.7rem; color: var(--accent-pink); background: #fdf4ff; padding: 2px 8px; border-radius: 5px; font-weight: bold; height: fit-content; }
+        
+        .attendance-options { display: flex; gap: 8px; flex-wrap: wrap; }
+        .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: 0.2s; }
+        
+        /* Active Highlights */
+        .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; }
+        .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; }
+        .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; }
+        .opt-btn.excuse.active { background: #64748b; color: white; border-color: #64748b; }
+        
+        .remarks-input { width: 100%; margin-top: 12px; padding: 10px; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; outline: none; }
+        .remarks-input:focus { border-color: var(--accent-blue); }
+
+        .submit-btn { width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 15px; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: 0.2s; }
+        .submit-btn:hover { background: #2563eb; transform: translateY(-2px); }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="attendance-header">
+        <div class="status-lock">
+            <i class="fa-solid fa-lock"></i> Attendance Record
+        </div>
+        <h1>Attendance</h1>
+        <p id="headerDetails">Loading Details...</p>
+    </div>
+
+    <div class="controls-row">
+        <div class="date-input" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;">
+            <button onclick="changeDate(-1)" class="nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
+            <div style="text-align: center;">
+                <label><i class="fa-regular fa-calendar"></i> Date</label>
+                <div id="currentDateDisplay">...</div>
+            </div>
+            <button onclick="changeDate(1)" class="nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+
+        <div class="subject-select">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-blue); height: 100%; display: flex; align-items: center; justify-content: space-between;">
+                <span id="subjectDisplay">...</span> <i class="fa-solid fa-chevron-down"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="mini-stats-grid">
+        <div class="mini-card total"><h3 id="statTotal">0</h3><p>Total</p></div>
+        <div class="mini-card present"><h3 id="statPresent">0</h3><p>Present</p></div>
+        <div class="mini-card absent"><h3 id="statAbsent">0</h3><p>Absent</p></div>
+        <div class="mini-card late"><h3 id="statLate">0</h3><p>Late</p></div>
+    </div>
+
+    <div class="search-container">
+        <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
+        <input type="text" id="searchInput" placeholder="Search student name..." onkeyup="filterStudents()">
+    </div>
+
+    <div id="studentListContainer">
+        <div style="text-align:center; padding: 30px; color: var(--text-sub);">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 10px;"></i>
+            <p>Loading students from database...</p>
+        </div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn">
+        <i class="fa-solid fa-paper-plane"></i> Submit Attendance
+    </button>
+
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i>Home</a>
+        <a href="attendance.html" class="nav-item active"><i class="fa-solid fa-calendar-check"></i>Attendance</a>
+        <a href="record.html" class="nav-item"><i class="fa-solid fa-file-invoice"></i>Records</a>
+        <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
+    </nav>
+
+    <script>
+        // UPDATED: Render Backend URL
+        const API_URL = 'https://teacher-panel-d1kw.onrender.com';
+        const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // DATE NAVIGATION LOGIC
+        let currentDateObj = new Date();
+
+        function updateDateDisplay() {
+            const dateStr = currentDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            document.getElementById('currentDateDisplay').textContent = dateStr;
+        }
+
+        async function changeDate(offset) {
+            currentDateObj.setDate(currentDateObj.getDate() + offset);
+            updateDateDisplay();
+            const section = localStorage.getItem('faci_section');
+            await loadDynamicStudents(section); // Reload data based on new date
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const section = localStorage.getItem('faci_section');
+            const subject = localStorage.getItem('faci_subject') || 'Subject';
+            const faciId = localStorage.getItem('faci_id');
+
+            // SECURITY FIX: Prevent unauthorized access
+            if (!faciId || !section) {
+                window.location.href = 'login.html'; 
+                return;
+            }
+
+            document.getElementById('subjectDisplay').textContent = subject.substring(0, 7) + '...';
+
+            updateDateDisplay(); // Show initial date (today)
+            await loadDynamicStudents(section);
+        });
+
+        async function loadDynamicStudents(sectionTitle) {
+            const container = document.getElementById('studentListContainer');
+            container.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i></div>';
+
+            try {
+                // 1. Fetch Section Info
+                const { data: sections } = await supabaseClient.from('sections').select('id, semester').eq('title', sectionTitle);
+                
+                if (!sections || sections.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">Error: Section not found or restricted.</div>';
+                    return;
+                }
+                const sectionId = sections[0].id;
+                const semester = sections[0].semester || '1st Sem'; 
+                document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle}`;
+
+                // 2. Fetch Students specifically tied to this section ID
+                const { data: students } = await supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name');
+                
+                if (!students || students.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding: 20px;">No students assigned yet to this section.</div>';
+                    document.getElementById('statTotal').textContent = "0";
+                    return;
+                }
+
+                document.getElementById('statTotal').textContent = students.length;
+
+                // 3. FETCH EXISTING ATTENDANCE FOR SELECTED DATE strictly filtering by sectionTitle
+                const dateStr = document.getElementById('currentDateDisplay').textContent;
+                const { data: attendanceData } = await supabaseClient
+                    .from('attendance')
+                    .select('*')
+                    .eq('section', sectionTitle)
+                    .eq('date', dateStr);
+                
+                let html = '';
+                const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
+                const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
+                
+                if(males.length > 0) {
+                    html += '<div class="gender-divider">👶 MALE</div>';
+                    males.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Male', attendanceData); });
+                }
+                if(females.length > 0) {
+                    html += '<div class="gender-divider">💆‍♀️ FEMALE</div>';
+                    females.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Female', attendanceData); });
+                }
+                
+                container.innerHTML = html;
+                attachButtonListeners();
+                updateStats(); // Update Top Numbers base sa gina-load nga data
+
+            } catch (error) {
+                console.error("Error fetching students:", error);
+                container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">Failed to load students. Please check your connection.</div>';
+            }
+        }
+
+        function generateStudentCard(student, index, gender, attendanceData) {
+            const num = index.toString().padStart(2, '0');
+            const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
+
+            // CHECK KUNG MAY NA-SUBMIT NA NGA RECORD INI NGA ESTUDYANTE
+            const record = attendanceData ? attendanceData.find(a => a.student_id_no === student.id_no || a.student_name === student.full_name) : null;
+            
+            let preP = '', preA = '', preL = '', preE = '';
+            let rem = '';
+
+            if (record) {
+                if(record.status === 'Present') preP = 'active';
+                else if(record.status === 'Absent') preA = 'active';
+                else if(record.status === 'Late') preL = 'active';
+                else if(record.status === 'Excused') preE = 'active';
+                rem = record.remarks || '';
+            }
+
+            return `
+            <div class="student-card student-item">
+                <div class="student-info">
+                    <div class="student-name">
+                        <h4 class="s-name"><span style="color: var(--accent-blue); opacity: 0.5;">${num}</span> ${student.full_name}</h4>
+                        <p class="s-id">${student.id_no || 'No ID'}</p>
+                    </div>
+                    <span class="${tagClass}">${gender}</span>
+                </div>
+                <div class="attendance-options">
+                    <button class="opt-btn present ${preP}">Present</button>
+                    <button class="opt-btn absent ${preA}">Absent</button>
+                    <button class="opt-btn late ${preL}">Late</button>
+                    <button class="opt-btn excuse ${preE}">Excused</button>
+                </div>
+                <input type="text" class="remarks-input" value="${rem}" placeholder="Add optional remark...">
+            </div>`;
+        }
+
+        function attachButtonListeners() {
+            document.querySelectorAll('.student-card').forEach(card => {
+                const buttons = card.querySelectorAll('.opt-btn');
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        buttons.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        updateStats();
+                    });
+                });
+            });
+        }
+
+        function updateStats() {
+            let present = 0, absent = 0, late = 0;
+            document.querySelectorAll('.student-card').forEach(card => {
+                const activeBtn = card.querySelector('.opt-btn.active');
+                if(activeBtn) {
+                    if(activeBtn.classList.contains('present')) present++;
+                    if(activeBtn.classList.contains('absent')) absent++;
+                    if(activeBtn.classList.contains('late')) late++;
+                }
+            });
+            document.getElementById('statPresent').textContent = present;
+            document.getElementById('statAbsent').textContent = absent;
+            document.getElementById('statLate').textContent = late;
+        }
+
+        function filterStudents() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('.student-item').forEach(card => {
+                const name = card.querySelector('.s-name').textContent.toLowerCase();
+                card.style.display = name.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        // SUBMIT AND UPDATE DATABASE
+        document.getElementById('submitBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('submitBtn');
+            const dateStr = document.getElementById('currentDateDisplay').textContent;
+            const section = localStorage.getItem('faci_section');
+            const subject = localStorage.getItem('faci_subject');
+            const faciId = localStorage.getItem('faci_id'); 
+
+            let attendanceData = [];
+            let allMarked = true;
+
+            document.querySelectorAll('.student-card').forEach(card => {
+                const nameElement = card.querySelector('.s-name').cloneNode(true);
+                if(nameElement.querySelector('span')) nameElement.querySelector('span').remove();
+                const cleanName = nameElement.textContent.trim();
+                
+                const idNo = card.querySelector('.s-id').textContent.trim();
+                const activeBtn = card.querySelector('.opt-btn.active');
+                const remarks = card.querySelector('.remarks-input').value.trim();
+
+                if (!activeBtn) {
+                    allMarked = false;
+                } else {
+                    let statusText = activeBtn.textContent.trim();
+                    if(statusText === 'Excused') statusText = 'Excused'; // ensure correct casing
+                    
+                    attendanceData.push({
+                        date: dateStr,
+                        section: section,
+                        subject: subject,
+                        facilitator_id: faciId,
+                        student_name: cleanName,
+                        student_id_no: idNo,
+                        status: statusText,
+                        remarks: remarks
+                    });
+                }
+            });
+
+            if (!allMarked) {
+                alert("Please mark the attendance for ALL students before submitting.");
+                return;
+            }
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+            btn.disabled = true;
+
+            try {
+                // DELETE EXISTING RECORDS FOR THIS DATE/SECTION TO AVOID DUPLICATES
+                await supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
+
+                // INSERT NEW RECORDS VIA FLASK API
+                const response = await fetch(`${API_URL}/api/attendance/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(attendanceData)
+                });
+
+                if (response.ok) {
+                    btn.style.background = '#10b981';
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
+                    setTimeout(() => { 
+                        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
+                        btn.style.background = 'var(--accent-blue)';
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error("Failed");
+                }
+            } catch (error) {
+                console.error("Error submitting:", error);
+                alert("Failed to submit. Please ensure backend is running.");
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
+                btn.style.background = 'var(--accent-blue)';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
