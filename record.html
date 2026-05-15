@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Class Record</title>
-    <!-- PWA MANIFEST & FAVICON -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link rel="apple-touch-icon" href="logo.jpg">
@@ -84,6 +83,14 @@
             font-family: 'Inter', sans-serif;
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
+        
+        /* ADDED: Style for disabled (locked) inputs */
+        .score-input:disabled {
+            background-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+            border: 1px solid #cbd5e1;
+        }
 
         .submit-btn {
             width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none;
@@ -95,6 +102,30 @@
         .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+
+        /* CUSTOM MODAL STYLES */
+        .custom-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
+        .custom-alert-box {
+            background: var(--panel-bg); padding: 25px 20px; border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
+            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid #e2e8f0;
+        }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
+        .custom-alert-icon { font-size: 3rem; color: var(--accent-blue); margin-bottom: 15px; }
+        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-btn {
+            background: var(--text-main); color: white; border: none; padding: 12px 20px;
+            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-alert-btn:hover { background: #334155; }
     </style>
 </head>
 <body>
@@ -172,12 +203,20 @@
     </button>
 
     <nav class="bottom-nav">
-        <!-- FIXED: changed faci-dashboard.html to index.html -->
         <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i>Home</a>
         <a href="attendance.html" class="nav-item"><i class="fa-solid fa-calendar-check"></i>Attendance</a>
         <a href="record.html" class="nav-item active"><i class="fa-solid fa-chart-column"></i>Records</a>
         <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
     </nav>
+
+    <div id="customAlertOverlay" class="custom-alert-overlay">
+        <div class="custom-alert-box">
+            <i class="fa-solid fa-circle-exclamation custom-alert-icon"></i>
+            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
+            <p id="customAlertMessage" class="custom-alert-msg"></p>
+            <button onclick="closeAlert()" class="custom-alert-btn">Understood</button>
+        </div>
+    </div>
 
     <script>
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
@@ -186,15 +225,37 @@
 
         let currentSectionId = null;
 
+        // CUSTOM ALERT LOGIC WITH CALLBACK
+        let alertCallback = null;
+
+        function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
+            document.getElementById('customAlertTitle').textContent = title;
+            document.getElementById('customAlertMessage').textContent = message;
+            document.querySelector('.custom-alert-icon').style.color = iconColor;
+            document.getElementById('customAlertOverlay').classList.add('show');
+            alertCallback = callback;
+        }
+
+        function closeAlert() {
+            document.getElementById('customAlertOverlay').classList.remove('show');
+            if (alertCallback) {
+                alertCallback(); 
+                alertCallback = null;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const sectionTitle = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject') || 'Subject';
-            const faciId = localStorage.getItem('faci_id'); // SECURITY CHECK
+            const faciId = localStorage.getItem('faci_id'); 
 
-            // FIXED: Ensure strict redirection if unauthorized
             if(!sectionTitle || !faciId) {
-                alert("Please log in again.");
-                window.location.href = "login.html";
+                showAlert(
+                    "Authentication Required", 
+                    "Please log in again to access the class record.", 
+                    "#ef4444", 
+                    () => { window.location.href = "login.html"; }
+                );
                 return;
             }
 
@@ -262,21 +323,26 @@
                 <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
             `;
 
+            // ADDED RESTRICTION: Disable input if it already has a value in the database
+            
             // Modules 1-25
             for(let i=1; i<=25; i++) {
                 let val = record ? record[`module_${i}`] : '';
-                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}"></td>`;
+                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
+                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}" ${disabledAttr}></td>`;
             }
             // Activities 1-10
             for(let i=1; i<=10; i++) {
                 let val = record ? record[`activity_${i}`] : '';
-                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}"></td>`;
+                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
+                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}" ${disabledAttr}></td>`;
             }
             // AT, PT1, PT2, QE
             const fields = { 'at': 'at', 'pt_1': 'pt_1', 'pt_2': 'pt_2', 'qe': 'qe' };
             Object.keys(fields).forEach(f => {
                 let val = record ? record[f] : '';
-                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}"></td>`;
+                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
+                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}" ${disabledAttr}></td>`;
             });
 
             tr.innerHTML = html;
@@ -297,7 +363,11 @@
             const faciId = localStorage.getItem('faci_id');
 
             if (!currentSectionId || !faciId) {
-                alert("Session invalid or Section ID not found. Refresh the page.");
+                showAlert(
+                    "Session Error", 
+                    "Session invalid or Section ID not found. Please refresh the page.", 
+                    "#f59e0b"
+                );
                 return;
             }
 
@@ -337,7 +407,10 @@
 
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
-                setTimeout(() => { 
+                
+                // Reload data to apply locks to newly submitted scores
+                setTimeout(async () => { 
+                    await loadClassRecordData(sectionTitle);
                     btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
                     btn.style.background = 'var(--accent-blue)';
                     btn.disabled = false;
@@ -345,7 +418,11 @@
 
             } catch (error) {
                 console.error("Error saving:", error);
-                alert("Error: " + error.message);
+                showAlert(
+                    "System Error", 
+                    "Failed to submit records: " + error.message, 
+                    "#ef4444"
+                );
                 btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
                 btn.style.background = 'var(--accent-blue)';
                 btn.disabled = false;
