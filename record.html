@@ -33,6 +33,14 @@
         .header-flex { display: flex; justify-content: space-between; align-items: center; }
         .header-flex h1 { font-size: 1.5rem; font-weight: 800; }
 
+        /* ADDED: Date Navigator CSS pareho sa Attendance */
+        .controls-row { margin-bottom: 20px; }
+        .date-input { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); display: flex; justify-content: space-between; align-items: center; }
+        .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px; text-align: center;}
+        .date-input div { font-weight: 700; font-size: 0.95rem; text-align: center; }
+        .nav-btn { background: var(--hover-bg); border: 1px solid #e2e8f0; color: var(--text-main); border-radius: 6px; padding: 8px 16px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .nav-btn:hover { background: #e2e8f0; border-color: var(--accent-blue); color: var(--accent-blue); }
+
         .info-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; border-top: 4px solid var(--accent-blue); }
         .info-box p { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;}
         .info-box h3 { font-size: 0.95rem; font-weight: 700; margin-top: 0; }
@@ -84,12 +92,13 @@
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         
-        /* Disabled (locked) inputs */
+        /* Disabled (locked) inputs styling */
         .score-input:disabled {
             background-color: #e2e8f0;
             color: #94a3b8;
             cursor: not-allowed;
             border: 1px solid #cbd5e1;
+            opacity: 0.7;
         }
 
         .submit-btn {
@@ -137,6 +146,17 @@
                 <h1>Class Record</h1>
                 <p style="font-size: 0.8rem; color: var(--text-sub);">All scores — <span id="headerSection">...</span></p>
             </div>
+        </div>
+    </div>
+
+    <div class="controls-row">
+        <div class="date-input">
+            <button onclick="changeDate(-1)" class="nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
+            <div>
+                <label><i class="fa-regular fa-calendar"></i> Recording Date</label>
+                <div id="currentDateDisplay">...</div>
+            </div>
+            <button onclick="changeDate(1)" class="nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
     </div>
 
@@ -198,7 +218,7 @@
         </div>
     </div>
 
-    <button class="submit-btn" id="submitBtn">
+    <button class="submit-btn" id="submitBtn" data-locked="false">
         <i class="fa-solid fa-paper-plane"></i> Submit Records
     </button>
 
@@ -224,10 +244,7 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentSectionId = null;
-
-        // START DATE SANG KLASE (I-edit mo ini base sa actual start date nyo)
-        // Format: YYYY-MM-DD. Kung ang current date is before this, ma-block ang submission.
-        const CLASS_START_DATE = new Date('2026-08-01'); 
+        let currentDateObj = new Date();
 
         // CUSTOM ALERT LOGIC WITH CALLBACK
         let alertCallback = null;
@@ -246,6 +263,37 @@
                 alertCallback(); 
                 alertCallback = null;
             }
+        }
+
+        // DATE NAVIGATOR FUNCTIONS
+        function updateDateDisplay() {
+            const dateStr = currentDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            document.getElementById('currentDateDisplay').textContent = dateStr;
+        }
+
+        async function changeDate(offset) {
+            let tempDate = new Date(currentDateObj);
+            tempDate.setDate(tempDate.getDate() + offset);
+
+            let today = new Date();
+            today.setHours(0,0,0,0);
+            let checkDate = new Date(tempDate);
+            checkDate.setHours(0,0,0,0);
+
+            // RESTRICTION: Block future dates completely
+            if (checkDate > today) {
+                showAlert(
+                    "Action Restricted", 
+                    "Class hasn't started yet. You cannot record scores for future dates.", 
+                    "#f59e0b"
+                );
+                return; 
+            }
+
+            currentDateObj = tempDate;
+            updateDateDisplay();
+            const section = localStorage.getItem('faci_section');
+            await loadClassRecordData(section); 
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -267,6 +315,7 @@
             document.getElementById('infoSection').textContent = sectionTitle;
             document.getElementById('infoSubject').textContent = subject.substring(0, 15);
 
+            updateDateDisplay();
             await loadClassRecordData(sectionTitle);
         });
 
@@ -287,7 +336,23 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                const { data: existingRecords } = await supabaseClient.from('class_records').select('*').eq('section_id', currentSectionId);
+                // FILTER BY SELECTED DATE AND SECTION
+                const dateStr = document.getElementById('currentDateDisplay').textContent;
+                const { data: existingRecords } = await supabaseClient
+                    .from('class_records')
+                    .select('*')
+                    .eq('section_id', currentSectionId)
+                    .eq('date', dateStr);
+
+                // CHECK IF PAST DATE & HAS RECORDS -> LOCK
+                let today = new Date();
+                today.setHours(0,0,0,0);
+                let checkDate = new Date(currentDateObj);
+                checkDate.setHours(0,0,0,0);
+
+                const isPastDate = checkDate < today;
+                const isAlreadySubmitted = existingRecords && existingRecords.length > 0;
+                const isLocked = isPastDate && isAlreadySubmitted;
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
@@ -301,12 +366,24 @@
 
                 if (males.length > 0) {
                     tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2"><i class="fa-solid fa-mars"></i> MALE</td><td colspan="39"></td></tr>`;
-                    males.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
+                    males.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords, isLocked)));
                 }
 
                 if (females.length > 0) {
                     tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2" style="color: #ec4899;"><i class="fa-solid fa-venus"></i> FEMALE</td><td colspan="39"></td></tr>`;
-                    females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
+                    females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords, isLocked)));
+                }
+
+                // Update UI sang Submit Button kon locked
+                const submitBtn = document.getElementById('submitBtn');
+                if (isLocked) {
+                    submitBtn.style.background = '#94a3b8'; // Grayish indicate locked
+                    submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Record Finalized';
+                    submitBtn.dataset.locked = "true";
+                } else {
+                    submitBtn.style.background = 'var(--accent-blue)';
+                    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
+                    submitBtn.dataset.locked = "false";
                 }
 
             } catch (error) {
@@ -315,7 +392,7 @@
             }
         }
 
-        function createInputRow(student, index, existingRecords) {
+        function createInputRow(student, index, existingRecords, isLocked) {
             const tr = document.createElement('tr');
             tr.className = 'student-data-row';
             tr.dataset.uuid = student.id; 
@@ -327,24 +404,24 @@
                 <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
             `;
 
+            // If the day is locked, apply disabled attribute to ALL inputs
+            let baseDisabledAttr = isLocked ? 'disabled' : '';
+
             // Modules 1-25
             for(let i=1; i<=25; i++) {
                 let val = record ? record[`module_${i}`] : '';
-                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
-                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}" ${disabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}" ${baseDisabledAttr}></td>`;
             }
             // Activities 1-10
             for(let i=1; i<=10; i++) {
                 let val = record ? record[`activity_${i}`] : '';
-                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
-                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}" ${disabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}" ${baseDisabledAttr}></td>`;
             }
             // AT, PT1, PT2, QE
             const fields = { 'at': 'at', 'pt_1': 'pt_1', 'pt_2': 'pt_2', 'qe': 'qe' };
             Object.keys(fields).forEach(f => {
                 let val = record ? record[f] : '';
-                let disabledAttr = (val !== null && val !== '') ? 'disabled' : '';
-                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}" ${disabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}" ${baseDisabledAttr}></td>`;
             });
 
             tr.innerHTML = html;
@@ -363,6 +440,17 @@
             const btn = document.getElementById('submitBtn');
             const sectionTitle = localStorage.getItem('faci_section');
             const faciId = localStorage.getItem('faci_id');
+            const dateStr = document.getElementById('currentDateDisplay').textContent;
+
+            // RESTRICTION: Block submission if already locked
+            if (btn.dataset.locked === "true") {
+                showAlert(
+                    "Record Locked", 
+                    "Class already finished. You cannot edit previous records.", 
+                    "#64748b" 
+                );
+                return;
+            }
 
             if (!currentSectionId || !faciId) {
                 showAlert(
@@ -373,31 +461,18 @@
                 return;
             }
 
-            // --- RESTRICTION 1: ADVANCE DATE CHECK ---
-            let today = new Date();
-            today.setHours(0,0,0,0);
-            if (today < CLASS_START_DATE) {
-                showAlert(
-                    "Action Restricted", 
-                    "Class hasn't started yet. You cannot submit scores in advance.", 
-                    "#f59e0b"
-                );
-                return;
-            }
-
-            // --- RESTRICTION 2: EMPTY INPUT CHECK ---
-            let hasNewInput = false;
+            // RESTRICTION: Empty Input Blocker
+            let hasScore = false;
             document.querySelectorAll('.score-input').forEach(input => {
-                // If it's not disabled (newly typed) and not blank
-                if (!input.disabled && input.value.trim() !== "") {
-                    hasNewInput = true;
+                if (input.value.trim() !== "") {
+                    hasScore = true;
                 }
             });
 
-            if (!hasNewInput) {
+            if (!hasScore) {
                 showAlert(
                     "No Data to Submit", 
-                    "Please input at least one new score before submitting. Blank submissions are not allowed.", 
+                    "Please input at least one score before submitting. Blank submissions are not allowed.", 
                     "#ef4444"
                 );
                 return;
@@ -408,7 +483,8 @@
                 const studUuid = row.dataset.uuid;
                 let dataObj = {
                     student_id: studUuid,
-                    section_id: currentSectionId
+                    section_id: currentSectionId,
+                    date: dateStr // ADDED DATE SO IT SAVES BY DAY
                 };
 
                 row.querySelectorAll('.score-input').forEach(input => {
@@ -422,11 +498,12 @@
             btn.disabled = true;
 
             try {
-                // 1. Delete old records for this section
+                // 1. Delete old records for this section AND DATE to prevent duplicates
                 const { error: deleteError } = await supabaseClient
                     .from('class_records')
                     .delete()
-                    .eq('section_id', currentSectionId);
+                    .eq('section_id', currentSectionId)
+                    .eq('date', dateStr);
 
                 if (deleteError) throw deleteError;
 
@@ -440,11 +517,8 @@
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
                 
-                // Reload data to apply locks to newly submitted scores
                 setTimeout(async () => { 
-                    await loadClassRecordData(sectionTitle);
-                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Records';
-                    btn.style.background = 'var(--accent-blue)';
+                    await loadClassRecordData(sectionTitle); 
                     btn.disabled = false;
                 }, 2000);
 
