@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Profile</title>
-    <!-- PWA MANIFEST & FAVICON -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link rel="apple-touch-icon" href="logo.jpg">
@@ -84,12 +83,8 @@
             font-weight: 600;
         }
 
-        .profile-avatar-container:hover .profile-overlay {
-            opacity: 1;
-        }
-        .profile-avatar-container:hover .profile-avatar {
-            transform: scale(1.05);
-        }
+        .profile-avatar-container:hover .profile-overlay { opacity: 1; }
+        .profile-avatar-container:hover .profile-avatar { transform: scale(1.05); }
 
         .profile-name { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
         .profile-role { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 15px; font-weight: 500;}
@@ -128,6 +123,16 @@
         .info-text { flex-grow: 1; }
         .info-label { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 2px;}
         .info-value { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+
+        /* --- Co-Facilitators Styling --- */
+        .co-faci-row {
+            display: flex; align-items: center; gap: 12px; padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .co-faci-row:last-child { border-bottom: none; }
+        .co-faci-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; }
+        .co-faci-name { font-size: 0.9rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
+        .co-faci-role-text { font-size: 0.7rem; color: var(--accent-blue); font-weight: 600; background: #eff6ff; padding: 2px 8px; border-radius: 12px; display: inline-block;}
 
         .logout-btn {
             width: 100%; padding: 16px; background: #fee2e2; color: #dc2626; border: none;
@@ -221,6 +226,13 @@
             </div>
         </div>
 
+        <h3 class="section-title">Co-Facilitators</h3>
+        <div class="info-card" id="coFaciContainer">
+            <div style="text-align:center; padding: 15px; color: var(--text-sub); font-size: 0.8rem;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Loading partners...
+            </div>
+        </div>
+
         <button class="logout-btn" onclick="faciLogout()">
             <i class="fa-solid fa-arrow-right-from-bracket"></i> Log out
         </button>
@@ -255,7 +267,7 @@
             document.getElementById('cardSection').textContent = section;
             document.getElementById('cardSubject').textContent = subject;
 
-            // 🌟 LIVE DATA FETCH HALIN SA FACILITATORS TABLE 🌟
+            // 🌟 FETCH CURRENT FACILITATOR DATA 🌟
             try {
                 const { data: faciData } = await supabaseClient
                     .from('facilitators')
@@ -283,6 +295,44 @@
                 document.getElementById('faciName').textContent = fullName;
             }
 
+            // 🌟 FETCH CO-FACILITATORS IN THE SAME SECTION 🌟
+            try {
+                const { data: coFacis, error: coFaciErr } = await supabaseClient
+                    .from('facilitators')
+                    .select('full_name, avatar_url')
+                    .eq('section', section);
+
+                if (coFaciErr) throw coFaciErr;
+
+                const coFaciContainer = document.getElementById('coFaciContainer');
+                
+                // Filter out ang kaugalingon niya nga name para iban lang ang makita
+                const filteredFacis = coFacis.filter(f => f.full_name !== fullName);
+
+                if (filteredFacis.length === 0) {
+                    coFaciContainer.innerHTML = '<div style="text-align:center; padding: 20px 10px; color: var(--text-sub); font-size: 0.85rem;"><i class="fa-solid fa-user-shield" style="font-size: 1.5rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>You are the only facilitator assigned to this section.</div>';
+                } else {
+                    let coFaciHTML = '';
+                    filteredFacis.forEach(f => {
+                        const avatar = f.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.full_name)}&background=e2e8f0&color=475569`;
+                        coFaciHTML += `
+                            <div class="co-faci-row">
+                                <img src="${avatar}" class="co-faci-avatar" alt="Avatar">
+                                <div>
+                                    <p class="co-faci-name">${f.full_name}</p>
+                                    <span class="co-faci-role-text">Co-Facilitator</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    coFaciContainer.innerHTML = coFaciHTML;
+                }
+            } catch (err) {
+                console.error("Error loading co-facilitators:", err);
+                document.getElementById('coFaciContainer').innerHTML = '<div style="text-align:center; padding: 15px; color: #ef4444; font-size: 0.8rem;">Failed to load co-facilitators.</div>';
+            }
+
+            // 🌟 FETCH ATTENDANCE STATS 🌟
             try {
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
@@ -332,7 +382,6 @@
                     const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); 
 
                     try {
-                        // Mag update diritso sa facilitators table
                         const { error } = await supabaseClient
                             .from('facilitators')
                             .update({ avatar_url: compressedBase64 })
