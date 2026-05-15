@@ -42,7 +42,6 @@
         .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px;}
         .date-input div { font-weight: 700; font-size: 0.9rem; }
 
-        /* Date Navigator Buttons */
         .nav-btn {
             background: var(--input-bg); border: 1px solid #e2e8f0; color: var(--text-main);
             border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: 0.2s;
@@ -73,7 +72,6 @@
         .attendance-options { display: flex; gap: 8px; flex-wrap: wrap; }
         .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: 0.2s; }
         
-        /* Active Highlights */
         .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; }
         .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; }
         .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; }
@@ -90,7 +88,6 @@
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
 
-        /* CUSTOM MODAL STYLES */
         .custom-alert-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
@@ -112,6 +109,17 @@
             border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
         }
         .custom-alert-btn:hover { background: #334155; }
+
+        /* LIVE UPDATE TOAST NOTIFICATION */
+        .toast-notification {
+            visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
+            text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
+            right: 20px; top: 20px; font-size: 0.85rem; font-weight: bold;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
     </style>
 </head>
 <body>
@@ -180,14 +188,17 @@
         </div>
     </div>
 
+    <div id="updateToast" class="toast-notification">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        <span id="updateToastMsg">Live Update: Teacher modified the attendance.</span>
+    </div>
+
     <script>
-        // UPDATED: Render Backend URL
         const API_URL = 'https://teacher-panel-d1kw.onrender.com';
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // CUSTOM ALERT LOGIC
         function showAlert(title, message, iconColor = 'var(--accent-blue)') {
             document.getElementById('customAlertTitle').textContent = title;
             document.getElementById('customAlertMessage').textContent = message;
@@ -199,7 +210,13 @@
             document.getElementById('customAlertOverlay').classList.remove('show');
         }
 
-        // DATE NAVIGATION LOGIC
+        function showUpdateToast(message) {
+            const toast = document.getElementById('updateToast');
+            document.getElementById('updateToastMsg').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
         let currentDateObj = new Date();
 
         function updateDateDisplay() {
@@ -217,11 +234,10 @@
             checkDate.setHours(0,0,0,0);
 
             if (checkDate > today) {
-                // GAMITON NA NATON ANG CUSTOM ALERT
                 showAlert(
                     "Action Restricted", 
                     "You cannot log attendance for a schedule that has not yet occurred.", 
-                    "#f59e0b" // Orange color for warning
+                    "#f59e0b"
                 );
                 return;
             }
@@ -246,7 +262,38 @@
 
             updateDateDisplay();
             await loadDynamicStudents(section);
+
+            // REALTIME LISTENER SANG FACI PANEL
+            listenForTeacherUpdates();
         });
+
+        // --- REALTIME LISTENER FUNCTION ---
+        function listenForTeacherUpdates() {
+            supabaseClient
+                .channel('public:attendance_faci')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'attendance' },
+                    (payload) => {
+                        console.log('Attendance updated by teacher!', payload);
+                        
+                        const section = localStorage.getItem('faci_section');
+                        const affectedSection = payload.new?.section || payload.old?.section;
+                        
+                        if (affectedSection === section) {
+                            const dateStr = document.getElementById('currentDateDisplay').textContent;
+                            const affectedDate = payload.new?.date || payload.old?.date;
+                            
+                            // Load liwat kon ang gin edit sang teacher is ang adlaw nga gina view subong
+                            if (affectedDate === dateStr) {
+                                loadDynamicStudents(section);
+                                showUpdateToast("Live Update: Teacher modified the attendance.");
+                            }
+                        }
+                    }
+                )
+                .subscribe();
+        }
 
         async function loadDynamicStudents(sectionTitle) {
             const container = document.getElementById('studentListContainer');
@@ -400,7 +447,6 @@
             });
         }
 
-        // SUBMIT AND UPDATE DATABASE
         document.getElementById('submitBtn').addEventListener('click', async () => {
             const btn = document.getElementById('submitBtn');
 
