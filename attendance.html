@@ -89,6 +89,29 @@
         .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+
+        /* CUSTOM MODAL STYLES */
+        .custom-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
+        .custom-alert-box {
+            background: var(--panel-bg); padding: 25px 20px; border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
+            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid #e2e8f0;
+        }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
+        .custom-alert-icon { font-size: 3rem; color: var(--accent-blue); margin-bottom: 15px; }
+        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-btn {
+            background: var(--text-main); color: white; border: none; padding: 12px 20px;
+            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+        }
+        .custom-alert-btn:hover { background: #334155; }
     </style>
 </head>
 <body>
@@ -148,12 +171,33 @@
         <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
     </nav>
 
+    <div id="customAlertOverlay" class="custom-alert-overlay">
+        <div class="custom-alert-box">
+            <i class="fa-solid fa-circle-exclamation custom-alert-icon"></i>
+            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
+            <p id="customAlertMessage" class="custom-alert-msg"></p>
+            <button onclick="closeAlert()" class="custom-alert-btn">Understood</button>
+        </div>
+    </div>
+
     <script>
         // UPDATED: Render Backend URL
         const API_URL = 'https://teacher-panel-d1kw.onrender.com';
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // CUSTOM ALERT LOGIC
+        function showAlert(title, message, iconColor = 'var(--accent-blue)') {
+            document.getElementById('customAlertTitle').textContent = title;
+            document.getElementById('customAlertMessage').textContent = message;
+            document.querySelector('.custom-alert-icon').style.color = iconColor;
+            document.getElementById('customAlertOverlay').classList.add('show');
+        }
+
+        function closeAlert() {
+            document.getElementById('customAlertOverlay').classList.remove('show');
+        }
 
         // DATE NAVIGATION LOGIC
         let currentDateObj = new Date();
@@ -167,21 +211,25 @@
             let tempDate = new Date(currentDateObj);
             tempDate.setDate(tempDate.getDate() + offset);
 
-            // ADDED RESTRICTION: Check if future date
             let today = new Date();
             today.setHours(0,0,0,0);
             let checkDate = new Date(tempDate);
             checkDate.setHours(0,0,0,0);
 
             if (checkDate > today) {
-                alert("Attendance for future dates cannot be recorded at this time.");
-                return; // Stop execution, do not advance date
+                // GAMITON NA NATON ANG CUSTOM ALERT
+                showAlert(
+                    "Action Restricted", 
+                    "You cannot log attendance for a schedule that has not yet occurred.", 
+                    "#f59e0b" // Orange color for warning
+                );
+                return;
             }
 
             currentDateObj = tempDate;
             updateDateDisplay();
             const section = localStorage.getItem('faci_section');
-            await loadDynamicStudents(section); // Reload data based on new date
+            await loadDynamicStudents(section); 
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -189,7 +237,6 @@
             const subject = localStorage.getItem('faci_subject') || 'Subject';
             const faciId = localStorage.getItem('faci_id');
 
-            // SECURITY FIX: Prevent unauthorized access
             if (!faciId || !section) {
                 window.location.href = 'login.html'; 
                 return;
@@ -197,7 +244,7 @@
 
             document.getElementById('subjectDisplay').textContent = subject.substring(0, 7) + '...';
 
-            updateDateDisplay(); // Show initial date (today)
+            updateDateDisplay();
             await loadDynamicStudents(section);
         });
 
@@ -206,7 +253,6 @@
             container.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i></div>';
 
             try {
-                // 1. Fetch Section Info
                 const { data: sections } = await supabaseClient.from('sections').select('id, semester').eq('title', sectionTitle);
                 
                 if (!sections || sections.length === 0) {
@@ -217,7 +263,6 @@
                 const semester = sections[0].semester || '1st Sem'; 
                 document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle}`;
 
-                // 2. Fetch Students specifically tied to this section ID
                 const { data: students } = await supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name');
                 
                 if (!students || students.length === 0) {
@@ -228,7 +273,6 @@
 
                 document.getElementById('statTotal').textContent = students.length;
 
-                // 3. FETCH EXISTING ATTENDANCE FOR SELECTED DATE strictly filtering by sectionTitle
                 const dateStr = document.getElementById('currentDateDisplay').textContent;
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
@@ -236,7 +280,6 @@
                     .eq('section', sectionTitle)
                     .eq('date', dateStr);
 
-                // ADDED RESTRICTION: Check if it's a previous date & already submitted
                 let today = new Date();
                 today.setHours(0,0,0,0);
                 let checkDate = new Date(currentDateObj);
@@ -261,13 +304,12 @@
                 
                 container.innerHTML = html;
                 attachButtonListeners();
-                updateStats(); // Update Top Numbers base sa gina-load nga data
+                updateStats();
 
-                // Update UI sang Submit Button kon locked
                 const submitBtn = document.getElementById('submitBtn');
                 if (isLocked) {
-                    submitBtn.style.background = '#94a3b8'; // Grayish indicate locked
-                    submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Class Already Finished';
+                    submitBtn.style.background = '#94a3b8'; 
+                    submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Record Finalized';
                     submitBtn.dataset.locked = "true";
                 } else {
                     submitBtn.style.background = 'var(--accent-blue)';
@@ -285,7 +327,6 @@
             const num = index.toString().padStart(2, '0');
             const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
 
-            // CHECK KUNG MAY NA-SUBMIT NA NGA RECORD INI NGA ESTUDYANTE
             const record = attendanceData ? attendanceData.find(a => a.student_id_no === student.id_no || a.student_name === student.full_name) : null;
             
             let preP = '', preA = '', preL = '', preE = '';
@@ -299,7 +340,6 @@
                 rem = record.remarks || '';
             }
 
-            // ADDED RESTRICTION: Disable inputs kon naka lock
             const disabledBtnAttr = isLocked ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '';
             const disabledInputAttr = isLocked ? 'disabled style="opacity:0.6; background:#e2e8f0; cursor:not-allowed;"' : '';
 
@@ -326,7 +366,6 @@
             document.querySelectorAll('.student-card').forEach(card => {
                 const buttons = card.querySelectorAll('.opt-btn');
                 buttons.forEach(btn => {
-                    // Prevent click events if button is disabled
                     if (!btn.disabled) {
                         btn.addEventListener('click', () => {
                             buttons.forEach(b => b.classList.remove('active'));
@@ -365,9 +404,12 @@
         document.getElementById('submitBtn').addEventListener('click', async () => {
             const btn = document.getElementById('submitBtn');
 
-            // ADDED RESTRICTION: Block submission if already locked
             if (btn.dataset.locked === "true") {
-                alert("Class already finished. You cannot edit previous attendance.");
+                showAlert(
+                    "Record Locked", 
+                    "The attendance for this session has already been finalized and cannot be modified.", 
+                    "#64748b" 
+                );
                 return;
             }
 
@@ -392,7 +434,7 @@
                     allMarked = false;
                 } else {
                     let statusText = activeBtn.textContent.trim();
-                    if(statusText === 'Excused') statusText = 'Excused'; // ensure correct casing
+                    if(statusText === 'Excused') statusText = 'Excused';
                     
                     attendanceData.push({
                         date: dateStr,
@@ -408,7 +450,11 @@
             });
 
             if (!allMarked) {
-                alert("Please mark the attendance for ALL students before submitting.");
+                showAlert(
+                    "Incomplete Data", 
+                    "Please mark the attendance status for all students before submitting.", 
+                    "#ef4444" 
+                );
                 return;
             }
 
@@ -416,10 +462,8 @@
             btn.disabled = true;
 
             try {
-                // DELETE EXISTING RECORDS FOR THIS DATE/SECTION TO AVOID DUPLICATES
                 await supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
 
-                // INSERT NEW RECORDS VIA FLASK API
                 const response = await fetch(`${API_URL}/api/attendance/submit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -431,7 +475,6 @@
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
                     
                     setTimeout(async () => { 
-                        // Reload dynamic students to re-evaluate the lock status after submitting
                         await loadDynamicStudents(section); 
                         btn.disabled = false;
                     }, 2000);
@@ -440,7 +483,11 @@
                 }
             } catch (error) {
                 console.error("Error submitting:", error);
-                alert("Failed to submit. Please ensure backend is running.");
+                showAlert(
+                    "System Error", 
+                    "Failed to submit attendance. Please verify your network connection.", 
+                    "#ef4444" 
+                );
                 btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
                 btn.style.background = 'var(--accent-blue)';
                 btn.disabled = false;
