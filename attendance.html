@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Attendance</title>
-    <!-- PWA MANIFEST & FAVICON -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link rel="apple-touch-icon" href="logo.jpg">
@@ -138,7 +137,7 @@
         </div>
     </div>
 
-    <button class="submit-btn" id="submitBtn">
+    <button class="submit-btn" id="submitBtn" data-locked="false">
         <i class="fa-solid fa-paper-plane"></i> Submit Attendance
     </button>
 
@@ -165,7 +164,21 @@
         }
 
         async function changeDate(offset) {
-            currentDateObj.setDate(currentDateObj.getDate() + offset);
+            let tempDate = new Date(currentDateObj);
+            tempDate.setDate(tempDate.getDate() + offset);
+
+            // ADDED RESTRICTION: Check if future date
+            let today = new Date();
+            today.setHours(0,0,0,0);
+            let checkDate = new Date(tempDate);
+            checkDate.setHours(0,0,0,0);
+
+            if (checkDate > today) {
+                alert("Class hasn't started yet.");
+                return; // Stop execution, do not advance date
+            }
+
+            currentDateObj = tempDate;
             updateDateDisplay();
             const section = localStorage.getItem('faci_section');
             await loadDynamicStudents(section); // Reload data based on new date
@@ -222,23 +235,45 @@
                     .select('*')
                     .eq('section', sectionTitle)
                     .eq('date', dateStr);
-                
+
+                // ADDED RESTRICTION: Check if it's a previous date & already submitted
+                let today = new Date();
+                today.setHours(0,0,0,0);
+                let checkDate = new Date(currentDateObj);
+                checkDate.setHours(0,0,0,0);
+
+                const isPastDate = checkDate < today;
+                const isAlreadySubmitted = attendanceData && attendanceData.length > 0;
+                const isLocked = isPastDate && isAlreadySubmitted;
+
                 let html = '';
                 const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
                 const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
                 
                 if(males.length > 0) {
                     html += '<div class="gender-divider">👶 MALE</div>';
-                    males.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Male', attendanceData); });
+                    males.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Male', attendanceData, isLocked); });
                 }
                 if(females.length > 0) {
                     html += '<div class="gender-divider">💆‍♀️ FEMALE</div>';
-                    females.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Female', attendanceData); });
+                    females.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Female', attendanceData, isLocked); });
                 }
                 
                 container.innerHTML = html;
                 attachButtonListeners();
                 updateStats(); // Update Top Numbers base sa gina-load nga data
+
+                // Update UI sang Submit Button kon locked
+                const submitBtn = document.getElementById('submitBtn');
+                if (isLocked) {
+                    submitBtn.style.background = '#94a3b8'; // Grayish indicate locked
+                    submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Class Already Finished';
+                    submitBtn.dataset.locked = "true";
+                } else {
+                    submitBtn.style.background = 'var(--accent-blue)';
+                    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
+                    submitBtn.dataset.locked = "false";
+                }
 
             } catch (error) {
                 console.error("Error fetching students:", error);
@@ -246,7 +281,7 @@
             }
         }
 
-        function generateStudentCard(student, index, gender, attendanceData) {
+        function generateStudentCard(student, index, gender, attendanceData, isLocked) {
             const num = index.toString().padStart(2, '0');
             const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
 
@@ -264,6 +299,10 @@
                 rem = record.remarks || '';
             }
 
+            // ADDED RESTRICTION: Disable inputs kon naka lock
+            const disabledBtnAttr = isLocked ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '';
+            const disabledInputAttr = isLocked ? 'disabled style="opacity:0.6; background:#e2e8f0; cursor:not-allowed;"' : '';
+
             return `
             <div class="student-card student-item">
                 <div class="student-info">
@@ -274,12 +313,12 @@
                     <span class="${tagClass}">${gender}</span>
                 </div>
                 <div class="attendance-options">
-                    <button class="opt-btn present ${preP}">Present</button>
-                    <button class="opt-btn absent ${preA}">Absent</button>
-                    <button class="opt-btn late ${preL}">Late</button>
-                    <button class="opt-btn excuse ${preE}">Excused</button>
+                    <button class="opt-btn present ${preP}" ${disabledBtnAttr}>Present</button>
+                    <button class="opt-btn absent ${preA}" ${disabledBtnAttr}>Absent</button>
+                    <button class="opt-btn late ${preL}" ${disabledBtnAttr}>Late</button>
+                    <button class="opt-btn excuse ${preE}" ${disabledBtnAttr}>Excused</button>
                 </div>
-                <input type="text" class="remarks-input" value="${rem}" placeholder="Add optional remark...">
+                <input type="text" class="remarks-input" value="${rem}" placeholder="Add optional remark..." ${disabledInputAttr}>
             </div>`;
         }
 
@@ -287,11 +326,14 @@
             document.querySelectorAll('.student-card').forEach(card => {
                 const buttons = card.querySelectorAll('.opt-btn');
                 buttons.forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        buttons.forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        updateStats();
-                    });
+                    // Prevent click events if button is disabled
+                    if (!btn.disabled) {
+                        btn.addEventListener('click', () => {
+                            buttons.forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            updateStats();
+                        });
+                    }
                 });
             });
         }
@@ -322,6 +364,13 @@
         // SUBMIT AND UPDATE DATABASE
         document.getElementById('submitBtn').addEventListener('click', async () => {
             const btn = document.getElementById('submitBtn');
+
+            // ADDED RESTRICTION: Block submission if already locked
+            if (btn.dataset.locked === "true") {
+                alert("Class already finished. You cannot edit previous attendance.");
+                return;
+            }
+
             const dateStr = document.getElementById('currentDateDisplay').textContent;
             const section = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject');
@@ -380,9 +429,10 @@
                 if (response.ok) {
                     btn.style.background = '#10b981';
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
-                    setTimeout(() => { 
-                        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
-                        btn.style.background = 'var(--accent-blue)';
+                    
+                    setTimeout(async () => { 
+                        // Reload dynamic students to re-evaluate the lock status after submitting
+                        await loadDynamicStudents(section); 
                         btn.disabled = false;
                     }, 2000);
                 } else {
