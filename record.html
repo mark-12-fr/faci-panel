@@ -135,6 +135,17 @@
             font-family: 'Inter', sans-serif;
         }
         .custom-alert-btn:hover { background: #334155; }
+
+        /* LIVE UPDATE TOAST NOTIFICATION */
+        .toast-notification {
+            visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
+            text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
+            right: 20px; top: 20px; font-size: 0.85rem; font-weight: bold;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
     </style>
 </head>
 <body>
@@ -238,6 +249,11 @@
         </div>
     </div>
 
+    <div id="updateToast" class="toast-notification">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
@@ -263,6 +279,14 @@
                 alertCallback(); 
                 alertCallback = null;
             }
+        }
+
+        // Live Update Toast Function
+        function showUpdateToast(message) {
+            const toast = document.getElementById('updateToast');
+            document.getElementById('updateToastMsg').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
         // DATE NAVIGATOR FUNCTIONS
@@ -317,7 +341,33 @@
 
             updateDateDisplay();
             await loadClassRecordData(sectionTitle);
+
+            // TINAWAG NGA REALTIME LISTENER SANG FACI
+            listenForTeacherUpdates();
         });
+
+        // --- REALTIME LISTENER FUNCTION (TEACHER TO FACI) ---
+        function listenForTeacherUpdates() {
+            supabaseClient
+                .channel('public:class_records_faci')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'class_records' },
+                    (payload) => {
+                        console.log('Detected change in DB:', payload);
+                        
+                        if (currentSectionId && 
+                            ((payload.new && payload.new.section_id == currentSectionId) || 
+                             (payload.old && payload.old.section_id == currentSectionId))) {
+                            
+                            const sectionTitle = localStorage.getItem('faci_section');
+                            loadClassRecordData(sectionTitle);
+                            showUpdateToast("Live Update: A score was modified by the Teacher.");
+                        }
+                    }
+                )
+                .subscribe();
+        }
 
         async function loadClassRecordData(sectionTitle) {
             const tbody = document.getElementById('recordTableBody');
