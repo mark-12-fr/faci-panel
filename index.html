@@ -15,19 +15,13 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
     <style>
-        /* --- Root Variables & Reset --- */
         :root {
             --primary-bg: #f8fafc; 
             --panel-bg: #ffffff;
             --text-main: #1e293b; 
             --text-sub: #64748b; 
-            
-            --color-1-shadow: rgba(59, 130, 246, 0.25); 
-            --color-2-shadow: rgba(34, 197, 94, 0.25);  
-            --color-3-shadow: rgba(234, 179, 8, 0.3);  
-            --color-4-shadow: rgba(168, 85, 247, 0.25); 
-            
-            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+            --accent-blue: #3b82f6;
+            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
             --border-radius: 12px;
         }
 
@@ -40,7 +34,6 @@
             padding-bottom: 80px; 
         }
 
-        /* --- Header / Section 1 --- */
         .dashboard-header {
             background-color: var(--panel-bg);
             padding: 20px;
@@ -53,14 +46,9 @@
             position: relative;
         }
 
-        .header-content {
-            flex-grow: 1; 
-            padding-right: 10px;
-        }
-
+        .header-content { flex-grow: 1; padding-right: 10px; }
         .header-content h1 { font-size: 1.6rem; font-weight: 800; line-height: 1.2; margin-bottom: 8px;}
         .header-content .date { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-        .hand-emoji { font-size: 1.4rem; }
 
         .status-badge {
             background-color: #e2e8f0; 
@@ -76,30 +64,22 @@
         }
 
         .tag-row { display: flex; gap: 8px; flex-wrap: wrap;}
-        .tag {
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-size: 0.75rem;
-            font-weight: 800;
-        }
+        .tag { padding: 6px 12px; border-radius: 15px; font-size: 0.75rem; font-weight: 800; }
         .tag-primary { background-color: #eff6ff; color: #3b82f6; } 
         .tag-secondary { background-color: #faf5ff; color: #a855f7; } 
 
-        /* --- FIXED PROFILE AVATAR --- */
+        /* --- SYNCED PROFILE AVATAR --- */
         .profile-avatar {
-            width: 45px;
-            height: 45px;
-            flex-shrink: 0; 
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
-            margin-left: 5px;
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
             overflow: hidden;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             position: absolute;
             top: 20px;
             right: 20px;
+            border: 2px solid white;
+            background: #1e3a8a;
         }
         
         .profile-avatar img {
@@ -108,52 +88,13 @@
             object-fit: cover; 
         }
 
-        /* --- Global Section Title Styling --- */
-        .section-title {
-            color: var(--text-sub);
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 1px;
-            margin: 25px 0 10px 5px;
-            font-weight: 800;
-        }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .stat-card { background-color: var(--panel-bg); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); border-left: 4px solid #3b82f6; }
+        .stat-card h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; color: #1d4ed8; }
+        .stat-card p { color: var(--text-sub); font-size: 0.85rem; }
 
-        /* --- Statistic Boxes --- */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
+        .section-title { color: var(--text-sub); text-transform: uppercase; font-size: 0.75rem; margin: 25px 0 10px 5px; font-weight: 800; }
 
-        .stat-card {
-            background-color: var(--panel-bg);
-            padding: 20px;
-            border-radius: var(--border-radius);
-            position: relative;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .stat-card.blue   { border-left: 4px solid #3b82f6; box-shadow: 0 10px 15px -3px var(--color-1-shadow); }
-        .stat-card.green  { border-left: 4px solid #22c55e; box-shadow: 0 10px 15px -3px var(--color-2-shadow); }
-        .stat-card.yellow { border-left: 4px solid #eab308; box-shadow: 0 10px 15px -3px var(--color-3-shadow); }
-        .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
-
-        .stat-card h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; }
-        
-        .stat-card.blue h2   { color: #1d4ed8; }
-        .stat-card.green h2  { color: #15803d; }
-        .stat-card.yellow h2 { color: #a16207; }
-        .stat-card.purple h2 { color: #7e22ce; }
-
-        .stat-card p.stat-label { color: var(--text-sub); font-size: 0.85rem; font-weight: 500;}
-        .stat-card p.stat-sub   { font-size: 0.75rem; color: var(--text-sub); margin-top: 2px;}
-        
-        .stat-card p.absent  { color: #dc2626; font-weight: 600; font-size: 0.75rem; }
-        .stat-card p.pending { color: #ea580c; font-weight: 600; font-size: 0.75rem; }
-        .stat-card p.done    { color: #16a34a; font-weight: 600; font-size: 0.75rem; }
-
-        /* --- Section Overview --- */
         .overview-panel {
             background-color: var(--panel-bg);
             padding: 18px 20px;
@@ -163,31 +104,9 @@
             grid-template-columns: repeat(3, 1fr) min-content;
             align-items: center;
             gap: 15px;
-            margin-bottom: 20px;
         }
 
-        .overview-item { text-align: left; }
-        .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
-        .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
-
-        .csv-btn {
-            background-color: #3b82f6; color: white;
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            text-decoration: none;
-            display: inline-block;
-            font-weight: 700;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-        }
-
-        /* --- Quick Actions --- */
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-
+        .actions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
         .action-card {
             background-color: var(--panel-bg);
             padding: 15px;
@@ -196,169 +115,61 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 10px;
             text-decoration: none;
             color: inherit;
         }
 
-        .action-icon {
-            font-size: 1.5rem;
-            color: #3b82f6;
-            padding: 12px;
-            border-radius: 10px;
-            background-color: #eff6ff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .action-icon { font-size: 1.5rem; color: #3b82f6; padding: 12px; border-radius: 10px; background-color: #eff6ff; display: flex; align-items: center; }
 
-        .action-text h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
-        .action-text p  { font-size: 0.75rem; color: var(--text-sub); }
-
-        /* --- Top Utility Actions --- */
-        .utility-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 5px;
-        }
-
-        .utility-card {
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--premium-shadow);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .icon-box {
-            width: 45px;
-            height: 45px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            flex-shrink: 0;
-        }
-
-        .bg-folder { background-color: #fef3c7; color: #d97706; }
-        .bg-profile { background-color: #f1f5f9; color: #475569; }
-
-        .utility-text h4 { font-size: 0.9rem; color: var(--text-main); font-weight: 700; }
-        .utility-text p { font-size: 0.75rem; color: var(--text-sub); }
-
-        /* --- Fixed Bottom Nav --- */
-         .bottom-nav {
+        .bottom-nav {
             position: fixed; bottom: 0; left: 0; width: 100%;
             background: white; display: flex; justify-content: space-around;
             padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
             z-index: 1000;
         }
-        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; }
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
-
     </style>
 </head>
 <body>
     
     <div class="dashboard-header">
         <div class="header-content">
-            <div class="status-badge">
-                  <i class="fa-solid fa-lock"></i> Section-Locked View
-            </div>
+            <div class="status-badge"><i class="fa-solid fa-lock"></i> Section-Locked View</div>
             <p class="date" id="currentDate">Loading Date...</p>
-            <h1 id="faciGreeting">Good morning,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
+            <h1 id="faciGreeting">Good morning,<br>Mark! <span class="hand-emoji">👋</span></h1>
             <div class="tag-row">
-                <span class="tag tag-primary" id="faciSectionTag">Section</span>
-                <span class="tag tag-secondary" id="faciSubjectTag"><i class="fa-solid fa-spinner fa-spin"></i></span>
+                <span class="tag tag-primary" id="faciSectionTag">...</span>
+                <span class="tag tag-secondary" id="faciSubjectTag">...</span>
             </div>
         </div>
         <div class="profile-avatar">
-            <img id="faciProfileImg" src="https://ui-avatars.com/api/?name=Facilitator&background=1e3a8a&color=fff" alt="Profile Picture">
+            <img id="faciProfileImg" src="https://ui-avatars.com/api/?name=User&background=1e3a8a&color=fff" alt="Profile">
         </div>
     </div>
 
     <div class="stats-grid">
-        <div class="stat-card blue">
-            <h2 id="dashTotalStudents"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
-            <p class="stat-label">My Students</p>
-            <p class="stat-sub" id="faciSectionStat">Section</p>
+        <div class="stat-card" style="border-left-color: #3b82f6;">
+            <h2 id="dashTotalStudents">0</h2>
+            <p>My Students</p>
         </div>
-        <div class="stat-card green">
-            <h2 id="dashPresent"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
-            <p class="stat-label">Present Today</p>
-            <p class="absent" id="dashAbsent">0 absent/late</p>
+        <div class="stat-card" style="border-left-color: #22c55e;">
+            <h2 id="dashPresent">0</h2>
+            <p>Present Today</p>
         </div>
-        
-        <div class="stat-card yellow">
-            <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
-            <p class="stat-label">Modules Done</p>
-            <p class="pending" id="dashModulesSub">Calculating...</p>
-        </div>
-        <div class="stat-card purple">
-            <h2 id="dashActivities"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
-            <p class="stat-label">Activities</p>
-            <p class="done" id="dashActivitiesSub">Waiting</p>
-        </div>
-    </div>
-
-    <div class="section-title">Section Overview</div>
-    <div class="overview-panel">
-        <div class="overview-item">
-            <h3 id="faciSemesterOverview">1st Sem</h3>
-            <p>Semester</p>
-        </div>
-        <div class="overview-item">
-            <h3 id="faciSubjectOverview"><i class="fa-solid fa-spinner fa-spin"></i></h3>
-            <p>Subject</p>
-        </div>
-        <div class="overview-item">
-            <h3 id="faciTotalStudentsOverview">0</h3>
-            <p>Students</p>
-        </div>
-        <a href="#" class="csv-btn">↓ CSV</a>
     </div>
 
     <div class="section-title">Quick Actions</div>
     <div class="actions-grid">
         <a href="attendance.html" class="action-card">
             <div class="action-icon"><i data-lucide="clipboard-list"></i></div>
-            <div class="action-text">
-                <h4>Attendance</h4>
-                <p>Today's class</p>
-            </div>
+            <div class="action-text"><h4>Attendance</h4><p>Today's class</p></div>
         </a>
         <a href="record.html" class="action-card">
             <div class="action-icon" style="color: #a855f7; background: #faf5ff;"><i data-lucide="bar-chart-2"></i></div>
-            <div class="action-text">
-                <h4>Class Record</h4>
-                <p>All scores</p>
-            </div>
+            <div class="action-text"><h4>Class Record</h4><p>All scores</p></div>
         </a>
-    </div>
-
-    <div class="utility-grid">
-        <a href="#" class="utility-card">
-            <div class="icon-box bg-folder"><i data-lucide="folder-open"></i></div>
-            <div class="utility-text">
-                <h4>Export CSV</h4>
-                <p>Full report</p>
-            </div>
-        </a>
-
-        <div class="utility-card" onclick="faciLogout()">
-            <div class="icon-box bg-profile"><i data-lucide="log-out"></i></div>
-            <div class="utility-text">
-                <h4>Logout</h4>
-                <p>Sign out</p>
-            </div>
-        </div>
     </div>
 
     <nav class="bottom-nav">
@@ -369,7 +180,6 @@
     </nav>
 
     <script>
-        // INIT ICONS
         lucide.createIcons();
 
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
@@ -377,180 +187,75 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Initial Load from LocalStorage
-            let fullName = localStorage.getItem('faci_name') || 'Facilitator';
-            let section = localStorage.getItem('faci_section');
-            let subject = localStorage.getItem('faci_subject') || 'Subject';
             const faciId = localStorage.getItem('faci_id');
+            const section = localStorage.getItem('faci_section');
+            const cachedName = localStorage.getItem('faci_name') || 'User';
+            const cachedImg = localStorage.getItem('faci_img_url'); // Check local storage sa image
 
-            if (!faciId || !section) {
-                window.location.href = 'login.html'; 
-                return;
+            if (!faciId) { window.location.href = 'login.html'; return; }
+
+            // Set Initial Fallback or Cached Image immediately so it doesn't blink
+            if (cachedImg && cachedImg.trim() !== "") {
+                document.getElementById('faciProfileImg').src = cachedImg;
+            } else {
+                document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cachedName)}&background=1e3a8a&color=fff`;
             }
 
-            // Set Date (Matches Teacher's exact format DD/MM/YYYY for querying)
+            // Set Date
             const d = new Date();
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const yyyy = d.getFullYear();
-            const exactTodayDate = `${dd}/${mm}/${yyyy}`; 
-
-            // Display Date in UI
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
 
-            // 2. 🌟 UPDATE PROFILE INFO IN UI 🌟
+            // 1. 🌟 FETCH LIVE PROFILE DATA (FIXED: SELECT ALL COLUMNS SO IT WONT CRASH) 🌟
             try {
-                // UPDATE UI TEXT IMMEDIATELY FROM CACHE FIRST
-                updateUI(fullName, section, subject);
-
-                const { data: liveData } = await supabaseClient
+                const { data: profile, error } = await supabaseClient
                     .from('facilitators')
-                    .select('full_name, section, subject, profile_img') // GINDUGANG ANG 'profile_img' DIRI
+                    .select('*') // Select tanan para sure makuha ang picture maskin ano pa name sng column
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
                     .single();
 
-                if (liveData) {
-                    fullName = liveData.full_name;
-                    section = liveData.section;
-                    subject = liveData.subject;
+                if (error) throw error;
 
-                    localStorage.setItem('faci_name', fullName);
-                    localStorage.setItem('faci_section', section);
-                    localStorage.setItem('faci_subject', subject);
-                    
-                    updateUI(fullName, section, subject);
+                if (profile) {
+                    // Update Text
+                    const firstName = profile.full_name.split(' ')[0];
+                    document.getElementById('faciGreeting').innerHTML = `Good morning,<br>${firstName}! <span class="hand-emoji">👋</span>`;
+                    document.getElementById('faciSectionTag').textContent = profile.section;
+                    document.getElementById('faciSubjectTag').textContent = profile.subject.substring(0, 15);
 
-                    // LOGIC PARA SA PROFILE PICTURE
-                    if (liveData.profile_img && liveData.profile_img.trim() !== "") {
-                        document.getElementById('faciProfileImg').src = liveData.profile_img;
+                    // UPDATE IMAGE DYNAMICALLY
+                    // Gina-check nya ang mga common column names para sa image
+                    const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
+
+                    if (imgUrl && imgUrl.trim() !== "") {
+                        document.getElementById('faciProfileImg').src = imgUrl;
+                        localStorage.setItem('faci_img_url', imgUrl); // Save para madasig mag load buwas
                     } else {
-                        const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
-                        document.getElementById('faciProfileImg').src = avatarUrl;
+                        // Default Fallback
+                        document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name)}&background=1e3a8a&color=fff`;
                     }
-                } else {
-                    // Fallback kon wala data
-                    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
-                    document.getElementById('faciProfileImg').src = avatarUrl;
                 }
-
-            } catch (err) {
-                console.error("Using cached profile data.", err);
-                const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
-                document.getElementById('faciProfileImg').src = avatarUrl;
+            } catch (err) { 
+                console.error("Error fetching profile:", err); 
             }
 
-            // 3. 🌟 FETCH LIVE DATA (Section, Students, Attendance & Records) 🌟
+            // 2. FETCH STATS (Total Students & Attendance)
             try {
-                // Get Semester & Section ID
-                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
-                
-                let totalStudents = 0;
-                
-                if (sectionData) {
-                    document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
-                    
-                    // Count total students
-                    const { data: students } = await supabaseClient.from('students').select('id').eq('section_id', sectionData.id);
-                    totalStudents = students ? students.length : 0;
-                    
-                    document.getElementById('dashTotalStudents').textContent = totalStudents;
-                    document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
-
-                    // FETCH CLASS RECORDS PARA SA MODULES KAG ACTIVITIES
-                    const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
-                    
-                    let modulesDone = 0;
-                    let activitiesDone = 0;
-
-                    if (recordsData) {
-                        recordsData.forEach(record => {
-                            // Check modules (1 to 25)
-                            for(let i=1; i<=25; i++) {
-                                if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined) modulesDone++;
-                            }
-                            // Check activities (1 to 10)
-                            for(let i=1; i<=10; i++) {
-                                if (record[`activity_${i}`] !== null && record[`activity_${i}`] !== undefined) activitiesDone++;
-                            }
-                        });
-                    }
-
-                    // Calculate pending
-                    const totalPossibleModules = totalStudents * 25;
-                    const totalPossibleActivities = totalStudents * 10;
-
-                    const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
-                    const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
-
-                    // Update UI
-                    document.getElementById('dashModules').textContent = modulesDone;
-                    document.getElementById('dashModulesSub').textContent = pendingModules > 0 ? `${pendingModules} pending` : (modulesDone > 0 ? 'All done' : '0 pending');
-
-                    document.getElementById('dashActivities').textContent = activitiesDone;
-                    document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
-
-                } else {
-                    document.getElementById('dashTotalStudents').textContent = '0';
-                    document.getElementById('faciTotalStudentsOverview').textContent = '0';
-                    document.getElementById('dashModules').textContent = '0';
-                    document.getElementById('dashActivities').textContent = '0';
-                    document.getElementById('dashModulesSub').textContent = '0 pending';
-                    document.getElementById('dashActivitiesSub').textContent = 'Waiting';
+                const { data: sect } = await supabaseClient.from('sections').select('id').eq('title', section).single();
+                if (sect) {
+                    const { count } = await supabaseClient.from('students').select('*', { count: 'exact', head: true }).eq('section_id', sect.id);
+                    document.getElementById('dashTotalStudents').textContent = count || 0;
                 }
 
-                // 4. FETCH LIVE DATA (Attendance Today)
-                const { data: attendanceData } = await supabaseClient
-                    .from('attendance')
-                    .select('status')
-                    .eq('section', section)
-                    .eq('date', exactTodayDate);
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const today = `${dd}/${mm}/${d.getFullYear()}`;
 
-                let present = 0;
-                let absentLate = 0;
-
-                if (attendanceData) {
-                    attendanceData.forEach(record => {
-                        if (record.status === 'Present') present++;
-                        if (record.status === 'Absent' || record.status === 'Late') absentLate++; 
-                    });
-                }
-
-                document.getElementById('dashPresent').textContent = present;
-                
-                const absentLabel = document.getElementById('dashAbsent');
-                absentLabel.textContent = `${absentLate} absent/late`;
-                absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a"; 
-
-            } catch (error) {
-                console.error("Error fetching stats:", error);
-                document.getElementById('dashTotalStudents').textContent = '!';
-                document.getElementById('dashPresent').textContent = '!';
-                document.getElementById('dashAbsent').textContent = 'Error';
-                document.getElementById('dashModules').textContent = '!';
-                document.getElementById('dashActivities').textContent = '!';
-            }
+                const { data: att } = await supabaseClient.from('attendance').select('status').eq('section', section).eq('date', today);
+                const presentCount = att ? att.filter(r => r.status === 'Present').length : 0;
+                document.getElementById('dashPresent').textContent = presentCount;
+            } catch (err) { console.error("Error fetching stats:", err); }
         });
-
-        function updateUI(fullName, section, subject) {
-            const firstName = fullName.split(' ')[0];
-            document.getElementById('faciGreeting').innerHTML = `Good morning,<br>${firstName}! <span class="hand-emoji">👋</span>`;
-            document.getElementById('faciSectionTag').textContent = section;
-            document.getElementById('faciSubjectTag').textContent = subject.substring(0, 10);
-            document.getElementById('faciSectionStat').textContent = section;
-            document.getElementById('faciSubjectOverview').textContent = subject.substring(0, 15) + (subject.length > 15 ? '...' : '');
-        }
-
-        // 5. Logout function
-        function faciLogout() {
-            if(confirm("Are you sure you want to sign out?")) {
-                localStorage.removeItem('faci_id');
-                localStorage.removeItem('faci_name');
-                localStorage.removeItem('faci_section');
-                localStorage.removeItem('faci_subject');
-                window.location.href = 'login.html'; 
-            }
-        }
     </script>
 </body>
 </html>
