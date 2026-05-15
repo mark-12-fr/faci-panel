@@ -84,7 +84,7 @@
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         
-        /* ADDED: Style for disabled (locked) inputs */
+        /* Disabled (locked) inputs */
         .score-input:disabled {
             background-color: #e2e8f0;
             color: #94a3b8;
@@ -225,6 +225,10 @@
 
         let currentSectionId = null;
 
+        // START DATE SANG KLASE (I-edit mo ini base sa actual start date nyo)
+        // Format: YYYY-MM-DD. Kung ang current date is before this, ma-block ang submission.
+        const CLASS_START_DATE = new Date('2026-08-01'); 
+
         // CUSTOM ALERT LOGIC WITH CALLBACK
         let alertCallback = null;
 
@@ -323,8 +327,6 @@
                 <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
             `;
 
-            // ADDED RESTRICTION: Disable input if it already has a value in the database
-            
             // Modules 1-25
             for(let i=1; i<=25; i++) {
                 let val = record ? record[`module_${i}`] : '';
@@ -367,6 +369,36 @@
                     "Session Error", 
                     "Session invalid or Section ID not found. Please refresh the page.", 
                     "#f59e0b"
+                );
+                return;
+            }
+
+            // --- RESTRICTION 1: ADVANCE DATE CHECK ---
+            let today = new Date();
+            today.setHours(0,0,0,0);
+            if (today < CLASS_START_DATE) {
+                showAlert(
+                    "Action Restricted", 
+                    "Class hasn't started yet. You cannot submit scores in advance.", 
+                    "#f59e0b"
+                );
+                return;
+            }
+
+            // --- RESTRICTION 2: EMPTY INPUT CHECK ---
+            let hasNewInput = false;
+            document.querySelectorAll('.score-input').forEach(input => {
+                // If it's not disabled (newly typed) and not blank
+                if (!input.disabled && input.value.trim() !== "") {
+                    hasNewInput = true;
+                }
+            });
+
+            if (!hasNewInput) {
+                showAlert(
+                    "No Data to Submit", 
+                    "Please input at least one new score before submitting. Blank submissions are not allowed.", 
+                    "#ef4444"
                 );
                 return;
             }
