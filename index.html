@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Dashboard</title>
-    <!-- PWA MANIFEST & FAVICON -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link rel="apple-touch-icon" href="logo.jpg">
@@ -30,6 +29,7 @@
             
             --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
             --border-radius: 12px;
+            --accent-blue: #3b82f6;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -88,8 +88,8 @@
 
         /* --- FIXED PROFILE AVATAR --- */
         .profile-avatar {
-            width: 45px;
-            height: 45px;
+            width: 55px;
+            height: 55px;
             flex-shrink: 0; 
             border-radius: 50%;
             margin-left: 5px;
@@ -101,6 +101,7 @@
             position: absolute;
             top: 20px;
             right: 20px;
+            border: 2px solid white;
         }
         
         .profile-avatar img {
@@ -297,7 +298,6 @@
             <p class="absent" id="dashAbsent">0 absent/late</p>
         </div>
         
-        <!-- GINBUTANGAN SANG IDs PARA SA JAVASCRIPT -->
         <div class="stat-card yellow">
             <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Modules Done</p>
@@ -371,7 +371,6 @@
     </nav>
 
     <script>
-        // INIT ICONS
         lucide.createIcons();
 
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
@@ -379,7 +378,6 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Initial Load from LocalStorage
             let fullName = localStorage.getItem('faci_name') || 'Facilitator';
             let section = localStorage.getItem('faci_section');
             let subject = localStorage.getItem('faci_subject') || 'Subject';
@@ -390,25 +388,22 @@
                 return;
             }
 
-            // Set Date (Matches Teacher's exact format DD/MM/YYYY for querying)
             const d = new Date();
             const dd = String(d.getDate()).padStart(2, '0');
             const mm = String(d.getMonth() + 1).padStart(2, '0');
             const yyyy = d.getFullYear();
             const exactTodayDate = `${dd}/${mm}/${yyyy}`; 
 
-            // Display Date in UI
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
 
-            // 2. 🌟 UPDATE PROFILE INFO IN UI 🌟
+            // 1. FETCH LIVE DATA (Profile & Image)
             try {
-                // UPDATE UI TEXT IMMEDIATELY FROM CACHE FIRST
                 updateUI(fullName, section, subject);
 
                 const { data: liveData } = await supabaseClient
                     .from('facilitators')
-                    .select('full_name, section, subject')
+                    .select('full_name, section, subject, profile_img')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
                     .single();
 
@@ -422,19 +417,23 @@
                     localStorage.setItem('faci_subject', subject);
                     
                     updateUI(fullName, section, subject);
-                }
 
-                // Default Profile Picture Logic
-                const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
-                document.getElementById('faciProfileImg').src = avatarUrl;
+                    // SYNC PROFILE IMAGE
+                    if (liveData.profile_img) {
+                        document.getElementById('faciProfileImg').src = liveData.profile_img;
+                    } else {
+                        // Fallback to avatar if no image uploaded
+                        const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=1e3a8a&color=fff&size=150&bold=true`;
+                        document.getElementById('faciProfileImg').src = avatarUrl;
+                    }
+                }
 
             } catch (err) {
                 console.error("Using cached profile data.", err);
             }
 
-            // 3. 🌟 FETCH LIVE DATA (Section, Students, Attendance & Records) 🌟
+            // 2. FETCH LIVE STATS (Students, Records, Attendance)
             try {
-                // Get Semester & Section ID
                 const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
                 
                 let totalStudents = 0;
@@ -442,14 +441,12 @@
                 if (sectionData) {
                     document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
                     
-                    // Count total students
                     const { data: students } = await supabaseClient.from('students').select('id').eq('section_id', sectionData.id);
                     totalStudents = students ? students.length : 0;
                     
                     document.getElementById('dashTotalStudents').textContent = totalStudents;
                     document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
 
-                    // NEW: FETCH CLASS RECORDS PARA SA MODULES KAG ACTIVITIES
                     const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
                     
                     let modulesDone = 0;
@@ -457,41 +454,27 @@
 
                     if (recordsData) {
                         recordsData.forEach(record => {
-                            // Check modules (1 to 25)
                             for(let i=1; i<=25; i++) {
                                 if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined) modulesDone++;
                             }
-                            // Check activities (1 to 10)
                             for(let i=1; i<=10; i++) {
                                 if (record[`activity_${i}`] !== null && record[`activity_${i}`] !== undefined) activitiesDone++;
                             }
                         });
                     }
 
-                    // Calculate pending (kung pila tanan modules nga dapat na score-ran vs sa actual nga nascore-ran)
                     const totalPossibleModules = totalStudents * 25;
                     const totalPossibleActivities = totalStudents * 10;
-
                     const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
                     const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
 
-                    // Update UI
                     document.getElementById('dashModules').textContent = modulesDone;
                     document.getElementById('dashModulesSub').textContent = pendingModules > 0 ? `${pendingModules} pending` : (modulesDone > 0 ? 'All done' : '0 pending');
-
                     document.getElementById('dashActivities').textContent = activitiesDone;
                     document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
 
-                } else {
-                    document.getElementById('dashTotalStudents').textContent = '0';
-                    document.getElementById('faciTotalStudentsOverview').textContent = '0';
-                    document.getElementById('dashModules').textContent = '0';
-                    document.getElementById('dashActivities').textContent = '0';
-                    document.getElementById('dashModulesSub').textContent = '0 pending';
-                    document.getElementById('dashActivitiesSub').textContent = 'Waiting';
                 }
 
-                // 4. FETCH LIVE DATA (Attendance Today)
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
                     .select('status')
@@ -509,18 +492,12 @@
                 }
 
                 document.getElementById('dashPresent').textContent = present;
-                
                 const absentLabel = document.getElementById('dashAbsent');
                 absentLabel.textContent = `${absentLate} absent/late`;
                 absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a"; 
 
             } catch (error) {
                 console.error("Error fetching stats:", error);
-                document.getElementById('dashTotalStudents').textContent = '!';
-                document.getElementById('dashPresent').textContent = '!';
-                document.getElementById('dashAbsent').textContent = 'Error';
-                document.getElementById('dashModules').textContent = '!';
-                document.getElementById('dashActivities').textContent = '!';
             }
         });
 
@@ -533,13 +510,9 @@
             document.getElementById('faciSubjectOverview').textContent = subject.substring(0, 15) + (subject.length > 15 ? '...' : '');
         }
 
-        // 5. Logout function
         function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
-                localStorage.removeItem('faci_id');
-                localStorage.removeItem('faci_name');
-                localStorage.removeItem('faci_section');
-                localStorage.removeItem('faci_subject');
+                localStorage.clear();
                 window.location.href = 'login.html'; 
             }
         }
