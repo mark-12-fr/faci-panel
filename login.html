@@ -300,8 +300,8 @@
                 <img src="logo.jpg" alt="Logo">
             </div>
             <h1 class="splash-title">Management System</h1>
-            <p class="splash-subtitle">PHINMA University of Iloilo</p>
-            <div class="splash-loader"></div>
+            <p class="splash-subtitle" id="splashSubtitle">PHINMA University of Iloilo</p>
+            <div class="splash-loader" id="splashLoaderEl"></div>
         </div>
     </div>
 
@@ -317,7 +317,7 @@
 
         <form id="faciLoginForm">
             <div class="input-group">
-                <label for="accountId">Faci ID</label>
+                <label for="accountId">Facilitator ID</label>
                 <input type="text" id="accountId" placeholder="e.g. FACI-1234" required>
             </div>
             
@@ -341,18 +341,48 @@
     </div>
 
     <script>
-        // 🌟 SPLASH SCREEN LOGIC 🌟
-        window.addEventListener('load', function() {
-            const splashScreen = document.getElementById('splashScreen');
-            setTimeout(() => {
-                splashScreen.style.opacity = '0';
-                splashScreen.style.visibility = 'hidden';
-                document.body.style.overflow = 'auto'; // Restore scrolling after splash
-            }, 1500); 
-        });
-
         // UPDATED: Render Backend URL
         const API_URL = 'https://teacher-panel-d1kw.onrender.com'; 
+
+        // 🌟 WAKE UP SERVER (PRE-WARMING) 🌟
+        // Pukawon ang Render server sa background para indi maghulat ang faci
+        fetch(`${API_URL}/`).catch(() => console.log("Server initialized."));
+
+        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
+        window.addEventListener('DOMContentLoaded', () => {
+            const activeFaciId = localStorage.getItem('faci_id');
+            if (activeFaciId) {
+                // Kon may naka-save na nga session, skip the login page entirely!
+                document.getElementById('splashLoaderEl').style.display = 'none';
+                document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
+                
+                // Maderetso na dayon sa dashboard
+                setTimeout(() => {
+                    window.location.href = 'index.html'; 
+                }, 800);
+                return; // Stop the rest of the script so they don't see the login form
+            }
+
+            // Check if Faci ID was remembered
+            const rememberedId = localStorage.getItem('remembered_faci_id');
+            if (rememberedId) {
+                document.getElementById('accountId').value = rememberedId;
+                document.getElementById('rememberMe').checked = true;
+            }
+        });
+
+        // 🌟 SPLASH SCREEN LOGIC 🌟
+        window.addEventListener('load', function() {
+            // Only hide splash if NOT auto-redirecting
+            if (!localStorage.getItem('faci_id')) {
+                const splashScreen = document.getElementById('splashScreen');
+                setTimeout(() => {
+                    splashScreen.style.opacity = '0';
+                    splashScreen.style.visibility = 'hidden';
+                    document.body.style.overflow = 'auto'; // Restore scrolling after splash
+                }, 1500); 
+            }
+        });
 
         // Password Visibility Toggle Logic
         const togglePassword = document.getElementById('togglePassword');
@@ -368,16 +398,7 @@
             this.classList.toggle('fa-eye-slash');
         });
 
-        // Check if Faci ID was remembered
-        window.addEventListener('DOMContentLoaded', () => {
-            const rememberedId = localStorage.getItem('remembered_faci_id');
-            if (rememberedId) {
-                document.getElementById('accountId').value = rememberedId;
-                document.getElementById('rememberMe').checked = true;
-            }
-        });
-
-        // Login Logic
+        // 🌟 FAST & PROFESSIONAL LOGIN LOGIC 🌟
         document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
             e.preventDefault(); 
 
@@ -390,7 +411,9 @@
 
             // Reset error state
             errorDiv.style.display = 'none';
-            loginBtn.textContent = 'Verifying...';
+            
+            // PROFESSIONAL LOADING UI
+            loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...';
             loginBtn.disabled = true;
 
             try {
@@ -428,27 +451,29 @@
                     localStorage.setItem('faci_section', data.faci.section);
                     localStorage.setItem('faci_subject', data.faci.subject);
 
-                    // Green button sa success
+                    // SIMPLE & PROFESSIONAL SUCCESS MESSAGE
                     loginBtn.style.backgroundColor = '#10b981'; 
-                    loginBtn.textContent = 'Login Successful!';
+                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful. Redirecting...';
                     
                     setTimeout(() => {
-                        // Ma-direct na sa dashboard sang faci (index.html para sa Vercel deployment)
+                        // Ma-direct na sa dashboard sang faci
                         window.location.href = 'index.html'; 
-                    }, 1000);
+                    }, 800);
 
                 } else {
-                    errorText.textContent = data.error || 'Invalid Faci ID or password.';
+                    // SIMPLE & PROFESSIONAL ERROR MESSAGE (Credentials)
+                    errorText.textContent = 'Incorrect Facilitator ID or password. Please try again.';
                     errorDiv.style.display = 'flex'; 
-                    loginBtn.textContent = 'Login';
+                    loginBtn.innerHTML = 'Login';
                     loginBtn.disabled = false;
                 }
 
             } catch (error) {
+                // SIMPLE & PROFESSIONAL ERROR MESSAGE (Network/Server Error)
                 console.error('Login request failed:', error);
-                errorText.textContent = 'Connection error. Please try again.';
+                errorText.textContent = 'Connection failed. Please check your internet and try again.';
                 errorDiv.style.display = 'flex';
-                loginBtn.textContent = 'Login';
+                loginBtn.innerHTML = 'Login';
                 loginBtn.disabled = false;
             }
         });
