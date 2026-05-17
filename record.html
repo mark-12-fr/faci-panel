@@ -33,7 +33,6 @@
         .header-flex { display: flex; justify-content: space-between; align-items: center; }
         .header-flex h1 { font-size: 1.5rem; font-weight: 800; }
 
-        /* ADDED: Date Navigator CSS pareho sa Attendance */
         .controls-row { margin-bottom: 20px; }
         .date-input { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); display: flex; justify-content: space-between; align-items: center; }
         .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px; text-align: center;}
@@ -92,7 +91,6 @@
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         
-        /* Disabled (locked) inputs styling */
         .score-input:disabled {
             background-color: #e2e8f0;
             color: #94a3b8;
@@ -112,7 +110,6 @@
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
 
-        /* CUSTOM MODAL STYLES */
         .custom-alert-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
@@ -136,7 +133,6 @@
         }
         .custom-alert-btn:hover { background: #334155; }
 
-        /* LIVE UPDATE TOAST NOTIFICATION */
         .toast-notification {
             visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
             text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
@@ -262,7 +258,6 @@
         let currentSectionId = null;
         let currentDateObj = new Date();
 
-        // CUSTOM ALERT LOGIC WITH CALLBACK
         let alertCallback = null;
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
@@ -281,7 +276,6 @@
             }
         }
 
-        // Live Update Toast Function
         function showUpdateToast(message) {
             const toast = document.getElementById('updateToast');
             document.getElementById('updateToastMsg').textContent = message;
@@ -289,7 +283,6 @@
             setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
-        // DATE NAVIGATOR FUNCTIONS
         function updateDateDisplay() {
             const dateStr = currentDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
             document.getElementById('currentDateDisplay').textContent = dateStr;
@@ -304,7 +297,6 @@
             let checkDate = new Date(tempDate);
             checkDate.setHours(0,0,0,0);
 
-            // RESTRICTION: Block future dates completely
             if (checkDate > today) {
                 showAlert(
                     "Action Restricted", 
@@ -342,11 +334,9 @@
             updateDateDisplay();
             await loadClassRecordData(sectionTitle);
 
-            // TINAWAG NGA REALTIME LISTENER SANG FACI
             listenForTeacherUpdates();
         });
 
-        // --- REALTIME LISTENER FUNCTION (TEACHER TO FACI) ---
         function listenForTeacherUpdates() {
             supabaseClient
                 .channel('public:class_records_faci')
@@ -386,15 +376,12 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                // FILTER BY SELECTED DATE AND SECTION
-                const dateStr = document.getElementById('currentDateDisplay').textContent;
+                // FIX: Removed .eq('date', dateStr) here para makuha niya ang daan nga scores bisan san-o gin-save
                 const { data: existingRecords } = await supabaseClient
                     .from('class_records')
                     .select('*')
-                    .eq('section_id', currentSectionId)
-                    .eq('date', dateStr);
+                    .eq('section_id', currentSectionId);
 
-                // CHECK IF PAST DATE & HAS RECORDS -> LOCK
                 let today = new Date();
                 today.setHours(0,0,0,0);
                 let checkDate = new Date(currentDateObj);
@@ -424,10 +411,9 @@
                     females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords, isLocked)));
                 }
 
-                // Update UI sang Submit Button kon locked
                 const submitBtn = document.getElementById('submitBtn');
                 if (isLocked) {
-                    submitBtn.style.background = '#94a3b8'; // Grayish indicate locked
+                    submitBtn.style.background = '#94a3b8';
                     submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Record Finalized';
                     submitBtn.dataset.locked = "true";
                 } else {
@@ -449,29 +435,30 @@
 
             const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
             
+            // FIX: Added recordid to dataset so we can update instead of creating a duplicate
+            if (record && record.id) {
+                tr.dataset.recordid = record.id;
+            }
+            
             let html = `
                 <td class="td-sticky-1">${index}</td>
                 <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
             `;
 
-            // If the day is locked, apply disabled attribute to ALL inputs
             let baseDisabledAttr = isLocked ? 'disabled' : '';
 
-            // Modules 1-25
             for(let i=1; i<=25; i++) {
                 let val = record ? record[`module_${i}`] : '';
-                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val || ''}" ${baseDisabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="module_${i}" value="${val !== null && val !== undefined ? val : ''}" ${baseDisabledAttr}></td>`;
             }
-            // Activities 1-10
             for(let i=1; i<=10; i++) {
                 let val = record ? record[`activity_${i}`] : '';
-                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val || ''}" ${baseDisabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="activity_${i}" value="${val !== null && val !== undefined ? val : ''}" ${baseDisabledAttr}></td>`;
             }
-            // AT, PT1, PT2, QE
             const fields = { 'at': 'at', 'pt_1': 'pt_1', 'pt_2': 'pt_2', 'qe': 'qe' };
             Object.keys(fields).forEach(f => {
                 let val = record ? record[f] : '';
-                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val || ''}" ${baseDisabledAttr}></td>`;
+                html += `<td><input type="number" class="score-input" data-field="${f}" value="${val !== null && val !== undefined ? val : ''}" ${baseDisabledAttr}></td>`;
             });
 
             tr.innerHTML = html;
@@ -492,7 +479,6 @@
             const faciId = localStorage.getItem('faci_id');
             const dateStr = document.getElementById('currentDateDisplay').textContent;
 
-            // RESTRICTION: Block submission if already locked
             if (btn.dataset.locked === "true") {
                 showAlert(
                     "Record Locked", 
@@ -511,7 +497,6 @@
                 return;
             }
 
-            // RESTRICTION: Empty Input Blocker
             let hasScore = false;
             document.querySelectorAll('.score-input').forEach(input => {
                 if (input.value.trim() !== "") {
@@ -531,11 +516,18 @@
             let recordData = [];
             document.querySelectorAll('.student-data-row').forEach(row => {
                 const studUuid = row.dataset.uuid;
+                const recordId = row.dataset.recordid; // FIX: Retrieve the ID of the existing record
+
                 let dataObj = {
                     student_id: studUuid,
                     section_id: currentSectionId,
-                    date: dateStr // ADDED DATE SO IT SAVES BY DAY
+                    date: dateStr 
                 };
+
+                // FIX: If there's an existing record, pass its ID so Supabase updates it instead of creating a new row
+                if (recordId) {
+                    dataObj.id = recordId; 
+                }
 
                 row.querySelectorAll('.score-input').forEach(input => {
                     const val = input.value.trim();
@@ -548,21 +540,12 @@
             btn.disabled = true;
 
             try {
-                // 1. Delete old records for this section AND DATE to prevent duplicates
-                const { error: deleteError } = await supabaseClient
+                // FIX: Removed delete() and insert(), replaced with a much safer upsert()
+                const { error: saveError } = await supabaseClient
                     .from('class_records')
-                    .delete()
-                    .eq('section_id', currentSectionId)
-                    .eq('date', dateStr);
+                    .upsert(recordData);
 
-                if (deleteError) throw deleteError;
-
-                // 2. Insert new records
-                const { error: insertError } = await supabaseClient
-                    .from('class_records')
-                    .insert(recordData);
-
-                if (insertError) throw insertError;
+                if (saveError) throw saveError;
 
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
