@@ -379,20 +379,19 @@
                     currentSectionId = sectionData.id;
                 }
 
-                let students = [];
-                if (currentSectionId) {
-                    const { data: fetchedStudents } = await supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true });
-                    students = fetchedStudents || [];
-                }
-                document.getElementById('infoTotal').textContent = students.length;
-
                 // FILTER BY SELECTED DATE AND SECTION
                 const dateStr = document.getElementById('currentDateDisplay').textContent;
-                const { data: existingRecords } = await supabaseClient
-                    .from('class_records')
-                    .select('*')
-                    .eq('section_id', currentSectionId)
-                    .eq('date', dateStr);
+                let students = [];
+                let existingRecords = [];
+                if (currentSectionId) {
+                    const [studentsRes, recordsRes] = await Promise.all([
+                        supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true }),
+                        supabaseClient.from('class_records').select('*').eq('section_id', currentSectionId).eq('date', dateStr)
+                    ]);
+                    students = studentsRes.data || [];
+                    existingRecords = recordsRes.data || [];
+                }
+                document.getElementById('infoTotal').textContent = students.length;
 
                 // CHECK IF PAST DATE & HAS RECORDS -> LOCK
                 let today = new Date();
@@ -570,7 +569,7 @@
                 setTimeout(async () => { 
                     await loadClassRecordData(sectionTitle); 
                     btn.disabled = false;
-                }, 2000);
+                }, 300);
 
             } catch (error) {
                 console.error("Error saving:", error);

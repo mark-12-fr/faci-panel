@@ -356,10 +356,7 @@
                 document.getElementById('splashLoaderEl').style.display = 'none';
                 document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
                 
-                // Maderetso na dayon sa dashboard
-                setTimeout(() => {
-                    window.location.href = 'index.html'; 
-                }, 800);
+                requestAnimationFrame(() => window.location.replace('index.html'));
                 return; // Stop the rest of the script so they don't see the login form
             }
 
@@ -380,7 +377,7 @@
                     splashScreen.style.opacity = '0';
                     splashScreen.style.visibility = 'hidden';
                     document.body.style.overflow = 'auto'; // Restore scrolling after splash
-                }, 1500); 
+                }, 300);
             }
         });
 
@@ -455,10 +452,7 @@
                     loginBtn.style.backgroundColor = '#10b981'; 
                     loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
                     
-                    setTimeout(() => {
-                        // Ma-direct na sa dashboard sang faci
-                        window.location.href = 'index.html'; 
-                    }, 800);
+                    requestAnimationFrame(() => window.location.replace('index.html'));
 
                 } else {
                     // SIMPLE & PROFESSIONAL ERROR MESSAGE (Credentials)

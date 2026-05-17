@@ -402,14 +402,20 @@
 
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
+            const profileRequest = supabaseClient
+                .from('facilitators')
+                .select('*')
+                .or(`id.eq.${faciId},account_id.eq.${faciId}`)
+                .single();
+            const sectionRequest = supabaseClient
+                .from('sections')
+                .select('id, semester')
+                .eq('title', section)
+                .single();
 
             // 1. FETCH LIVE PROFILE DATA (FIXED: SELECT ALL COLUMNS)
             try {
-                const { data: profile, error } = await supabaseClient
-                    .from('facilitators')
-                    .select('*') 
-                    .or(`id.eq.${faciId},account_id.eq.${faciId}`)
-                    .single();
+                const { data: profile, error } = await profileRequest;
 
                 if (error) throw error;
 
@@ -437,20 +443,28 @@
 
             // 2. FETCH LIVE STATS (Students, Records, Attendance)
             try {
-                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
-                
+                const { data: sectionData } = await sectionRequest;
+
                 let totalStudents = 0;
-                
+                let attendanceData = [];
+
                 if (sectionData) {
                     document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
-                    
-                    const { data: students } = await supabaseClient.from('students').select('id').eq('section_id', sectionData.id);
+
+                    const [studentsRes, recordsRes, attendanceRes] = await Promise.all([
+                        supabaseClient.from('students').select('id').eq('section_id', sectionData.id),
+                        supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id),
+                        supabaseClient.from('attendance').select('status').eq('section', section).eq('date', exactTodayDate)
+                    ]);
+
+                    const students = studentsRes.data || [];
+                    attendanceData = attendanceRes.data || [];
                     totalStudents = students ? students.length : 0;
-                    
+
                     document.getElementById('dashTotalStudents').textContent = totalStudents;
                     document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
 
-                    const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
+                    const recordsData = recordsRes.data || [];
                     
                     let modulesDone = 0;
                     let activitiesDone = 0;
@@ -484,13 +498,6 @@
                     document.getElementById('dashModulesSub').textContent = '0 pending';
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
                 }
-
-                // FETCH LIVE DATA (Attendance Today)
-                const { data: attendanceData } = await supabaseClient
-                    .from('attendance')
-                    .select('status')
-                    .eq('section', section)
-                    .eq('date', exactTodayDate);
 
                 let present = 0;
                 let absentLate = 0;
