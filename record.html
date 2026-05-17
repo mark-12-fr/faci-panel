@@ -91,14 +91,13 @@
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         
-        /* 🔒 LOCKED INPUT STYLE */
+        /* 🔒 LOCKED INPUT STYLE (UPDATED TO MATCH YOUR PICTURE) */
         .score-input:disabled {
-            background-color: #f1f5f9;
-            color: #1e293b;
+            background-color: #f1f5f9; /* Gray background */
+            color: #94a3b8; /* Gray text color */
             font-weight: 800;
             cursor: not-allowed;
             border: 1px solid #e2e8f0;
-            opacity: 0.9;
         }
 
         .submit-btn {
@@ -466,21 +465,17 @@
                 let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr };
                 if (recordId) dataObj.id = recordId; 
 
-                let rowHasChanges = false;
-
-                // Loop through ALL inputs (both locked and open)
+                // Loop through ALL inputs
                 row.querySelectorAll('.score-input').forEach(input => {
                     const val = input.value.trim();
                     dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
                     
                     // Check if there is an actual NEW score being typed (not disabled)
                     if (val !== "" && !input.disabled) {
-                        rowHasChanges = true;
                         hasNewInput = true;
                     }
                 });
                 
-                // Only push to upsert array if something is actually submitted
                 recordData.push(dataObj);
             });
 
@@ -500,9 +495,21 @@
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
                 
+                // --- INSTANT LOCKING ---
+                // I-lock dayon ang tanan nga bag-o nga may unod pagka-submit
+                document.querySelectorAll('.score-input').forEach(input => {
+                    if (input.value.trim() !== "") {
+                        input.disabled = true;
+                        input.title = "Score submitted. Only the Teacher can edit this.";
+                    }
+                });
+                // -----------------------
+
                 setTimeout(async () => { 
-                    await loadClassRecordData(sectionTitle); // Refreshing automatically LOCKS the new scores
+                    await loadClassRecordData(sectionTitle); 
                     btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit New Scores';
+                    btn.style.background = 'var(--accent-blue)';
                 }, 2000);
 
             } catch (error) {
