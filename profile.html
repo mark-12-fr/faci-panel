@@ -247,6 +247,11 @@
     </nav>
 
     <script>
+        // 🔒 SECURITY GUARD SANG PAGE (I-check dayon kon naka-login, kung wala kick out dayon sa login)
+        if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
+            window.location.href = 'login.html';
+        }
+
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -403,12 +408,14 @@
             reader.readAsDataURL(file);
         }
 
+        // 🌟 SAFE LOGOUT FUNCTION 🌟
         function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
                 localStorage.removeItem('faci_id');
                 localStorage.removeItem('faci_name');
                 localStorage.removeItem('faci_section');
                 localStorage.removeItem('faci_subject');
+                localStorage.removeItem('faci_img_url'); 
                 window.location.href = 'login.html'; 
             }
         }
