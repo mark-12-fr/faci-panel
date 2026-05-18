@@ -327,9 +327,17 @@
                     .eq('section', sectionTitle)
                     .eq('date', dateStr);
 
-                // GIN-UPDATE NGA LOCKING LOGIC: Kon may unod na, automatic lock bisan ano pa nga adlaw.
+                // CHECK KUNG PAST DATE NA O KUNG NAKA-SUBMIT NA
+                let today = new Date();
+                today.setHours(0,0,0,0);
+                let checkDate = new Date(currentDateObj);
+                checkDate.setHours(0,0,0,0);
+
+                const isPastDate = checkDate < today;
                 const isAlreadySubmitted = attendanceData && attendanceData.length > 0;
-                const isLocked = isAlreadySubmitted;
+                
+                // I-lock kung past date na OR may unod na.
+                const isLocked = isAlreadySubmitted || isPastDate;
 
                 let html = '';
                 const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
@@ -349,9 +357,15 @@
                 updateStats();
 
                 const submitBtn = document.getElementById('submitBtn');
-                if (isLocked) {
+                
+                // UPDATE BUTTON DISPLAY BASE SA STATUS
+                if (isAlreadySubmitted) {
                     submitBtn.style.background = '#94a3b8'; 
                     submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Record Finalized';
+                    submitBtn.dataset.locked = "true";
+                } else if (isPastDate) {
+                    submitBtn.style.background = '#94a3b8'; 
+                    submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Locked (Past Date)';
                     submitBtn.dataset.locked = "true";
                 } else {
                     submitBtn.style.background = 'var(--accent-blue)';
@@ -448,7 +462,7 @@
             if (btn.dataset.locked === "true") {
                 showAlert(
                     "Record Locked", 
-                    "The attendance for this session has already been finalized and cannot be modified.", 
+                    "You cannot modify attendance for past dates or already finalized sessions.", 
                     "#64748b" 
                 );
                 return;
