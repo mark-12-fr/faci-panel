@@ -327,14 +327,9 @@
                     .eq('section', sectionTitle)
                     .eq('date', dateStr);
 
-                let today = new Date();
-                today.setHours(0,0,0,0);
-                let checkDate = new Date(currentDateObj);
-                checkDate.setHours(0,0,0,0);
-
-                const isPastDate = checkDate < today;
+                // GIN-UPDATE NGA LOCKING LOGIC: Kon may unod na, automatic lock bisan ano pa nga adlaw.
                 const isAlreadySubmitted = attendanceData && attendanceData.length > 0;
-                const isLocked = isPastDate && isAlreadySubmitted;
+                const isLocked = isAlreadySubmitted;
 
                 let html = '';
                 const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
@@ -519,6 +514,19 @@
                 if (response.ok) {
                     btn.style.background = '#10b981';
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
+                    
+                    // --- INSTANT LOCKING PAGKA-SUBMIT SANG DATA ---
+                    document.querySelectorAll('.opt-btn').forEach(b => {
+                        b.disabled = true;
+                        b.style.opacity = '0.6';
+                        b.style.cursor = 'not-allowed';
+                    });
+                    document.querySelectorAll('.remarks-input').forEach(input => {
+                        input.disabled = true;
+                        input.style.opacity = '0.6';
+                        input.style.background = '#e2e8f0';
+                        input.style.cursor = 'not-allowed';
+                    });
                     
                     setTimeout(async () => { 
                         await loadDynamicStudents(section); 
