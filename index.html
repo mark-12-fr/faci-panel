@@ -372,6 +372,11 @@
     </nav>
 
     <script>
+        // 🔒 SECURITY GUARD SANG PAGE (I-check dayon kon naka-login, kung wala kick out dayon sa login)
+        if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
+            window.location.href = 'login.html';
+        }
+
         lucide.createIcons();
 
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
@@ -383,8 +388,6 @@
             const section = localStorage.getItem('faci_section');
             const cachedName = localStorage.getItem('faci_name') || 'User';
             const cachedImg = localStorage.getItem('faci_img_url'); 
-
-            if (!faciId || !section) { window.location.href = 'login.html'; return; }
 
             // Set Initial Fallback or Cached Image immediately
             if (cachedImg && cachedImg.trim() !== "") {
@@ -520,7 +523,13 @@
         // Logout function
         function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
-                localStorage.clear();
+                // Modified clearing to be safe so it doesn't delete non-faci data
+                localStorage.removeItem('faci_id');
+                localStorage.removeItem('faci_name');
+                localStorage.removeItem('faci_section');
+                localStorage.removeItem('faci_subject');
+                localStorage.removeItem('faci_img_url');
+                
                 window.location.href = 'login.html'; 
             }
         }
