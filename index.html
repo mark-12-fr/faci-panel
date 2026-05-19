@@ -28,6 +28,7 @@
             --color-4-shadow: rgba(168, 85, 247, 0.25); 
             
             --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+            --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             --border-radius: 12px;
             --accent-blue: #3b82f6;
         }
@@ -39,7 +40,26 @@
             color: var(--text-main);
             padding: 15px;
             padding-bottom: 80px; 
+            overflow-x: hidden; /* Prevents horizontal scroll during animations */
         }
+
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(25px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in-up {
+            opacity: 0; /* Hidden before animation starts */
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Animation Delays for Staggered Effect */
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
 
         /* --- Header / Section 1 --- */
         .dashboard-header {
@@ -52,6 +72,12 @@
             justify-content: space-between;
             align-items: flex-start;
             position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .dashboard-header:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--hover-shadow);
         }
 
         .header-content {
@@ -61,7 +87,18 @@
 
         .header-content h1 { font-size: 1.6rem; font-weight: 800; line-height: 1.2; margin-bottom: 8px;}
         .header-content .date { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-        .hand-emoji { font-size: 1.4rem; }
+        .hand-emoji { font-size: 1.4rem; display: inline-block; animation: wave 2.5s infinite; transform-origin: 70% 70%; }
+
+        @keyframes wave {
+            0% { transform: rotate( 0.0deg) }
+            10% { transform: rotate(14.0deg) }  
+            20% { transform: rotate(-8.0deg) }
+            30% { transform: rotate(14.0deg) }
+            40% { transform: rotate(-4.0deg) }
+            50% { transform: rotate(10.0deg) }
+            60% { transform: rotate( 0.0deg) }  
+            100% { transform: rotate( 0.0deg) }
+        }
 
         .status-badge {
             background-color: #e2e8f0; 
@@ -103,8 +140,11 @@
             right: 20px;
             border: 2px solid white;
             background: #1e3a8a;
+            transition: transform 0.3s ease;
         }
         
+        .profile-avatar:active { transform: scale(0.9); }
+
         .profile-avatar img {
             width: 100%; 
             height: 100%; 
@@ -134,15 +174,25 @@
             border-radius: var(--border-radius);
             position: relative;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
         }
 
+        .stat-card:active { transform: scale(0.96) !important; }
+        
         .stat-card.blue   { border-left: 4px solid #3b82f6; box-shadow: 0 10px 15px -3px var(--color-1-shadow); }
+        .stat-card.blue:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-1-shadow); }
+        
         .stat-card.green  { border-left: 4px solid #22c55e; box-shadow: 0 10px 15px -3px var(--color-2-shadow); }
+        .stat-card.green:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-2-shadow); }
+        
         .stat-card.yellow { border-left: 4px solid #eab308; box-shadow: 0 10px 15px -3px var(--color-3-shadow); }
+        .stat-card.yellow:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-3-shadow); }
+        
         .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
+        .stat-card.purple:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-4-shadow); }
 
-        .stat-card h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; }
+        .stat-card h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; transition: color 0.3s ease; }
         
         .stat-card.blue h2   { color: #1d4ed8; }
         .stat-card.green h2  { color: #15803d; }
@@ -167,6 +217,12 @@
             align-items: center;
             gap: 15px;
             margin-bottom: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .overview-panel:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--hover-shadow);
         }
 
         .overview-item { text-align: left; }
@@ -182,7 +238,10 @@
             display: inline-block;
             font-weight: 700;
             box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+            transition: all 0.2s ease;
         }
+        .csv-btn:hover { background-color: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
+        .csv-btn:active { transform: scale(0.95); }
 
         /* --- Quick Actions --- */
         .actions-grid {
@@ -202,7 +261,16 @@
             margin-bottom: 10px;
             text-decoration: none;
             color: inherit;
+            transition: all 0.3s ease;
         }
+
+        .action-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--hover-shadow);
+            background-color: #f8fafc;
+        }
+        
+        .action-card:active { transform: scale(0.97); }
 
         .action-icon {
             font-size: 1.5rem;
@@ -213,7 +281,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: transform 0.3s ease;
         }
+        
+        .action-card:hover .action-icon { transform: scale(1.1); }
 
         .action-text h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
         .action-text p  { font-size: 0.75rem; color: var(--text-sub); }
@@ -236,7 +307,16 @@
             gap: 12px;
             text-decoration: none;
             cursor: pointer;
+            transition: all 0.3s ease;
         }
+
+        .utility-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--hover-shadow);
+            background-color: #f8fafc;
+        }
+        
+        .utility-card:active { transform: scale(0.97); }
 
         .icon-box {
             width: 45px;
@@ -247,7 +327,10 @@
             justify-content: center;
             font-size: 1.2rem;
             flex-shrink: 0;
+            transition: transform 0.3s ease;
         }
+        
+        .utility-card:hover .icon-box { transform: rotate(5deg) scale(1.1); }
 
         .bg-folder { background-color: #fef3c7; color: #d97706; }
         .bg-profile { background-color: #f1f5f9; color: #475569; }
@@ -262,15 +345,19 @@
             padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
             z-index: 1000;
         }
-        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
-        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; transition: transform 0.2s ease;}
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+        
+        .nav-item:hover { color: var(--accent-blue); }
+        .nav-item:hover i { transform: translateY(-2px); }
+        .nav-item:active { transform: scale(0.9); }
 
     </style>
 </head>
 <body>
     
-    <div class="dashboard-header">
+    <div class="dashboard-header fade-in-up">
         <div class="header-content">
             <div class="status-badge">
                   <i class="fa-solid fa-lock"></i> Section-Locked View
@@ -288,31 +375,31 @@
     </div>
 
     <div class="stats-grid">
-        <div class="stat-card blue">
+        <div class="stat-card blue fade-in-up delay-1">
             <h2 id="dashTotalStudents"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">My Students</p>
             <p class="stat-sub" id="faciSectionStat">Section</p>
         </div>
-        <div class="stat-card green">
+        <div class="stat-card green fade-in-up delay-1">
             <h2 id="dashPresent"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Present Today</p>
             <p class="absent" id="dashAbsent">0 absent/late</p>
         </div>
         
-        <div class="stat-card yellow">
+        <div class="stat-card yellow fade-in-up delay-2">
             <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Modules Done</p>
             <p class="pending" id="dashModulesSub">Calculating...</p>
         </div>
-        <div class="stat-card purple">
+        <div class="stat-card purple fade-in-up delay-2">
             <h2 id="dashActivities"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Activities</p>
             <p class="done" id="dashActivitiesSub">Waiting</p>
         </div>
     </div>
 
-    <div class="section-title">Section Overview</div>
-    <div class="overview-panel">
+    <div class="section-title fade-in-up delay-3">Section Overview</div>
+    <div class="overview-panel fade-in-up delay-3">
         <div class="overview-item">
             <h3 id="faciSemesterOverview">1st Sem</h3>
             <p>Semester</p>
@@ -328,16 +415,16 @@
         <a href="#" class="csv-btn">↓ CSV</a>
     </div>
 
-    <div class="section-title">Quick Actions</div>
+    <div class="section-title fade-in-up delay-4">Quick Actions</div>
     <div class="actions-grid">
-        <a href="attendance.html" class="action-card">
+        <a href="attendance.html" class="action-card fade-in-up delay-4">
             <div class="action-icon"><i data-lucide="clipboard-list"></i></div>
             <div class="action-text">
                 <h4>Attendance</h4>
                 <p>Today's class</p>
             </div>
         </a>
-        <a href="record.html" class="action-card">
+        <a href="record.html" class="action-card fade-in-up delay-4">
             <div class="action-icon" style="color: #a855f7; background: #faf5ff;"><i data-lucide="bar-chart-2"></i></div>
             <div class="action-text">
                 <h4>Class Record</h4>
@@ -347,7 +434,7 @@
     </div>
 
     <div class="utility-grid">
-        <a href="#" class="utility-card">
+        <a href="#" class="utility-card fade-in-up delay-5">
             <div class="icon-box bg-folder"><i data-lucide="folder-open"></i></div>
             <div class="utility-text">
                 <h4>Export CSV</h4>
@@ -355,7 +442,7 @@
             </div>
         </a>
 
-        <div class="utility-card" onclick="faciLogout()">
+        <div class="utility-card fade-in-up delay-5" onclick="faciLogout()">
             <div class="icon-box bg-profile"><i data-lucide="log-out"></i></div>
             <div class="utility-text">
                 <h4>Logout</h4>
