@@ -19,6 +19,7 @@
             --accent-blue: #3b82f6;
             --accent-pink: #d946ef;
             --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             --border-radius: 12px;
             --hover-bg: #f1f5f9;
         }
@@ -30,39 +31,77 @@
             color: var(--text-main);
             padding: 15px;
             padding-bottom: 90px;
+            overflow-x: hidden;
         }
 
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bobbing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .fade-in-up {
+            opacity: 0; 
+            animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        /* --- HEADER & CONTROLS --- */
         .attendance-header { margin-bottom: 20px; }
         .status-lock { background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: 600; }
         .attendance-header h1 { font-size: 1.5rem; font-weight: 800; }
         .attendance-header p { font-size: 0.85rem; color: var(--text-sub); }
 
         .controls-row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; margin-bottom: 15px; }
-        .date-input, .subject-select { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); }
+        .date-input, .subject-select { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); transition: transform 0.2s ease; }
+        .date-input:hover, .subject-select:hover { transform: translateY(-2px); }
         .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px;}
         .date-input div { font-weight: 700; font-size: 0.9rem; }
 
         .nav-btn {
             background: var(--input-bg); border: 1px solid #e2e8f0; color: var(--text-main);
-            border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: 0.2s;
+            border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
         .nav-btn:hover { background: var(--hover-bg); border-color: var(--accent-blue); color: var(--accent-blue); }
+        .nav-btn:active { transform: scale(0.9); }
 
+        /* --- MINI STATS WITH BOBBING ANIMATION --- */
         .mini-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
         .mini-card { background: var(--panel-bg); padding: 12px 5px; text-align: center; border-radius: 10px; box-shadow: var(--premium-shadow); border-bottom: 3px solid #cbd5e1; transition: 0.3s; }
-        .mini-card h3 { font-size: 1.2rem; }
+        .mini-card:hover { transform: translateY(-3px); box-shadow: var(--hover-shadow); }
+        
+        .mini-card h3 { 
+            font-size: 1.2rem; 
+            display: inline-block; 
+            animation: bobbing 2s ease-in-out infinite; 
+        }
         .mini-card p { font-size: 0.65rem; color: var(--text-sub); font-weight: bold; }
-        .total h3 { color: var(--text-main); }
-        .present { border-color: #22c55e; } .present h3 { color: #15803d; }
-        .absent { border-color: #ef4444; } .absent h3 { color: #b91c1c; }
-        .late { border-color: #f59e0b; } .late h3 { color: #b45309; }
+        
+        .total h3 { color: var(--text-main); animation-delay: 0s; }
+        .present { border-color: #22c55e; } .present h3 { color: #15803d; animation-delay: 0.2s;}
+        .absent { border-color: #ef4444; } .absent h3 { color: #b91c1c; animation-delay: 0.4s;}
+        .late { border-color: #f59e0b; } .late h3 { color: #b45309; animation-delay: 0.6s;}
 
-        .search-container { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .search-container { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 20px; border: 1px solid #e2e8f0; transition: transform 0.2s ease; }
+        .search-container:focus-within { transform: translateY(-2px); border-color: var(--accent-blue); }
         .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
 
+        /* --- STUDENT CARDS --- */
         .gender-divider { font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 15px 0 10px 5px; }
-        .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; }
+        .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; transition: all 0.3s ease; }
+        .student-card:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+        
         .student-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .student-name h4 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; }
         .student-name p { font-size: 0.75rem; color: var(--text-sub); }
@@ -70,24 +109,30 @@
         .fem-gen-tag { font-size: 0.7rem; color: var(--accent-pink); background: #fdf4ff; padding: 2px 8px; border-radius: 5px; font-weight: bold; height: fit-content; }
         
         .attendance-options { display: flex; gap: 8px; flex-wrap: wrap; }
-        .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: 0.2s; }
+        .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: all 0.2s; }
+        .opt-btn:active { transform: scale(0.95); }
         
-        .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; }
-        .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; }
-        .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; }
-        .opt-btn.excuse.active { background: #64748b; color: white; border-color: #64748b; }
+        .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; transform: scale(1.05); }
+        .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; transform: scale(1.05); }
+        .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; transform: scale(1.05); }
+        .opt-btn.excuse.active { background: #64748b; color: white; border-color: #64748b; transform: scale(1.05); }
         
-        .remarks-input { width: 100%; margin-top: 12px; padding: 10px; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; outline: none; }
-        .remarks-input:focus { border-color: var(--accent-blue); }
+        .remarks-input { width: 100%; margin-top: 12px; padding: 10px; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; outline: none; transition: 0.2s; }
+        .remarks-input:focus { border-color: var(--accent-blue); background: white; }
 
-        .submit-btn { width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 15px; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: 0.2s; }
-        .submit-btn:hover { background: #2563eb; transform: translateY(-2px); }
+        .submit-btn { width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 15px; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: all 0.2s; }
+        .submit-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
+        .submit-btn:active { transform: scale(0.98); }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
-        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
-        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; transition: transform 0.2s ease;}
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+        .nav-item:hover { color: var(--accent-blue); }
+        .nav-item:hover i { transform: translateY(-2px); }
+        .nav-item:active { transform: scale(0.9); }
 
+        /* CUSTOM ALERTS */
         .custom-alert-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
@@ -110,7 +155,6 @@
         }
         .custom-alert-btn:hover { background: #334155; }
 
-        /* LIVE UPDATE TOAST NOTIFICATION */
         .toast-notification {
             visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
             text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
@@ -124,7 +168,7 @@
 </head>
 <body>
 
-    <div class="attendance-header">
+    <div class="attendance-header fade-in-up">
         <div class="status-lock">
             <i class="fa-solid fa-lock"></i> Attendance Record
         </div>
@@ -132,7 +176,7 @@
         <p id="headerDetails">Loading Details...</p>
     </div>
 
-    <div class="controls-row">
+    <div class="controls-row fade-in-up delay-1">
         <div class="date-input" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;">
             <button onclick="changeDate(-1)" class="nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
             <div style="text-align: center;">
@@ -149,26 +193,26 @@
         </div>
     </div>
 
-    <div class="mini-stats-grid">
+    <div class="mini-stats-grid fade-in-up delay-2">
         <div class="mini-card total"><h3 id="statTotal">0</h3><p>Total</p></div>
         <div class="mini-card present"><h3 id="statPresent">0</h3><p>Present</p></div>
         <div class="mini-card absent"><h3 id="statAbsent">0</h3><p>Absent</p></div>
         <div class="mini-card late"><h3 id="statLate">0</h3><p>Late</p></div>
     </div>
 
-    <div class="search-container">
+    <div class="search-container fade-in-up delay-3">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
         <input type="text" id="searchInput" placeholder="Search student name..." onkeyup="filterStudents()">
     </div>
 
-    <div id="studentListContainer">
+    <div id="studentListContainer" class="fade-in-up delay-4">
         <div style="text-align:center; padding: 30px; color: var(--text-sub);">
             <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 10px;"></i>
             <p>Loading students from database...</p>
         </div>
     </div>
 
-    <button class="submit-btn" id="submitBtn" data-locked="false">
+    <button class="submit-btn fade-in-up delay-5" id="submitBtn" data-locked="false">
         <i class="fa-solid fa-paper-plane"></i> Submit Attendance
     </button>
 
@@ -194,7 +238,7 @@
     </div>
 
     <script>
-        // 🔒 SECURITY GUARD SANG PAGE (I-check dayon kon naka-login, kung wala kick out dayon sa login)
+        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -262,11 +306,9 @@
             updateDateDisplay();
             await loadDynamicStudents(section);
 
-            // REALTIME LISTENER SANG FACI PANEL
             listenForTeacherUpdates();
         });
 
-        // --- REALTIME LISTENER FUNCTION ---
         function listenForTeacherUpdates() {
             supabaseClient
                 .channel('public:attendance_faci')
@@ -283,7 +325,6 @@
                             const dateStr = document.getElementById('currentDateDisplay').textContent;
                             const affectedDate = payload.new?.date || payload.old?.date;
                             
-                            // Load liwat kon ang gin edit sang teacher is ang adlaw nga gina view subong
                             if (affectedDate === dateStr) {
                                 loadDynamicStudents(section);
                                 showUpdateToast("Live Update: Teacher modified the attendance.");
@@ -326,7 +367,6 @@
                     .eq('section', sectionTitle)
                     .eq('date', dateStr);
 
-                // CHECK KUNG PAST DATE NA O KUNG NAKA-SUBMIT NA
                 let today = new Date();
                 today.setHours(0,0,0,0);
                 let checkDate = new Date(currentDateObj);
@@ -335,20 +375,27 @@
                 const isPastDate = checkDate < today;
                 const isAlreadySubmitted = attendanceData && attendanceData.length > 0;
                 
-                // I-lock kung past date na OR may unod na.
                 const isLocked = isAlreadySubmitted || isPastDate;
 
                 let html = '';
                 const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
                 const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
                 
+                let globalIndex = 0; // For cascading delay
+
                 if(males.length > 0) {
-                    html += '<div class="gender-divider">👶 MALE</div>';
-                    males.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Male', attendanceData, isLocked); });
+                    html += `<div class="gender-divider fade-in-up" style="animation-delay: 0.1s;">👶 MALE</div>`;
+                    males.forEach((s) => { 
+                        html += generateStudentCard(s, globalIndex + 1, 'Male', attendanceData, isLocked, globalIndex); 
+                        globalIndex++;
+                    });
                 }
                 if(females.length > 0) {
-                    html += '<div class="gender-divider">💆‍♀️ FEMALE</div>';
-                    females.forEach((s, idx) => { html += generateStudentCard(s, idx + 1, 'Female', attendanceData, isLocked); });
+                    html += `<div class="gender-divider fade-in-up" style="animation-delay: ${Math.min(0.1 + (globalIndex*0.03), 0.5)}s;">💆‍♀️ FEMALE</div>`;
+                    females.forEach((s) => { 
+                        html += generateStudentCard(s, globalIndex + 1, 'Female', attendanceData, isLocked, globalIndex); 
+                        globalIndex++;
+                    });
                 }
                 
                 container.innerHTML = html;
@@ -357,7 +404,6 @@
 
                 const submitBtn = document.getElementById('submitBtn');
                 
-                // UPDATE BUTTON DISPLAY BASE SA STATUS
                 if (isAlreadySubmitted) {
                     submitBtn.style.background = '#94a3b8'; 
                     submitBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Record Finalized';
@@ -378,9 +424,11 @@
             }
         }
 
-        function generateStudentCard(student, index, gender, attendanceData, isLocked) {
+        // Added inline animation delay for cascading card entry effect
+        function generateStudentCard(student, index, gender, attendanceData, isLocked, globalIndex) {
             const num = index.toString().padStart(2, '0');
             const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
+            const delay = Math.min(0.1 + (globalIndex * 0.04), 0.6); // Stagger up to 0.6 seconds
 
             const record = attendanceData ? attendanceData.find(a => a.student_id_no === student.id_no || a.student_name === student.full_name) : null;
             
@@ -399,7 +447,7 @@
             const disabledInputAttr = isLocked ? 'disabled style="opacity:0.6; background:#e2e8f0; cursor:not-allowed;"' : '';
 
             return `
-            <div class="student-card student-item">
+            <div class="student-card student-item fade-in-up" style="animation-delay: ${delay}s;">
                 <div class="student-info">
                     <div class="student-name">
                         <h4 class="s-name"><span style="color: var(--accent-blue); opacity: 0.5;">${num}</span> ${student.full_name}</h4>
@@ -528,7 +576,6 @@
                     btn.style.background = '#10b981';
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
                     
-                    // --- INSTANT LOCKING PAGKA-SUBMIT SANG DATA ---
                     document.querySelectorAll('.opt-btn').forEach(b => {
                         b.disabled = true;
                         b.style.opacity = '0.6';
