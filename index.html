@@ -40,7 +40,7 @@
             color: var(--text-main);
             padding: 15px;
             padding-bottom: 80px; 
-            overflow-x: hidden; /* Prevents horizontal scroll during animations */
+            overflow-x: hidden; 
         }
 
         /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
@@ -49,12 +49,28 @@
             100% { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes wave {
+            0% { transform: rotate( 0.0deg) }
+            10% { transform: rotate(14.0deg) }  
+            20% { transform: rotate(-8.0deg) }
+            30% { transform: rotate(14.0deg) }
+            40% { transform: rotate(-4.0deg) }
+            50% { transform: rotate(10.0deg) }
+            60% { transform: rotate( 0.0deg) }  
+            100% { transform: rotate( 0.0deg) }
+        }
+
+        /* ✨ NEW: Bobbing Animation for Numbers (Up and Down) ✨ */
+        @keyframes bobbing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); } /* Moves up by 4px */
+        }
+
         .fade-in-up {
-            opacity: 0; /* Hidden before animation starts */
+            opacity: 0; 
             animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        /* Animation Delays for Staggered Effect */
         .delay-1 { animation-delay: 0.1s; }
         .delay-2 { animation-delay: 0.2s; }
         .delay-3 { animation-delay: 0.3s; }
@@ -89,17 +105,6 @@
         .header-content .date { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
         .hand-emoji { font-size: 1.4rem; display: inline-block; animation: wave 2.5s infinite; transform-origin: 70% 70%; }
 
-        @keyframes wave {
-            0% { transform: rotate( 0.0deg) }
-            10% { transform: rotate(14.0deg) }  
-            20% { transform: rotate(-8.0deg) }
-            30% { transform: rotate(14.0deg) }
-            40% { transform: rotate(-4.0deg) }
-            50% { transform: rotate(10.0deg) }
-            60% { transform: rotate( 0.0deg) }  
-            100% { transform: rotate( 0.0deg) }
-        }
-
         .status-badge {
             background-color: #e2e8f0; 
             padding: 6px 12px;
@@ -123,7 +128,7 @@
         .tag-primary { background-color: #eff6ff; color: #3b82f6; } 
         .tag-secondary { background-color: #faf5ff; color: #a855f7; } 
 
-        /* --- FIXED PROFILE AVATAR --- */
+        /* --- Profile Avatar --- */
         .profile-avatar {
             width: 55px;
             height: 55px;
@@ -151,7 +156,7 @@
             object-fit: cover; 
         }
 
-        /* --- Global Section Title Styling --- */
+        /* --- Section Title --- */
         .section-title {
             color: var(--text-sub);
             text-transform: uppercase;
@@ -192,12 +197,21 @@
         .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
         .stat-card.purple:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-4-shadow); }
 
-        .stat-card h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; transition: color 0.3s ease; }
+        /* ✨ Applying Bobbing Animation to Numbers ✨ */
+        .stat-card h2 { 
+            font-size: 2.2rem; 
+            font-weight: 800; 
+            margin-bottom: 5px; 
+            transition: color 0.3s ease; 
+            display: inline-block; /* Required for transform animation */
+            animation: bobbing 2s ease-in-out infinite; /* Continuous up and down */
+        }
         
-        .stat-card.blue h2   { color: #1d4ed8; }
-        .stat-card.green h2  { color: #15803d; }
-        .stat-card.yellow h2 { color: #a16207; }
-        .stat-card.purple h2 { color: #7e22ce; }
+        /* Staggered animation delays for the numbers */
+        .stat-card.blue h2   { color: #1d4ed8; animation-delay: 0s; }
+        .stat-card.green h2  { color: #15803d; animation-delay: 0.3s; }
+        .stat-card.yellow h2 { color: #a16207; animation-delay: 0.6s; }
+        .stat-card.purple h2 { color: #7e22ce; animation-delay: 0.9s; }
 
         .stat-card p.stat-label { color: var(--text-sub); font-size: 0.85rem; font-weight: 500;}
         .stat-card p.stat-sub   { font-size: 0.75rem; color: var(--text-sub); margin-top: 2px;}
@@ -289,7 +303,7 @@
         .action-text h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
         .action-text p  { font-size: 0.75rem; color: var(--text-sub); }
 
-        /* --- Top Utility Actions --- */
+        /* --- Utility Grid --- */
         .utility-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -459,7 +473,7 @@
     </nav>
 
     <script>
-        // 🔒 SECURITY GUARD SANG PAGE (I-check dayon kon naka-login, kung wala kick out dayon sa login)
+        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -476,14 +490,12 @@
             const cachedName = localStorage.getItem('faci_name') || 'User';
             const cachedImg = localStorage.getItem('faci_img_url'); 
 
-            // Set Initial Fallback or Cached Image immediately
             if (cachedImg && cachedImg.trim() !== "") {
                 document.getElementById('faciProfileImg').src = cachedImg;
             } else {
                 document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cachedName)}&background=1e3a8a&color=fff`;
             }
 
-            // Set Date 
             const d = new Date();
             const dd = String(d.getDate()).padStart(2, '0');
             const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -493,7 +505,7 @@
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
 
-            // 1. FETCH LIVE PROFILE DATA (FIXED: SELECT ALL COLUMNS)
+            // 1. FETCH LIVE PROFILE DATA 
             try {
                 const { data: profile, error } = await supabaseClient
                     .from('facilitators')
@@ -511,7 +523,6 @@
                     document.getElementById('faciSectionStat').textContent = profile.section;
                     document.getElementById('faciSubjectOverview').textContent = profile.subject.substring(0, 15) + (profile.subject.length > 15 ? '...' : '');
 
-                    // UPDATE IMAGE DYNAMICALLY
                     const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
 
                     if (imgUrl && imgUrl.trim() !== "") {
@@ -525,7 +536,7 @@
                 console.error("Error fetching profile:", err); 
             }
 
-            // 2. FETCH LIVE STATS (Students, Records, Attendance)
+            // 2. FETCH LIVE STATS 
             try {
                 const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
                 
@@ -575,7 +586,6 @@
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
                 }
 
-                // FETCH LIVE DATA (Attendance Today)
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
                     .select('status')
@@ -607,16 +617,13 @@
             }
         });
 
-        // Logout function
         function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
-                // Modified clearing to be safe so it doesn't delete non-faci data
                 localStorage.removeItem('faci_id');
                 localStorage.removeItem('faci_name');
                 localStorage.removeItem('faci_section');
                 localStorage.removeItem('faci_subject');
                 localStorage.removeItem('faci_img_url');
-                
                 window.location.href = 'login.html'; 
             }
         }
