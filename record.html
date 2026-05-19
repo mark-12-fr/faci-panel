@@ -136,6 +136,68 @@
             display: flex; align-items: center; gap: 12px;
         }
         .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
+
+        /* --- NEW DRAWER STYLES --- */
+        .clickable-name { 
+            cursor: pointer; 
+            color: var(--accent-blue); 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            transition: 0.2s;
+            padding: 4px 0;
+        }
+        .clickable-name:active { opacity: 0.7; }
+        .clickable-name i { font-size: 0.9rem; }
+
+        .drawer-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px);
+            z-index: 1500; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .drawer-overlay.show { opacity: 1; pointer-events: auto; }
+
+        .bottom-drawer {
+            position: fixed; bottom: -100%; left: 0; width: 100%; height: 85vh;
+            background: var(--panel-bg); border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 25px rgba(0,0,0,0.15); z-index: 1501;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;
+        }
+        .bottom-drawer.show { bottom: 0; }
+
+        .drawer-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px; border-bottom: 1px solid #e2e8f0; background: white; border-radius: 20px 20px 0 0;
+        }
+        .drawer-header h3 { font-size: 1.1rem; color: var(--text-main); margin: 0; font-weight: 800; display: flex; align-items: center; gap: 8px;}
+        .drawer-header h3 i { color: var(--accent-blue); }
+        .close-drawer-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: var(--text-sub); cursor: pointer; transition: 0.2s;}
+        .close-drawer-btn:active { background: #e2e8f0; }
+
+        .drawer-body { flex: 1; overflow-y: auto; padding: 20px; background: var(--primary-bg); }
+        
+        .drawer-section-title {
+            font-size: 0.75rem; font-weight: 800; color: var(--text-sub);
+            text-transform: uppercase; margin: 20px 0 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;
+        }
+        .drawer-section-title:first-child { margin-top: 0; }
+        
+        .drawer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 10px; }
+        .drawer-input-group { display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
+        .drawer-input-group label { font-size: 0.65rem; font-weight: 800; color: var(--text-sub); text-align: center; }
+        .drawer-input-group input {
+            width: 100%; text-align: center; border: 1px solid transparent; background: #f8fafc; border-radius: 6px;
+            padding: 8px 0; font-weight: 800; font-size: 0.95rem; outline: none; font-family: 'Inter', sans-serif; transition: 0.2s; color: var(--text-main);
+        }
+        .drawer-input-group input:focus { border-color: var(--accent-blue); background: #eff6ff; }
+        .drawer-input-group input:disabled { background-color: #f1f5f9; color: #cbd5e1; cursor: not-allowed; border: 1px solid #e2e8f0; }
+
+        .drawer-footer { padding: 15px 20px 25px; border-top: 1px solid #e2e8f0; background: white; }
+        .apply-drawer-btn {
+            width: 100%; padding: 16px; background: var(--text-main); color: white;
+            border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif;
+        }
+        .apply-drawer-btn:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -175,7 +237,7 @@
     </div>
 
     <div class="table-label">
-        <span>SCORE TABLE</span>
+        <span>SCORE TABLE (Tap Name to Edit)</span>
         <span style="color: var(--accent-blue);"><i class="fa-solid fa-arrow-left-right"></i> scroll</span>
     </div>
 
@@ -209,7 +271,7 @@
     </div>
 
     <button class="submit-btn" id="submitBtn">
-        <i class="fa-solid fa-paper-plane"></i> Submit Records
+        <i class="fa-solid fa-paper-plane"></i> Submit New Scores
     </button>
 
     <nav class="bottom-nav">
@@ -233,8 +295,21 @@
         <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
     </div>
 
+    <div id="inputDrawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
+    <div id="inputDrawer" class="bottom-drawer">
+        <div class="drawer-header">
+            <h3 id="drawerStudentName"><i class="fa-solid fa-user-pen"></i> Student Name</h3>
+            <button onclick="closeDrawer()" class="close-drawer-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="drawer-body" id="drawerBody">
+            </div>
+        <div class="drawer-footer">
+            <button class="apply-drawer-btn" onclick="applyDrawerScores()"><i class="fa-solid fa-check"></i> Apply to Table</button>
+        </div>
+    </div>
+
     <script>
-        // 🔒 SECURITY GUARD SANG PAGE (I-check dayon kon naka-login, kung wala kick out dayon sa login)
+        // 🔒 SECURITY GUARD
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -245,6 +320,7 @@
 
         let currentSectionId = null;
         let alertCallback = null;
+        let currentRowIdForDrawer = null; // Used for Drawer Tracking
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
             document.getElementById('customAlertTitle').textContent = title;
@@ -290,7 +366,7 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'class_records' }, (payload) => {
                         if (currentSectionId && ((payload.new && payload.new.section_id == currentSectionId) || (payload.old && payload.old.section_id == currentSectionId))) {
                             const sectionTitle = localStorage.getItem('faci_section');
-                            loadClassRecordData(sectionTitle); // Refresh table, locking any new edits by teacher
+                            loadClassRecordData(sectionTitle); 
                             showUpdateToast("Live Update: A score was modified by the Teacher.");
                         }
                     }
@@ -314,7 +390,6 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                // Load all existing scores
                 const { data: existingRecords } = await supabaseClient.from('class_records').select('*').eq('section_id', currentSectionId);
 
                 tbody.innerHTML = '';
@@ -354,17 +429,20 @@
             const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
             if (record && record.id) tr.dataset.recordid = record.id;
             
+            // 🔥 Added clickable name to open the Drawer
+            let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1">${index}</td>
-                <td class="td-sticky-2 search-target"><strong>${student.full_name}</strong></td>
+                <td class="td-sticky-2 search-target">
+                    <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
+                        <i class="fa-solid fa-pen-to-square"></i> ${student.full_name}
+                    </strong>
+                </td>
             `;
 
-            // 🔒 HELPER FUNCTION TO RENDER AND LOCK CELLS WITH DATA
             const renderInput = (field) => {
                 let val = record ? record[field] : '';
                 let hasValue = (val !== null && val !== undefined && val !== '');
-                
-                // Disable if the cell already contains a score (Cell-level Locking)
                 let isDisabled = hasValue ? 'disabled' : '';
                 let titleMsg = hasValue ? 'title="Score submitted. Only the Teacher can edit this."' : '';
 
@@ -380,6 +458,80 @@
             return tr;
         }
 
+        // --- DRAWER FUNCTIONS ---
+        function openDrawer(studentId, studentName) {
+            currentRowIdForDrawer = studentId;
+            document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
+            
+            const drawerBody = document.getElementById('drawerBody');
+            const row = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
+            if (!row) return;
+
+            const modules = Array.from({length: 25}, (_, i) => `module_${i+1}`);
+            const activities = Array.from({length: 10}, (_, i) => `activity_${i+1}`);
+            const others = ['at', 'pt_1', 'pt_2', 'qe'];
+
+            function createGrid(fields, title) {
+                let html = `<div class="drawer-section-title">${title}</div><div class="drawer-grid">`;
+                fields.forEach(f => {
+                    const tableInput = row.querySelector(`input[data-field="${f}"]`);
+                    const val = tableInput.value;
+                    const isDisabled = tableInput.disabled ? 'disabled' : '';
+                    const label = f.replace('module_', 'M').replace('activity_', 'A').toUpperCase().replace('_', ' ');
+                    
+                    html += `
+                        <div class="drawer-input-group">
+                            <label>${label}</label>
+                            <input type="number" id="drawer_${f}" value="${val}" ${isDisabled}>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                return html;
+            }
+
+            let finalHtml = createGrid(modules, 'Modules');
+            finalHtml += createGrid(activities, 'Activities');
+            finalHtml += createGrid(others, 'Assessments');
+
+            drawerBody.innerHTML = finalHtml;
+
+            document.getElementById('inputDrawerOverlay').classList.add('show');
+            document.getElementById('inputDrawer').classList.add('show');
+        }
+
+        function closeDrawer() {
+            document.getElementById('inputDrawerOverlay').classList.remove('show');
+            document.getElementById('inputDrawer').classList.remove('show');
+            currentRowIdForDrawer = null;
+        }
+
+        function applyDrawerScores() {
+            if (!currentRowIdForDrawer) return;
+            const row = document.querySelector(`.student-data-row[data-uuid="${currentRowIdForDrawer}"]`);
+            if (!row) return;
+
+            // Transfer data from Drawer back to the Main Table Row
+            const inputs = document.getElementById('drawerBody').querySelectorAll('input');
+            inputs.forEach(drawerInput => {
+                const field = drawerInput.id.replace('drawer_', '');
+                const tableInput = row.querySelector(`input[data-field="${field}"]`);
+                if (tableInput && !tableInput.disabled) {
+                    tableInput.value = drawerInput.value;
+                    
+                    // Highlight the cell to show it was edited from the drawer
+                    if(drawerInput.value !== "") {
+                       tableInput.style.backgroundColor = "#eff6ff";
+                       tableInput.style.borderColor = "var(--accent-blue)";
+                    }
+                }
+            });
+
+            closeDrawer();
+            showUpdateToast("Scores applied to table. Don't forget to Submit!");
+        }
+        // ------------------------
+
         document.getElementById('searchInput').addEventListener('input', function(e) {
             const term = e.target.value.toLowerCase();
             document.querySelectorAll('.student-data-row').forEach(row => {
@@ -392,7 +544,6 @@
             const btn = document.getElementById('submitBtn');
             const sectionTitle = localStorage.getItem('faci_section');
             const faciId = localStorage.getItem('faci_id');
-            // Automatic generation sang date subong para sa database record
             const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
             if (!currentSectionId || !faciId) {
@@ -403,7 +554,6 @@
             let hasNewInput = false;
             let recordData = [];
 
-            // Gather data from rows
             document.querySelectorAll('.student-data-row').forEach(row => {
                 const studUuid = row.dataset.uuid;
                 const recordId = row.dataset.recordid; 
@@ -411,12 +561,10 @@
                 let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr };
                 if (recordId) dataObj.id = recordId; 
 
-                // Loop through ALL inputs
                 row.querySelectorAll('.score-input').forEach(input => {
                     const val = input.value.trim();
                     dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
                     
-                    // Check if there is an actual NEW score being typed (not disabled)
                     if (val !== "" && !input.disabled) {
                         hasNewInput = true;
                     }
@@ -434,22 +582,20 @@
             btn.disabled = true;
 
             try {
-                // Upsert handles both update (if id exists) and insert (if new)
                 const { error: saveError } = await supabaseClient.from('class_records').upsert(recordData);
                 if (saveError) throw saveError;
 
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
                 
-                // --- INSTANT LOCKING ---
-                // I-lock dayon ang tanan nga bag-o nga may unod pagka-submit
                 document.querySelectorAll('.score-input').forEach(input => {
                     if (input.value.trim() !== "") {
                         input.disabled = true;
                         input.title = "Score submitted. Only the Teacher can edit this.";
+                        input.style.backgroundColor = "";
+                        input.style.borderColor = "transparent";
                     }
                 });
-                // -----------------------
 
                 setTimeout(async () => { 
                     await loadClassRecordData(sectionTitle); 
