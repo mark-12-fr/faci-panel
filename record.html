@@ -121,13 +121,12 @@
         }
         .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
 
-        /* --- ✨ NEW DRAWER STYLES SANG FACILITATOR ✨ --- */
+        /* --- ✨ DRAWER STYLES --- */
         .clickable-name { 
             cursor: pointer; color: var(--accent-blue); display: flex; align-items: center; gap: 6px; 
             transition: 0.2s; padding: 4px 0;
         }
         .clickable-name:active { opacity: 0.7; }
-        .clickable-name i { font-size: 0.9rem; }
 
         .drawer-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -288,7 +287,6 @@
     </div>
 
     <script>
-        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -299,7 +297,7 @@
 
         let currentSectionId = null;
         let alertCallback = null;
-        let currentRowIdForDrawer = null; // Gina gamit sa Drawer
+        let currentRowIdForDrawer = null; 
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
             document.getElementById('customAlertTitle').textContent = title;
@@ -408,13 +406,13 @@
             const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
             if (record && record.id) tr.dataset.recordid = record.id;
             
-            // ✨ Ginhimo naton Clickable ang Ngalan para magwa ang Drawer
+            // ✨ GIKAKAS NA ANG ICON SA KILID SANG NGALAN
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1">${index}</td>
                 <td class="td-sticky-2 search-target">
                     <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
-                        <i class="fa-solid fa-pen-to-square"></i> ${student.full_name}
+                        ${student.full_name}
                     </strong>
                 </td>
             `;
@@ -437,7 +435,6 @@
             return tr;
         }
 
-        // --- ✨ DRAWER FUNCTIONS ✨ ---
         function openDrawer(studentId, studentName) {
             currentRowIdForDrawer = studentId;
             document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
@@ -490,7 +487,6 @@
             const row = document.querySelector(`.student-data-row[data-uuid="${currentRowIdForDrawer}"]`);
             if (!row) return;
 
-            // Transfer data from Drawer pabalik sa Main Table Row
             const inputs = document.getElementById('drawerBody').querySelectorAll('input');
             inputs.forEach(drawerInput => {
                 const field = drawerInput.id.replace('drawer_', '');
@@ -498,7 +494,6 @@
                 if (tableInput && !tableInput.disabled) {
                     tableInput.value = drawerInput.value;
                     
-                    // Highlight ang cell kun may gin butang nga score halin sa drawer
                     if(drawerInput.value !== "") {
                        tableInput.style.backgroundColor = "#eff6ff";
                        tableInput.style.borderColor = "var(--accent-blue)";
@@ -509,7 +504,6 @@
             closeDrawer();
             showUpdateToast("Scores applied to table. Don't forget to Submit!");
         }
-        // ------------------------
 
         document.getElementById('searchInput').addEventListener('input', function(e) {
             const term = e.target.value.toLowerCase();
@@ -539,11 +533,10 @@
 
                 let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr };
                 
-                // ✨ FIX PARA SA "NULL ID" ERROR SANG SUPABASE ✨
                 if (recordId) {
-                    dataObj.id = recordId; // Update kun may exist na nga id
+                    dataObj.id = recordId; 
                 } else {
-                    dataObj.id = crypto.randomUUID(); // Insert sang bag-o nga random UUID id
+                    dataObj.id = crypto.randomUUID(); 
                 }
 
                 row.querySelectorAll('.score-input').forEach(input => {
