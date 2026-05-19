@@ -21,38 +21,83 @@
             --text-sub: #64748b;
             --accent-blue: #3b82f6;
             --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             --border-radius: 12px;
             --hover-bg: #f1f5f9;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--primary-bg); color: var(--text-main); padding: 15px; padding-bottom: 90px; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--primary-bg); color: var(--text-main); padding: 15px; padding-bottom: 90px; overflow-x: hidden; }
 
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bobbing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .fade-in-up {
+            opacity: 0; 
+            animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        /* --- UI ELEMENTS --- */
         .header-section { margin-bottom: 20px; position: relative; }
         .status-lock { background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: bold; }
         .header-flex { display: flex; justify-content: space-between; align-items: center; }
         .header-flex h1 { font-size: 1.5rem; font-weight: 800; }
 
-        .info-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; border-top: 4px solid var(--accent-blue); }
-        .info-box p { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;}
-        .info-box h3 { font-size: 0.95rem; font-weight: 700; margin-top: 0; }
+        .info-card { 
+            background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); 
+            box-shadow: var(--premium-shadow); display: grid; grid-template-columns: 1fr 1fr; 
+            gap: 15px; margin-bottom: 20px; border-top: 4px solid var(--accent-blue);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .info-card:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
         
+        .info-box p { font-size: 0.65rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;}
+        .info-box h3 { 
+            font-size: 0.95rem; font-weight: 700; margin-top: 0; 
+            display: inline-block; animation: bobbing 2s ease-in-out infinite; 
+        }
+        
+        /* Stagger the bobbing */
+        .info-box:nth-child(1) h3 { animation-delay: 0s; }
+        .info-box:nth-child(2) h3 { animation-delay: 0.2s; }
+        .info-box:nth-child(3) h3 { animation-delay: 0.4s; }
+
         .section-tag { 
-            background: #eff6ff; 
-            color: var(--accent-blue); 
-            padding: 4px 10px; 
-            border-radius: 15px; 
-            font-size: 0.75rem; 
-            display: inline-block; 
-            font-weight: 800;
+            background: #eff6ff; color: var(--accent-blue); padding: 4px 10px; 
+            border-radius: 15px; font-size: 0.75rem; display: inline-block; font-weight: 800;
+            animation: bobbing 2s ease-in-out infinite; animation-delay: 0.6s;
         }
 
-        .search-bar { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        .search-bar { 
+            background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; 
+            align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 15px; 
+            border: 1px solid #e2e8f0; transition: transform 0.2s ease, border-color 0.2s ease; 
+        }
+        .search-bar:focus-within { transform: translateY(-2px); border-color: var(--accent-blue); }
         .search-bar input { border: none; outline: none; width: 100%; font-size: 0.9rem; font-family: 'Inter', sans-serif;}
 
         .table-label { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 0 5px 10px; }
 
-        .table-scroll-container { background: var(--panel-bg); border-radius: var(--border-radius); box-shadow: var(--premium-shadow); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;}
+        .table-scroll-container { 
+            background: var(--panel-bg); border-radius: var(--border-radius); box-shadow: var(--premium-shadow); 
+            overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;
+            transition: box-shadow 0.3s ease;
+        }
+        .table-scroll-container:hover { box-shadow: var(--hover-shadow); }
+
         .horizontal-scroll { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
         table { border-collapse: collapse; width: 100%; white-space: nowrap; min-width: 2200px; }
         
@@ -74,20 +119,25 @@
             border-radius: 4px; padding: 5px 0; font-family: 'Inter', sans-serif;
         }
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
-        
         .score-input:disabled { background-color: #f1f5f9; color: #94a3b8; font-weight: 800; cursor: not-allowed; border: 1px solid #e2e8f0; }
 
         .submit-btn {
             width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none;
             border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 5px; margin-bottom: 25px;
-            cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: 0.2s; font-family: 'Inter', sans-serif;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: all 0.2s; font-family: 'Inter', sans-serif;
         }
+        .submit-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
+        .submit-btn:active { transform: scale(0.98); }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
-        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: 0.2s; }
-        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
+        .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; transition: transform 0.2s ease; }
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+        .nav-item:hover { color: var(--accent-blue); }
+        .nav-item:hover i { transform: translateY(-2px); }
+        .nav-item:active { transform: scale(0.9); }
 
+        /* --- ALERTS & TOASTS --- */
         .custom-alert-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
@@ -180,7 +230,7 @@
 </head>
 <body>
 
-    <div class="header-section">
+    <div class="header-section fade-in-up">
         <div class="status-lock"><i class="fa-solid fa-lock"></i> Class Record</div>
         <div class="header-flex">
             <div>
@@ -190,7 +240,7 @@
         </div>
     </div>
 
-    <div class="info-card">
+    <div class="info-card fade-in-up delay-1">
         <div class="info-box">
             <p>Semester</p>
             <h3 id="infoSemester">...</h3>
@@ -209,14 +259,17 @@
         </div>
     </div>
 
-    <div class="search-bar">
+    <div class="search-bar fade-in-up delay-2">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
         <input type="text" id="searchInput" placeholder="Search student name...">
     </div>
 
+    <div class="table-label fade-in-up delay-3">
+        <span>SCORE TABLE (Tap Name to Edit)</span>
+        <span style="color: var(--accent-blue);"><i class="fa-solid fa-arrow-left-right"></i> scroll</span>
+    </div>
 
-
-    <div class="table-scroll-container">
+    <div class="table-scroll-container fade-in-up delay-3">
         <div class="horizontal-scroll">
             <table>
                 <thead>
@@ -245,7 +298,7 @@
         </div>
     </div>
 
-    <button class="submit-btn" id="submitBtn">
+    <button class="submit-btn fade-in-up delay-4" id="submitBtn">
         <i class="fa-solid fa-paper-plane"></i> Submit New Scores
     </button>
 
@@ -403,7 +456,6 @@
             const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
             if (record && record.id) tr.dataset.recordid = record.id;
             
-            // ✨ GIKAKAS NA ANG ICON SA KILID SANG NGALAN
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1">${index}</td>
