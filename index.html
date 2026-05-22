@@ -60,10 +60,9 @@
             100% { transform: rotate( 0.0deg) }
         }
 
-        /* ✨ NEW: Bobbing Animation for Numbers (Up and Down) ✨ */
         @keyframes bobbing {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); } /* Moves up by 4px */
+            50% { transform: translateY(-4px); }
         }
 
         .fade-in-up {
@@ -197,17 +196,15 @@
         .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
         .stat-card.purple:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-4-shadow); }
 
-        /* ✨ Applying Bobbing Animation to Numbers ✨ */
         .stat-card h2 { 
             font-size: 2.2rem; 
             font-weight: 800; 
             margin-bottom: 5px; 
             transition: color 0.3s ease; 
-            display: inline-block; /* Required for transform animation */
-            animation: bobbing 2s ease-in-out infinite; /* Continuous up and down */
+            display: inline-block; 
+            animation: bobbing 2s ease-in-out infinite; 
         }
         
-        /* Staggered animation delays for the numbers */
         .stat-card.blue h2   { color: #1d4ed8; animation-delay: 0s; }
         .stat-card.green h2  { color: #15803d; animation-delay: 0.3s; }
         .stat-card.yellow h2 { color: #a16207; animation-delay: 0.6s; }
@@ -631,44 +628,43 @@
             }
         });
 
-     // 🔥 HEARTBEAT: Update status kada 30 seconds while open ang web 🔥
-setInterval(async () => {
-    const faciId = localStorage.getItem('faci_id');
-    if (faciId) {
-        await supabaseClient
-            .from('facilitators')
-            .update({ last_login: new Date().toISOString() })
-            .eq('id', faciId);
-    }
-}, 30000); 
+        // 🔥 HEARTBEAT: Update status kada 30 seconds while open ang web 🔥
+        setInterval(async () => {
+            const faciId = localStorage.getItem('faci_id');
+            if (faciId) {
+                try {
+                    await supabaseClient
+                        .from('facilitators')
+                        .update({ last_login: new Date().toISOString() })
+                        .eq('id', faciId);
+                } catch (e) { console.error(e); }
+            }
+        }, 30000); 
 
-// 🔥 INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
-async function faciLogout() {
-    if(confirm("Are you sure you want to sign out?")) {
-        const faciId = localStorage.getItem('faci_id');
-        if (faciId) {
-            try {
-                // Set last_login to null in Supabase to mark as Inactive immediately
-                await supabaseClient
-                    .from('facilitators')
-                    .update({ last_login: null })
-                    .eq('id', faciId);
-            } catch (error) {
-                console.error("Failed to update status on logout:", error);
+        // 🔥 INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
+        async function faciLogout() {
+            if(confirm("Are you sure you want to sign out?")) {
+                const faciId = localStorage.getItem('faci_id');
+                if (faciId) {
+                    try {
+                        await supabaseClient
+                            .from('facilitators')
+                            .update({ last_login: null })
+                            .eq('id', faciId);
+                    } catch (error) {
+                        console.error("Failed to update status on logout:", error);
+                    }
+                }
+                
+                localStorage.removeItem('faci_id');
+                localStorage.removeItem('faci_name');
+                localStorage.removeItem('faci_section');
+                localStorage.removeItem('faci_subject');
+                localStorage.removeItem('faci_img_url');
+                
+                window.location.href = 'login.html'; 
             }
         }
-        
-        localStorage.removeItem('faci_id');
-        localStorage.removeItem('faci_name');
-        localStorage.removeItem('faci_section');
-        localStorage.removeItem('faci_subject');
-        localStorage.removeItem('faci_img_url');
-        
-        window.location.href = 'login.html'; 
-    }
-}
-        
     </script>
-
 </body>
 </html>
