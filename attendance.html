@@ -248,21 +248,23 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Presence heartbeat: refresh last_login while the panel is open so it goes stale once closed.
+        // Presence heartbeat: tell the backend the panel is open so the teacher panel shows Active.
         let presenceHeartbeatTimer = null;
-        async function sendPresenceHeartbeat() {
+        async function sendPresenceHeartbeat(online = true) {
             const faciId = localStorage.getItem('faci_id');
             if (!faciId) return;
             try {
-                await supabaseClient
-                    .from('facilitators')
-                    .update({ last_login: new Date().toISOString() })
-                    .eq('id', faciId);
+                const res = await fetch('https://teacher-panel-d1kw.onrender.com/api/faci/presence', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ faci_id: faciId, online })
+                });
+                if (!res.ok) console.error('Presence heartbeat HTTP error:', res.status);
             } catch (error) {
-                console.error("Presence heartbeat failed:", error);
+                console.error('Presence heartbeat failed:', error);
             }
         }
-        presenceHeartbeatTimer = setInterval(sendPresenceHeartbeat, 30000);
+        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(), 30000);
         sendPresenceHeartbeat();
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') sendPresenceHeartbeat();
