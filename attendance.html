@@ -243,12 +243,11 @@
             window.location.href = 'login.html';
         }
 
-        const API_URL = 'https://teacher-panel-d1kw.onrender.com';
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + API + Tab Close Handling) 🔥
+        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
         
         async function sendPresenceHeartbeat(online = true) {
@@ -259,19 +258,10 @@
             const nowIso = new Date().toISOString();
 
             try {
-                // 1. Direct Supabase Update for instantaneous response on the Teacher Panel
+                // Direct Supabase Update for instantaneous response
                 await supabaseClient.from('facilitators')
                     .update({ status: statusVal, last_login: nowIso })
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`);
-
-                // 2. Original API Call (with keepalive so it runs even if tab is closing)
-                fetch('https://teacher-panel-d1kw.onrender.com/api/faci/presence', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ faci_id: faciId, online }),
-                    keepalive: true
-                }).catch(e => console.log('API heartbeat skipped'));
-
             } catch (error) {
                 console.error('Presence update failed:', error);
             }
@@ -611,15 +601,13 @@
             btn.disabled = true;
 
             try {
+                // Delete previous records for this date/section
                 await supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
 
-                const response = await fetch(`${API_URL}/api/attendance/submit`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(attendanceData)
-                });
+                // Insert the new records directly to Supabase
+                const { error } = await supabaseClient.from('attendance').insert(attendanceData);
 
-                if (response.ok) {
+                if (!error) {
                     btn.style.background = '#10b981';
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Updated Successfully!';
                     
@@ -640,7 +628,7 @@
                         btn.disabled = false;
                     }, 2000);
                 } else {
-                    throw new Error("Failed");
+                    throw error;
                 }
             } catch (error) {
                 console.error("Error submitting:", error);
