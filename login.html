@@ -1,497 +1,517 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facilitator Login | Management System</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="logo.jpg">
-    <link rel="apple-touch-icon" href="logo.jpg">
-    <meta name="theme-color" content="#3b82f6">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <style>
-        :root {
-            /* MATCHING THE IMAGE DESIGN VARIABLES */
-            --main-bg: #e8f0fe;       /* Soft light blue background */
-            --card-bg: #ffffff;       /* Pure white card */
-            --text-main: #111827;     /* Dark text */
-            --text-muted: #6b7280;    /* Muted text for subtitle */
-            --label-color: #3b82f6;   /* Blueish label color like in the image */
-            --border-color: #e5e7eb;  /* Light gray border */
-            --input-bg: #ffffff;      
-            --input-bg-focus: #f8fafc;
-            
-            --accent-blue: #3b82f6;   /* Main button blue */
-            --accent-hover: #2563eb;  
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator Login | Management System</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            /* MATCHING THE IMAGE DESIGN VARIABLES */
+            --main-bg: #e8f0fe;       /* Soft light blue background */
+            --card-bg: #ffffff;       /* Pure white card */
+            --text-main: #111827;     /* Dark text */
+            --text-muted: #6b7280;    /* Muted text for subtitle */
+            --label-color: #3b82f6;   /* Blueish label color like in the image */
+            --border-color: #e5e7eb;  /* Light gray border */
+            --input-bg: #ffffff;      
+            --input-bg-focus: #f8fafc;
+            
+            --accent-blue: #3b82f6;   /* Main button blue */
+            --accent-hover: #2563eb;  
+        }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #e4effe 0%, #f0f5ff 100%);
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            padding: 20px;
-            overflow: hidden; /* Prevent scrollbar during splash */
-        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e4effe 0%, #f0f5ff 100%);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            overflow: hidden; /* Prevent scrollbar during splash */
+        }
 
-        /* --- SPLASH SCREEN STYLES --- */
-        .splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100vh;
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-            z-index: 99999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
-        }
+        /* --- SPLASH SCREEN STYLES --- */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+        }
 
-        .splash-content {
-            text-align: center;
-            color: white;
-            animation: fadeIn 1s ease-in-out;
-        }
+        .splash-content {
+            text-align: center;
+            color: white;
+            animation: fadeIn 1s ease-in-out;
+        }
 
-        .splash-logo-container {
-            width: 90px;
-            height: 90px;
-            background: white;
-            border-radius: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0 auto 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            overflow: hidden;
-        }
+        .splash-logo-container {
+            width: 90px;
+            height: 90px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
 
-        .splash-logo-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .splash-logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
 
-        .splash-title {
-            font-size: 1.8rem;
-            font-weight: 800;
-            margin-bottom: 5px;
-            letter-spacing: 1px;
-        }
+        .splash-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
 
-        .splash-subtitle {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            margin-bottom: 30px;
-        }
+        .splash-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
 
-        .splash-loader {
-            width: 40px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.3);
-            margin: 0 auto;
-            border-radius: 4px;
-            position: relative;
-            overflow: hidden;
-        }
+        .splash-loader {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            margin: 0 auto;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
 
-        .splash-loader::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -20px;
-            width: 20px;
-            height: 100%;
-            background: white;
-            border-radius: 4px;
-            animation: loading 1s infinite ease-in-out;
-        }
+        .splash-loader::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -20px;
+            width: 20px;
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            animation: loading 1s infinite ease-in-out;
+        }
 
-        @keyframes loading {
-            0% { left: -20px; }
-            100% { left: 100%; }
-        }
+        @keyframes loading {
+            0% { left: -20px; }
+            100% { left: 100%; }
+        }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-        /* Clean White Card */
-        .login-container {
-            background: var(--card-bg);
-            padding: 45px 40px;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
-            width: 100%;
-            max-width: 420px;
-            text-align: center;
-        }
+        /* Clean White Card */
+        .login-container {
+            background: var(--card-bg);
+            padding: 45px 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
 
-        .login-header h2 {
-            font-size: 1.6rem;
-            margin-bottom: 6px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
+        .login-header h2 {
+            font-size: 1.6rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
 
-        .login-header p {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            margin-bottom: 30px;
-            font-weight: 400;
-        }
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
 
-        .input-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
 
-        .input-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.75rem;
-            color: var(--label-color);
-            font-weight: 600;
-        }
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+            color: var(--label-color);
+            font-weight: 600;
+        }
 
-        /* Wrapper for the password eye icon */
-        .password-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
+        /* Wrapper for the password eye icon */
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
 
-        .input-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--input-bg);
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            outline: none;
-            transition: all 0.2s ease-in-out;
-        }
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+        }
 
-        /* HIDE DEFAULT BROWSER EYE ICON (Edge/IE) */
-        input[type="password"]::-ms-reveal,
-        input[type="password"]::-ms-clear {
-            display: none;
-        }
+        /* HIDE DEFAULT BROWSER EYE ICON (Edge/IE) */
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear {
+            display: none;
+        }
 
-        .password-wrapper input {
-            padding-right: 45px;
-        }
+        .password-wrapper input {
+            padding-right: 45px;
+        }
 
-        .input-group input:focus {
-            border-color: var(--accent-blue);
-            background: var(--input-bg-focus);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
-        }
+        .input-group input:focus {
+            border-color: var(--accent-blue);
+            background: var(--input-bg-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
+        }
 
-        /* Eye Icon Styling */
-        .toggle-password {
-            position: absolute;
-            right: 16px;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 1rem;
-            transition: color 0.2s;
-        }
+        /* Eye Icon Styling */
+        .toggle-password {
+            position: absolute;
+            right: 16px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
 
-        .toggle-password:hover {
-            color: var(--accent-blue);
-        }
+        .toggle-password:hover {
+            color: var(--accent-blue);
+        }
 
-        /* Remember me & Forgot Password Row */
-        .options-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            font-size: 0.8rem;
-        }
+        /* Remember me & Forgot Password Row */
+        .options-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            font-size: 0.8rem;
+        }
 
-        .remember-me {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--text-main);
-            font-weight: 500;
-            cursor: pointer;
-        }
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            font-weight: 500;
+            cursor: pointer;
+        }
 
-        .remember-me input {
-            cursor: pointer;
-            width: 14px;
-            height: 14px;
-            accent-color: var(--accent-blue);
-        }
+        .remember-me input {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent-blue);
+        }
 
-        .forgot-password {
-            color: var(--accent-blue);
-            text-decoration: none;
-            font-weight: 500;
-        }
+        .forgot-password {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
 
-        .forgot-password:hover {
-            text-decoration: underline;
-        }
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
 
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            background-color: var(--accent-blue);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out, transform 0.1s;
-        }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s;
+        }
 
-        .login-btn:hover {
-            background-color: var(--accent-hover);
-        }
-        
-        .login-btn:active {
-            transform: scale(0.98);
-        }
+        .login-btn:hover {
+            background-color: var(--accent-hover);
+        }
+        
+        .login-btn:active {
+            transform: scale(0.98);
+        }
 
-        /* --- CUSTOM ALERT POPUP --- */
-        .custom-alert-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 200000; opacity: 0; pointer-events: none; transition: 0.3s ease;
-        }
-        .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
-        .custom-alert-box {
-            background: var(--card-bg); padding: 25px 20px; border-radius: 16px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
-            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid var(--border-color);
-        }
-        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
-        .custom-alert-icon { font-size: 3rem; margin-bottom: 15px; }
-        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
-        .custom-alert-msg { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; }
-        .custom-alert-btn {
-            background: var(--accent-blue); color: white; border: none; padding: 12px 20px;
-            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
-            font-family: 'Inter', sans-serif;
-        }
-        .custom-alert-btn:hover { background: var(--accent-hover); }
-    </style>
+        /* --- CUSTOM ALERT POPUP --- */
+        .custom-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 200000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
+        .custom-alert-box {
+            background: var(--card-bg); padding: 25px 20px; border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
+            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid var(--border-color);
+        }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
+        .custom-alert-icon { font-size: 3rem; margin-bottom: 15px; }
+        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-btn {
+            background: var(--accent-blue); color: white; border: none; padding: 12px 20px;
+            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-alert-btn:hover { background: var(--accent-hover); }
+    </style>
 </head>
 <body>
 
-    <div id="splashScreen" class="splash-screen">
-        <div class="splash-content">
-            <div class="splash-logo-container">
-                <img src="logo.jpg" alt="Logo">
-            </div>
-            <h1 class="splash-title">Management System</h1>
-            <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
-            <div class="splash-loader" id="splashLoaderEl"></div>
-        </div>
-    </div>
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo-container">
+                <img src="logo.jpg" alt="Logo">
+            </div>
+            <h1 class="splash-title">Management System</h1>
+            <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
+            <div class="splash-loader" id="splashLoaderEl"></div>
+        </div>
+    </div>
 
-    <div class="login-container">
-        <div class="login-header">
-            <h2>Welcome Facilitator</h2>
-            <p>Login to your account</p>
-        </div>
+    <div class="login-container">
+        <div class="login-header">
+            <h2>Welcome Facilitator</h2>
+            <p>Login to your account</p>
+        </div>
 
-        <form id="faciLoginForm">
-            <div class="input-group">
-                <label for="accountId">Facilitator ID</label>
-                <input type="text" id="accountId" placeholder="e.g. FACI-1234" required>
-            </div>
-            
-            <div class="input-group">
-                <label for="password">Password</label>
-                <div class="password-wrapper">
-                    <input type="password" id="password" placeholder="Enter your password" required>
-                    <i class="fa-solid fa-eye toggle-password" id="togglePassword" title="Show/Hide Password"></i>
-                </div>
-            </div>
+        <form id="faciLoginForm">
+            <div class="input-group">
+                <label for="accountId">Facilitator ID</label>
+                <input type="text" id="accountId" placeholder="e.g. FACI-1234" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                    <i class="fa-solid fa-eye toggle-password" id="togglePassword" title="Show/Hide Password"></i>
+                </div>
+            </div>
 
-            <div class="options-row">
-                <label class="remember-me">
-                    <input type="checkbox" id="rememberMe"> Remember me
-                </label>
-                <a href="#" class="forgot-password">Forgot password?</a>
-            </div>
+            <div class="options-row">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe"> Remember me
+                </label>
+                <a href="#" class="forgot-password">Forgot password?</a>
+            </div>
 
-            <button type="submit" class="login-btn" id="loginBtn">Login</button>
-        </form>
-    </div>
+            <button type="submit" class="login-btn" id="loginBtn">Login</button>
+        </form>
+    </div>
 
-    <div id="customAlertOverlay" class="custom-alert-overlay">
-        <div class="custom-alert-box">
-            <i class="fa-solid fa-circle-xmark custom-alert-icon" id="alertIcon" style="color: #ef4444;"></i>
-            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
-            <p id="customAlertMessage" class="custom-alert-msg"></p>
-            <button onclick="closeAlert()" class="custom-alert-btn">Okay</button>
-        </div>
-    </div>
+    <div id="customAlertOverlay" class="custom-alert-overlay">
+        <div class="custom-alert-box">
+            <i class="fa-solid fa-circle-xmark custom-alert-icon" id="alertIcon" style="color: #ef4444;"></i>
+            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
+            <p id="customAlertMessage" class="custom-alert-msg"></p>
+            <button onclick="closeAlert()" class="custom-alert-btn">Okay</button>
+        </div>
+    </div>
 
-    <script>
-        // UPDATED: Render Backend URL
-        const API_URL = 'https://teacher-panel-d1kw.onrender.com'; 
+    <script>
+        // Supabase Setup
+        const SUPABASE_URL ='https://njzvuwkepaasnsvuujgx.supabase.co'; 
+        const SUPABASE_ANON_KEY ='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0'; 
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 🌟 WAKE UP SERVER (PRE-WARMING) 🌟
-        fetch(`${API_URL}/`).catch(() => console.log("Server initialized."));
+        // Render Backend URL
+        const API_URL = 'https://teacher-panel-d1kw.onrender.com'; 
 
-        // 🌟 CUSTOM ALERT FUNCTIONS 🌟
-        function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
-            document.getElementById('customAlertTitle').textContent = title;
-            document.getElementById('customAlertMessage').textContent = message;
-            
-            const iconEl = document.getElementById('alertIcon');
-            iconEl.className = `fa-solid ${iconClass} custom-alert-icon`;
-            iconEl.style.color = iconColor;
-            
-            document.getElementById('customAlertOverlay').classList.add('show');
-        }
+        // 🌟 WAKE UP SERVER (PRE-WARMING) 🌟
+        fetch(`${API_URL}/`).catch(() => console.log("Server initialized."));
 
-        function closeAlert() {
-            document.getElementById('customAlertOverlay').classList.remove('show');
-        }
+        // 🌟 CUSTOM ALERT FUNCTIONS 🌟
+        function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
+            document.getElementById('customAlertTitle').textContent = title;
+            document.getElementById('customAlertMessage').textContent = message;
+            
+            const iconEl = document.getElementById('alertIcon');
+            iconEl.className = `fa-solid ${iconClass} custom-alert-icon`;
+            iconEl.style.color = iconColor;
+            
+            document.getElementById('customAlertOverlay').classList.add('show');
+        }
 
-        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
-        window.addEventListener('DOMContentLoaded', () => {
-            const activeFaciId = localStorage.getItem('faci_id');
-            if (activeFaciId) {
-                document.getElementById('splashLoaderEl').style.display = 'none';
-                document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
-                
-                setTimeout(() => {
-                    window.location.href = 'index.html'; 
-                }, 800);
-                return; 
-            }
+        function closeAlert() {
+            document.getElementById('customAlertOverlay').classList.remove('show');
+        }
 
-            // Check if Faci ID was remembered
-            const rememberedId = localStorage.getItem('remembered_faci_id');
-            if (rememberedId) {
-                document.getElementById('accountId').value = rememberedId;
-                document.getElementById('rememberMe').checked = true;
-            }
-        });
+        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
+        window.addEventListener('DOMContentLoaded', () => {
+            const activeFaciId = localStorage.getItem('faci_id');
+            if (activeFaciId) {
+                document.getElementById('splashLoaderEl').style.display = 'none';
+                document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html'; 
+                }, 800);
+                return; 
+            }
 
-        // 🌟 SPLASH SCREEN LOGIC 🌟
-        window.addEventListener('load', function() {
-            if (!localStorage.getItem('faci_id')) {
-                const splashScreen = document.getElementById('splashScreen');
-                setTimeout(() => {
-                    splashScreen.style.opacity = '0';
-                    splashScreen.style.visibility = 'hidden';
-                    document.body.style.overflow = 'auto';
-                }, 1500); 
-            }
-        });
+            // Check if Faci ID was remembered
+            const rememberedId = localStorage.getItem('remembered_faci_id');
+            if (rememberedId) {
+                document.getElementById('accountId').value = rememberedId;
+                document.getElementById('rememberMe').checked = true;
+            }
+        });
 
-        // Password Visibility Toggle Logic
-        const togglePassword = document.getElementById('togglePassword');
-        const passwordInput = document.getElementById('password');
+        // 🌟 SPLASH SCREEN LOGIC 🌟
+        window.addEventListener('load', function() {
+            if (!localStorage.getItem('faci_id')) {
+                const splashScreen = document.getElementById('splashScreen');
+                setTimeout(() => {
+                    splashScreen.style.opacity = '0';
+                    splashScreen.style.visibility = 'hidden';
+                    document.body.style.overflow = 'auto';
+                }, 1500); 
+            }
+        });
 
-        togglePassword.addEventListener('click', function () {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            
-            this.classList.toggle('fa-eye');
-            this.classList.toggle('fa-eye-slash');
-        });
+        // Password Visibility Toggle Logic
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
 
-        // 🌟 FAST & PROFESSIONAL LOGIN LOGIC 🌟
-        document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); 
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
 
-            const accountId = document.getElementById('accountId').value.trim();
-            const password = passwordInput.value.trim();
-            const rememberMe = document.getElementById('rememberMe').checked;
-            const loginBtn = document.getElementById('loginBtn');
-            
-            loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
-            loginBtn.disabled = true;
+        // 🌟 FAST & PROFESSIONAL LOGIN LOGIC 🌟
+        document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); 
 
-            try {
-                const response = await fetch(`${API_URL}/api/faci/login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        account_id: accountId,
-                        password: password
-                    })
-                });
+            const accountId = document.getElementById('accountId').value.trim();
+            const password = passwordInput.value.trim();
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
+            loginBtn.disabled = true;
 
-                const data = await response.json();
+            try {
+                const response = await fetch(`${API_URL}/api/faci/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_id: accountId,
+                        password: password
+                    })
+                });
 
-                if (response.ok) {
-                    if (rememberMe) {
-                        localStorage.setItem('remembered_faci_id', accountId);
-                    } else {
-                        localStorage.removeItem('remembered_faci_id');
-                    }
+                const data = await response.json();
 
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('user_id');
-                    localStorage.removeItem('cached_user_name');
-                    localStorage.removeItem('cached_user_avatar');
+                if (response.ok) {
+                    if (rememberMe) {
+                        localStorage.setItem('remembered_faci_id', accountId);
+                    } else {
+                        localStorage.removeItem('remembered_faci_id');
+                    }
 
-                    localStorage.setItem('faci_id', data.faci.id);
-                    localStorage.setItem('faci_name', data.faci.full_name);
-                    localStorage.setItem('faci_section', data.faci.section);
-                    localStorage.setItem('faci_subject', data.faci.subject);
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('cached_user_name');
+                    localStorage.removeItem('cached_user_avatar');
 
-                    loginBtn.style.backgroundColor = '#10b981'; 
-                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
-                    
-                    setTimeout(() => {
-                        window.location.href = 'index.html'; 
-                    }, 800);
+                    localStorage.setItem('faci_id', data.faci.id);
+                    localStorage.setItem('faci_name', data.faci.full_name);
+                    localStorage.setItem('faci_section', data.faci.section);
+                    localStorage.setItem('faci_subject', data.faci.subject);
 
-                } else {
-                    // SIMPLE ERROR MESSAGE VIA POPUP
-                    showAlert(
-                        "Login Failed", 
-                        "We couldn't find an account with those details. Please check your ID and password.", 
-                        "fa-circle-xmark", 
-                        "#ef4444"
-                    );
-                    loginBtn.innerHTML = 'Login';
-                    loginBtn.disabled = false;
-                }
+                    // 🔥 DUGANG NGA CODE: Update `last_login` kag `status` sa Supabase 🔥
+                    try {
+                        await supabaseClient
+                            .from('facilitators')
+                            .update({ 
+                                last_login: new Date().toISOString(),
+                                status: 'Active' // Option man ini kon may status column ka
+                            })
+                            .eq('id', data.faci.id);
+                    } catch (dbError) {
+                        console.error("Failed to update last login in Supabase:", dbError);
+                    }
 
-            } catch (error) {
-                console.error('Login request failed:', error);
-                // SIMPLE ERROR MESSAGE VIA POPUP
-                showAlert(
-                    "Connection Error", 
-                    "We're having trouble connecting. Please check your internet connection and try again.", 
-                    "fa-wifi", 
-                    "#f59e0b"
-                );
-                loginBtn.innerHTML = 'Login';
-                loginBtn.disabled = false;
-            }
-        });
-    </script>
+                    loginBtn.style.backgroundColor = '#10b981'; 
+                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
+                    
+                    setTimeout(() => {
+                        window.location.href = 'index.html'; 
+                    }, 800);
+
+                } else {
+                    // SIMPLE ERROR MESSAGE VIA POPUP
+                    showAlert(
+                        "Login Failed", 
+                        "We couldn't find an account with those details. Please check your ID and password.", 
+                        "fa-circle-xmark", 
+                        "#ef4444"
+                    );
+                    loginBtn.innerHTML = 'Login';
+                    loginBtn.disabled = false;
+                }
+
+            } catch (error) {
+                console.error('Login request failed:', error);
+                // SIMPLE ERROR MESSAGE VIA POPUP
+                showAlert(
+                    "Connection Error", 
+                    "We're having trouble connecting. Please check your internet connection and try again.", 
+                    "fa-wifi", 
+                    "#f59e0b"
+                );
+                loginBtn.innerHTML = 'Login';
+                loginBtn.disabled = false;
+            }
+        });
+    </script>
 
 </body>
 </html>
