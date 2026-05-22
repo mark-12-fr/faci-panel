@@ -297,6 +297,26 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // Presence heartbeat: refresh last_login while the panel is open so it goes stale once closed.
+        let presenceHeartbeatTimer = null;
+        async function sendPresenceHeartbeat() {
+            const faciId = localStorage.getItem('faci_id');
+            if (!faciId) return;
+            try {
+                await supabaseClient
+                    .from('facilitators')
+                    .update({ last_login: new Date().toISOString() })
+                    .eq('id', faciId);
+            } catch (error) {
+                console.error("Presence heartbeat failed:", error);
+            }
+        }
+        presenceHeartbeatTimer = setInterval(sendPresenceHeartbeat, 30000);
+        sendPresenceHeartbeat();
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') sendPresenceHeartbeat();
+        });
+
         document.addEventListener('DOMContentLoaded', async () => {
             let fullName = localStorage.getItem('faci_name') || 'Loading...';
             const section = localStorage.getItem('faci_section');
@@ -448,14 +468,26 @@
         }
 
         // 🌟 SAFE LOGOUT FUNCTION 🌟
-        function faciLogout() {
+        async function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
+                clearInterval(presenceHeartbeatTimer);
+                const faciId = localStorage.getItem('faci_id');
+                if (faciId) {
+                    try {
+                        await supabaseClient
+                            .from('facilitators')
+                            .update({ last_login: null })
+                            .eq('id', faciId);
+                    } catch (error) {
+                        console.error("Failed to update status on logout:", error);
+                    }
+                }
                 localStorage.removeItem('faci_id');
                 localStorage.removeItem('faci_name');
                 localStorage.removeItem('faci_section');
                 localStorage.removeItem('faci_subject');
-                localStorage.removeItem('faci_img_url'); 
-                window.location.href = 'login.html'; 
+                localStorage.removeItem('faci_img_url');
+                window.location.href = 'login.html';
             }
         }
     </script>
