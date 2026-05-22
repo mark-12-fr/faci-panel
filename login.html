@@ -468,13 +468,15 @@
 
                     // 🔥 DUGANG NGA CODE: Update `last_login` kag `status` sa Supabase 🔥
                     try {
-                        await supabaseClient
+                        const { error: dbError } = await supabaseClient
                             .from('facilitators')
                             .update({ 
                                 last_login: new Date().toISOString(),
-                                status: 'Active' // Option man ini kon may status column ka
+                                status: 'Active' 
                             })
                             .eq('id', data.faci.id);
+                            
+                        if (dbError) throw dbError;
                     } catch (dbError) {
                         console.error("Failed to update last login in Supabase:", dbError);
                     }
