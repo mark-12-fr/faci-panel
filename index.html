@@ -631,31 +631,43 @@
             }
         });
 
-        // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
-        async function faciLogout() {
-            if(confirm("Are you sure you want to sign out?")) {
-                const faciId = localStorage.getItem('faci_id');
-                if (faciId) {
-                    try {
-                        // Set last_login to null in Supabase to mark as Inactive
-                        await supabaseClient
-                            .from('facilitators')
-                            .update({ last_login: null })
-                            .eq('id', faciId);
-                    } catch (error) {
-                        console.error("Failed to update status on logout:", error);
-                    }
-                }
-                
-                localStorage.removeItem('faci_id');
-                localStorage.removeItem('faci_name');
-                localStorage.removeItem('faci_section');
-                localStorage.removeItem('faci_subject');
-                localStorage.removeItem('faci_img_url');
-                
-                window.location.href = 'login.html'; 
+     // 🔥 HEARTBEAT: Update status kada 30 seconds while open ang web 🔥
+setInterval(async () => {
+    const faciId = localStorage.getItem('faci_id');
+    if (faciId) {
+        await supabaseClient
+            .from('facilitators')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', faciId);
+    }
+}, 30000); 
+
+// 🔥 INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
+async function faciLogout() {
+    if(confirm("Are you sure you want to sign out?")) {
+        const faciId = localStorage.getItem('faci_id');
+        if (faciId) {
+            try {
+                // Set last_login to null in Supabase to mark as Inactive immediately
+                await supabaseClient
+                    .from('facilitators')
+                    .update({ last_login: null })
+                    .eq('id', faciId);
+            } catch (error) {
+                console.error("Failed to update status on logout:", error);
             }
         }
+        
+        localStorage.removeItem('faci_id');
+        localStorage.removeItem('faci_name');
+        localStorage.removeItem('faci_section');
+        localStorage.removeItem('faci_subject');
+        localStorage.removeItem('faci_img_url');
+        
+        window.location.href = 'login.html'; 
+    }
+}
+        
     </script>
 
 </body>
