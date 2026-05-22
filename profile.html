@@ -297,26 +297,51 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Presence heartbeat: tell the backend the panel is open so the teacher panel shows Active.
+        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + API + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
+
         async function sendPresenceHeartbeat(online = true) {
             const faciId = localStorage.getItem('faci_id');
             if (!faciId) return;
+
+            const statusVal = online ? 'Active' : 'Inactive';
+            const nowIso = new Date().toISOString();
+
             try {
-                const res = await fetch('https://teacher-panel-d1kw.onrender.com/api/faci/presence', {
+                // 1. Direct Supabase Update for instantaneous response on the Teacher Panel
+                await supabaseClient.from('facilitators')
+                    .update({ status: statusVal, last_login: nowIso })
+                    .or(`id.eq.${faciId},account_id.eq.${faciId}`);
+
+                // 2. Original API Call (with keepalive so it runs even if tab is closing)
+                fetch('https://teacher-panel-d1kw.onrender.com/api/faci/presence', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ faci_id: faciId, online })
-                });
-                if (!res.ok) console.error('Presence heartbeat HTTP error:', res.status);
+                    body: JSON.stringify({ faci_id: faciId, online }),
+                    keepalive: true
+                }).catch(e => console.log('API heartbeat skipped'));
+
             } catch (error) {
-                console.error('Presence heartbeat failed:', error);
+                console.error('Presence update failed:', error);
             }
         }
-        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(), 30000);
-        sendPresenceHeartbeat();
+
+        // Timer for every 30 seconds
+        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
+        sendPresenceHeartbeat(true);
+
+        // Detect if user minimizes browser, switches tab, or locks screen
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') sendPresenceHeartbeat();
+            if (document.visibilityState === 'visible') {
+                sendPresenceHeartbeat(true);
+            } else {
+                sendPresenceHeartbeat(false); // Inactive immediately
+            }
+        });
+
+        // Detect if user fully closes the tab / window ('X' button)
+        window.addEventListener('pagehide', () => {
+            sendPresenceHeartbeat(false);
         });
 
         document.addEventListener('DOMContentLoaded', async () => {
