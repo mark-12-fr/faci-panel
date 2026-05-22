@@ -1,670 +1,1323 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Facilitator Dashboard</title>
+
     <link rel="manifest" href="manifest.json">
+
     <link rel="icon" type="image/jpeg" href="logo.jpg">
+
     <link rel="apple-touch-icon" href="logo.jpg">
+
     <meta name="theme-color" content="#3b82f6">
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     
+
     <script src="https://unpkg.com/lucide@latest"></script>
+
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
+
+
     <style>
+
         /* --- Root Variables & Reset --- */
+
         :root {
+
             --primary-bg: #f8fafc; 
+
             --panel-bg: #ffffff;
+
             --text-main: #1e293b; 
+
             --text-sub: #64748b; 
+
             
+
             --color-1-shadow: rgba(59, 130, 246, 0.25); 
+
             --color-2-shadow: rgba(34, 197, 94, 0.25);  
+
             --color-3-shadow: rgba(234, 179, 8, 0.3);  
+
             --color-4-shadow: rgba(168, 85, 247, 0.25); 
+
             
+
             --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+
             --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
             --border-radius: 12px;
+
             --accent-blue: #3b82f6;
+
         }
+
+
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
+
             font-family: 'Inter', sans-serif;
+
             background-color: var(--primary-bg);
+
             color: var(--text-main);
+
             padding: 15px;
+
             padding-bottom: 80px; 
+
             overflow-x: hidden; 
+
         }
+
+
 
         /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+
         @keyframes fadeInUp {
+
             0% { opacity: 0; transform: translateY(25px); }
+
             100% { opacity: 1; transform: translateY(0); }
+
         }
+
+
 
         @keyframes wave {
+
             0% { transform: rotate( 0.0deg) }
+
             10% { transform: rotate(14.0deg) }  
+
             20% { transform: rotate(-8.0deg) }
+
             30% { transform: rotate(14.0deg) }
+
             40% { transform: rotate(-4.0deg) }
+
             50% { transform: rotate(10.0deg) }
+
             60% { transform: rotate( 0.0deg) }  
+
             100% { transform: rotate( 0.0deg) }
+
         }
+
+
+
+        /* ✨ NEW: Bobbing Animation for Numbers (Up and Down) ✨ */
 
         @keyframes bobbing {
+
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
+
+            50% { transform: translateY(-4px); } /* Moves up by 4px */
+
         }
+
+
 
         .fade-in-up {
+
             opacity: 0; 
+
             animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
         }
+
+
 
         .delay-1 { animation-delay: 0.1s; }
+
         .delay-2 { animation-delay: 0.2s; }
+
         .delay-3 { animation-delay: 0.3s; }
+
         .delay-4 { animation-delay: 0.4s; }
+
         .delay-5 { animation-delay: 0.5s; }
 
+
+
         /* --- Header / Section 1 --- */
+
         .dashboard-header {
+
             background-color: var(--panel-bg);
+
             padding: 20px;
+
             border-radius: var(--border-radius);
+
             box-shadow: var(--premium-shadow);
+
             margin-bottom: 20px;
+
             display: flex;
+
             justify-content: space-between;
+
             align-items: flex-start;
+
             position: relative;
+
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+
         }
+
         
+
         .dashboard-header:hover {
+
             transform: translateY(-2px);
+
             box-shadow: var(--hover-shadow);
+
         }
+
+
 
         .header-content {
+
             flex-grow: 1; 
+
             padding-right: 10px;
+
         }
+
+
 
         .header-content h1 { font-size: 1.6rem; font-weight: 800; line-height: 1.2; margin-bottom: 8px;}
+
         .header-content .date { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
         .hand-emoji { font-size: 1.4rem; display: inline-block; animation: wave 2.5s infinite; transform-origin: 70% 70%; }
 
+
+
         .status-badge {
+
             background-color: #e2e8f0; 
+
             padding: 6px 12px;
+
             border-radius: 20px;
+
             font-size: 0.75rem;
+
             color: var(--text-main);
+
             margin-bottom: 12px;
+
             display: inline-flex;
+
             align-items: center;
+
             gap: 5px;
+
             font-weight: 700;
+
         }
+
+
 
         .tag-row { display: flex; gap: 8px; flex-wrap: wrap;}
+
         .tag {
+
             padding: 6px 12px;
+
             border-radius: 15px;
+
             font-size: 0.75rem;
+
             font-weight: 800;
+
         }
+
         .tag-primary { background-color: #eff6ff; color: #3b82f6; } 
+
         .tag-secondary { background-color: #faf5ff; color: #a855f7; } 
 
+
+
         /* --- Profile Avatar --- */
+
         .profile-avatar {
+
             width: 55px;
+
             height: 55px;
+
             flex-shrink: 0; 
+
             border-radius: 50%;
+
             margin-left: 5px;
+
             display: flex; 
+
             align-items: center; 
+
             justify-content: center;
+
             overflow: hidden;
+
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+
             position: absolute;
+
             top: 20px;
+
             right: 20px;
+
             border: 2px solid white;
+
             background: #1e3a8a;
+
             transition: transform 0.3s ease;
+
         }
+
         
+
         .profile-avatar:active { transform: scale(0.9); }
 
+
+
         .profile-avatar img {
+
             width: 100%; 
+
             height: 100%; 
+
             object-fit: cover; 
+
         }
+
+
 
         /* --- Section Title --- */
+
         .section-title {
+
             color: var(--text-sub);
+
             text-transform: uppercase;
+
             font-size: 0.75rem;
+
             letter-spacing: 1px;
+
             margin: 25px 0 10px 5px;
+
             font-weight: 800;
+
         }
+
+
 
         /* --- Statistic Boxes --- */
+
         .stats-grid {
+
             display: grid;
+
             grid-template-columns: repeat(2, 1fr);
+
             gap: 15px;
+
         }
+
+
 
         .stat-card {
+
             background-color: var(--panel-bg);
+
             padding: 20px;
+
             border-radius: var(--border-radius);
+
             position: relative;
+
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
             cursor: pointer;
+
         }
+
+
 
         .stat-card:active { transform: scale(0.96) !important; }
+
         
+
         .stat-card.blue   { border-left: 4px solid #3b82f6; box-shadow: 0 10px 15px -3px var(--color-1-shadow); }
+
         .stat-card.blue:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-1-shadow); }
+
         
+
         .stat-card.green  { border-left: 4px solid #22c55e; box-shadow: 0 10px 15px -3px var(--color-2-shadow); }
+
         .stat-card.green:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-2-shadow); }
+
         
+
         .stat-card.yellow { border-left: 4px solid #eab308; box-shadow: 0 10px 15px -3px var(--color-3-shadow); }
+
         .stat-card.yellow:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-3-shadow); }
+
         
+
         .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
+
         .stat-card.purple:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-4-shadow); }
 
+
+
+        /* ✨ Applying Bobbing Animation to Numbers ✨ */
+
         .stat-card h2 { 
+
             font-size: 2.2rem; 
+
             font-weight: 800; 
+
             margin-bottom: 5px; 
+
             transition: color 0.3s ease; 
-            display: inline-block; 
-            animation: bobbing 2s ease-in-out infinite; 
+
+            display: inline-block; /* Required for transform animation */
+
+            animation: bobbing 2s ease-in-out infinite; /* Continuous up and down */
+
         }
+
         
+
+        /* Staggered animation delays for the numbers */
+
         .stat-card.blue h2   { color: #1d4ed8; animation-delay: 0s; }
+
         .stat-card.green h2  { color: #15803d; animation-delay: 0.3s; }
+
         .stat-card.yellow h2 { color: #a16207; animation-delay: 0.6s; }
+
         .stat-card.purple h2 { color: #7e22ce; animation-delay: 0.9s; }
 
+
+
         .stat-card p.stat-label { color: var(--text-sub); font-size: 0.85rem; font-weight: 500;}
+
         .stat-card p.stat-sub   { font-size: 0.75rem; color: var(--text-sub); margin-top: 2px;}
+
         
+
         .stat-card p.absent  { color: #dc2626; font-weight: 600; font-size: 0.75rem; }
+
         .stat-card p.pending { color: #ea580c; font-weight: 600; font-size: 0.75rem; }
+
         .stat-card p.done    { color: #16a34a; font-weight: 600; font-size: 0.75rem; }
 
+
+
         /* --- Section Overview --- */
+
         .overview-panel {
+
             background-color: var(--panel-bg);
+
             padding: 18px 20px;
+
             border-radius: var(--border-radius);
+
             box-shadow: var(--premium-shadow);
+
             display: grid;
+
             grid-template-columns: repeat(3, 1fr) min-content;
+
             align-items: center;
+
             gap: 15px;
+
             margin-bottom: 20px;
+
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+
         }
+
         
+
         .overview-panel:hover {
+
             transform: translateY(-2px);
+
             box-shadow: var(--hover-shadow);
+
         }
+
+
 
         .overview-item { text-align: left; }
+
         .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
+
         .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
 
+
+
         .csv-btn {
+
             background-color: #3b82f6; color: white;
+
             padding: 10px 12px;
+
             border-radius: 8px;
+
             font-size: 0.75rem;
+
             text-decoration: none;
+
             display: inline-block;
+
             font-weight: 700;
+
             box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+
             transition: all 0.2s ease;
+
         }
+
         .csv-btn:hover { background-color: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
+
         .csv-btn:active { transform: scale(0.95); }
 
+
+
         /* --- Quick Actions --- */
+
         .actions-grid {
+
             display: grid;
+
             grid-template-columns: repeat(2, 1fr);
+
             gap: 15px;
+
         }
+
+
 
         .action-card {
+
             background-color: var(--panel-bg);
+
             padding: 15px;
+
             border-radius: var(--border-radius);
+
             box-shadow: var(--premium-shadow);
+
             display: flex;
+
             align-items: center;
+
             gap: 12px;
+
             margin-bottom: 10px;
+
             text-decoration: none;
+
             color: inherit;
+
             transition: all 0.3s ease;
+
         }
+
+
 
         .action-card:hover {
+
             transform: translateY(-3px);
+
             box-shadow: var(--hover-shadow);
+
             background-color: #f8fafc;
+
         }
+
         
+
         .action-card:active { transform: scale(0.97); }
 
+
+
         .action-icon {
+
             font-size: 1.5rem;
+
             color: #3b82f6;
+
             padding: 12px;
+
             border-radius: 10px;
+
             background-color: #eff6ff;
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
+
             transition: transform 0.3s ease;
+
         }
+
         
+
         .action-card:hover .action-icon { transform: scale(1.1); }
 
+
+
         .action-text h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
+
         .action-text p  { font-size: 0.75rem; color: var(--text-sub); }
 
+
+
         /* --- Utility Grid --- */
+
         .utility-grid {
+
             display: grid;
+
             grid-template-columns: repeat(2, 1fr);
+
             gap: 15px;
+
             margin-bottom: 5px;
+
         }
+
+
 
         .utility-card {
+
             background: var(--panel-bg);
+
             padding: 15px;
+
             border-radius: var(--border-radius);
+
             box-shadow: var(--premium-shadow);
+
             display: flex;
+
             align-items: center;
+
             gap: 12px;
+
             text-decoration: none;
+
             cursor: pointer;
+
             transition: all 0.3s ease;
+
         }
+
+
 
         .utility-card:hover {
+
             transform: translateY(-3px);
+
             box-shadow: var(--hover-shadow);
+
             background-color: #f8fafc;
+
         }
+
         
+
         .utility-card:active { transform: scale(0.97); }
 
+
+
         .icon-box {
+
             width: 45px;
+
             height: 45px;
+
             border-radius: 10px;
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
+
             font-size: 1.2rem;
+
             flex-shrink: 0;
+
             transition: transform 0.3s ease;
+
         }
+
         
+
         .utility-card:hover .icon-box { transform: rotate(5deg) scale(1.1); }
 
+
+
         .bg-folder { background-color: #fef3c7; color: #d97706; }
+
         .bg-profile { background-color: #f1f5f9; color: #475569; }
 
+
+
         .utility-text h4 { font-size: 0.9rem; color: var(--text-main); font-weight: 700; }
+
         .utility-text p { font-size: 0.75rem; color: var(--text-sub); }
 
+
+
         /* --- Fixed Bottom Nav --- */
+
          .bottom-nav {
+
             position: fixed; bottom: 0; left: 0; width: 100%;
+
             background: white; display: flex; justify-content: space-around;
+
             padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+
             z-index: 1000;
+
         }
+
         .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
+
         .nav-item i { display: block; font-size: 1.2rem; margin-bottom: 3px; transition: transform 0.2s ease;}
+
         .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+
         
+
         .nav-item:hover { color: var(--accent-blue); }
+
         .nav-item:hover i { transform: translateY(-2px); }
+
         .nav-item:active { transform: scale(0.9); }
 
+
+
     </style>
+
 </head>
 
+
+
 <body>
+
     
+
     <div class="dashboard-header fade-in-up">
+
         <div class="header-content">
+
             <div class="status-badge">
+
                   <i class="fa-solid fa-lock"></i> Section-Locked View
+
             </div>
+
             <p class="date" id="currentDate">Loading Date...</p>
+
             <h1 id="faciGreeting">Good Day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
+
             <div class="tag-row">
+
                 <span class="tag tag-primary" id="faciSectionTag">Section</span>
+
                 <span class="tag tag-secondary" id="faciSubjectTag"><i class="fa-solid fa-spinner fa-spin"></i></span>
+
             </div>
+
         </div>
+
         <div class="profile-avatar">
+
             <img id="faciProfileImg" src="https://ui-avatars.com/api/?name=User&background=1e3a8a&color=fff" alt="Profile Picture">
+
         </div>
+
     </div>
+
+
 
     <div class="stats-grid">
+
         <div class="stat-card blue fade-in-up delay-1">
+
             <h2 id="dashTotalStudents"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+
             <p class="stat-label">My Students</p>
+
             <p class="stat-sub" id="faciSectionStat">Section</p>
+
         </div>
+
         <div class="stat-card green fade-in-up delay-1">
+
             <h2 id="dashPresent"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+
             <p class="stat-label">Present Today</p>
+
             <p class="absent" id="dashAbsent">0 absent/late</p>
+
         </div>
+
         
+
         <div class="stat-card yellow fade-in-up delay-2">
+
             <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+
             <p class="stat-label">Modules Done</p>
+
             <p class="pending" id="dashModulesSub">Calculating...</p>
+
         </div>
+
         <div class="stat-card purple fade-in-up delay-2">
+
             <h2 id="dashActivities"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+
             <p class="stat-label">Activities</p>
+
             <p class="done" id="dashActivitiesSub">Waiting</p>
+
         </div>
+
     </div>
+
+
 
     <div class="section-title fade-in-up delay-3">Section Overview</div>
+
     <div class="overview-panel fade-in-up delay-3">
+
         <div class="overview-item">
+
             <h3 id="faciSemesterOverview">1st Sem</h3>
+
             <p>Semester</p>
+
         </div>
+
         <div class="overview-item">
+
             <h3 id="faciSubjectOverview"><i class="fa-solid fa-spinner fa-spin"></i></h3>
+
             <p>Subject</p>
+
         </div>
+
         <div class="overview-item">
+
             <h3 id="faciTotalStudentsOverview">0</h3>
+
             <p>Students</p>
+
         </div>
+
         <a href="#" class="csv-btn">↓ CSV</a>
+
     </div>
+
+
 
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
+
     <div class="actions-grid">
+
         <a href="attendance.html" class="action-card fade-in-up delay-4">
+
             <div class="action-icon"><i data-lucide="clipboard-list"></i></div>
+
             <div class="action-text">
+
                 <h4>Attendance</h4>
+
                 <p>Today's class</p>
+
             </div>
+
         </a>
+
         <a href="record.html" class="action-card fade-in-up delay-4">
+
             <div class="action-icon" style="color: #a855f7; background: #faf5ff;"><i data-lucide="bar-chart-2"></i></div>
+
             <div class="action-text">
+
                 <h4>Class Record</h4>
+
                 <p>All scores</p>
+
             </div>
+
         </a>
+
     </div>
+
+
 
     <div class="utility-grid">
+
         <a href="#" class="utility-card fade-in-up delay-5">
+
             <div class="icon-box bg-folder"><i data-lucide="folder-open"></i></div>
+
             <div class="utility-text">
+
                 <h4>Export CSV</h4>
+
                 <p>Full report</p>
+
             </div>
+
         </a>
 
+
+
         <div class="utility-card fade-in-up delay-5" onclick="faciLogout()">
+
             <div class="icon-box bg-profile"><i data-lucide="log-out"></i></div>
+
             <div class="utility-text">
+
                 <h4>Logout</h4>
+
                 <p>Sign out</p>
+
             </div>
+
         </div>
+
     </div>
 
+
+
     <nav class="bottom-nav">
+
         <a href="index.html" class="nav-item active"><i class="fa-solid fa-house"></i>Home</a>
+
         <a href="attendance.html" class="nav-item"><i class="fa-solid fa-calendar-check"></i>Attendance</a>
+
         <a href="record.html" class="nav-item"><i class="fa-solid fa-chart-column"></i>Records</a>
+
         <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
+
     </nav>
 
+
+
     <script>
+
         // 🔒 SECURITY GUARD 
+
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
+
             window.location.href = 'login.html';
+
         }
+
+
 
         lucide.createIcons();
 
+
+
         const SUPABASE_URL = 'https://njzvuwkepaasnsvuujgx.supabase.co'; 
+
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
+
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+
+
         document.addEventListener('DOMContentLoaded', async () => {
+
             const faciId = localStorage.getItem('faci_id');
+
             const section = localStorage.getItem('faci_section');
+
             const cachedName = localStorage.getItem('faci_name') || 'User';
+
             const cachedImg = localStorage.getItem('faci_img_url'); 
 
+
+
             // 🔥 1. AUTO-ACTIVE LOGIC (PAG-OPEN SANG APP) 🔥
+
             if (faciId) {
+
                 try {
+
                     await supabaseClient
+
                         .from('facilitators')
+
                         .update({ last_login: new Date().toISOString() })
+
                         .eq('id', faciId);
+
                     console.log("Status updated to Active.");
+
                 } catch (error) {
+
                     console.error("Failed to auto-update status:", error);
+
                 }
+
             }
+
+
 
             if (cachedImg && cachedImg.trim() !== "") {
+
                 document.getElementById('faciProfileImg').src = cachedImg;
+
             } else {
+
                 document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cachedName)}&background=1e3a8a&color=fff`;
+
             }
 
+
+
             const d = new Date();
+
             const dd = String(d.getDate()).padStart(2, '0');
+
             const mm = String(d.getMonth() + 1).padStart(2, '0');
+
             const yyyy = d.getFullYear();
+
             const exactTodayDate = `${dd}/${mm}/${yyyy}`; 
 
+
+
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
 
+
+
             // 1. FETCH LIVE PROFILE DATA 
+
             try {
+
                 const { data: profile, error } = await supabaseClient
+
                     .from('facilitators')
+
                     .select('*') 
+
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
+
                     .single();
+
+
 
                 if (error) throw error;
 
+
+
                 if (profile) {
+
                     const firstName = profile.full_name.split(' ')[0];
+
                     document.getElementById('faciGreeting').innerHTML = `Good morning,<br>${firstName}! <span class="hand-emoji">👋</span>`;
+
                     document.getElementById('faciSectionTag').textContent = profile.section;
+
                     document.getElementById('faciSubjectTag').textContent = profile.subject.substring(0, 10);
+
                     document.getElementById('faciSectionStat').textContent = profile.section;
+
                     document.getElementById('faciSubjectOverview').textContent = profile.subject.substring(0, 15) + (profile.subject.length > 15 ? '...' : '');
+
+
 
                     const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
 
+
+
                     if (imgUrl && imgUrl.trim() !== "") {
+
                         document.getElementById('faciProfileImg').src = imgUrl;
+
                         localStorage.setItem('faci_img_url', imgUrl); 
+
                     } else {
+
                         document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name)}&background=1e3a8a&color=fff`;
+
                     }
+
                 }
+
             } catch (err) { 
+
                 console.error("Error fetching profile:", err); 
+
             }
+
+
 
             // 2. FETCH LIVE STATS 
+
             try {
+
                 const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
+
                 
+
                 let totalStudents = 0;
+
                 
+
                 if (sectionData) {
+
                     document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
+
                     
+
                     const { data: students } = await supabaseClient.from('students').select('id').eq('section_id', sectionData.id);
+
                     totalStudents = students ? students.length : 0;
+
                     
+
                     document.getElementById('dashTotalStudents').textContent = totalStudents;
+
                     document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
 
+
+
                     const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
+
                     
+
                     let modulesDone = 0;
+
                     let activitiesDone = 0;
 
+
+
                     if (recordsData) {
+
                         recordsData.forEach(record => {
+
                             for(let i=1; i<=25; i++) {
+
                                 if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined) modulesDone++;
+
                             }
+
                             for(let i=1; i<=10; i++) {
+
                                 if (record[`activity_${i}`] !== null && record[`activity_${i}`] !== undefined) activitiesDone++;
+
                             }
+
                         });
+
                     }
+
+
 
                     const totalPossibleModules = totalStudents * 25;
+
                     const totalPossibleActivities = totalStudents * 10;
+
                     const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
+
                     const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
 
+
+
                     document.getElementById('dashModules').textContent = modulesDone;
+
                     document.getElementById('dashModulesSub').textContent = pendingModules > 0 ? `${pendingModules} pending` : (modulesDone > 0 ? 'All done' : '0 pending');
+
                     document.getElementById('dashActivities').textContent = activitiesDone;
+
                     document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
 
+
+
                 } else {
+
                     document.getElementById('dashTotalStudents').textContent = '0';
+
                     document.getElementById('faciTotalStudentsOverview').textContent = '0';
+
                     document.getElementById('dashModules').textContent = '0';
+
                     document.getElementById('dashActivities').textContent = '0';
+
                     document.getElementById('dashModulesSub').textContent = '0 pending';
+
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
+
                 }
+
+
 
                 const { data: attendanceData } = await supabaseClient
+
                     .from('attendance')
+
                     .select('status')
+
                     .eq('section', section)
+
                     .eq('date', exactTodayDate);
 
+
+
                 let present = 0;
+
                 let absentLate = 0;
 
+
+
                 if (attendanceData) {
+
                     attendanceData.forEach(record => {
+
                         if (record.status === 'Present') present++;
+
                         if (record.status === 'Absent' || record.status === 'Late') absentLate++; 
+
                     });
+
                 }
+
+
 
                 document.getElementById('dashPresent').textContent = present;
+
                 const absentLabel = document.getElementById('dashAbsent');
+
                 absentLabel.textContent = `${absentLate} absent/late`;
+
                 absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a"; 
 
+
+
             } catch (error) {
+
                 console.error("Error fetching stats:", error);
+
                 document.getElementById('dashTotalStudents').textContent = '!';
+
                 document.getElementById('dashPresent').textContent = '!';
+
                 document.getElementById('dashAbsent').textContent = 'Error';
+
                 document.getElementById('dashModules').textContent = '!';
+
                 document.getElementById('dashActivities').textContent = '!';
+
             }
+
         });
 
-        // 🔥 HEARTBEAT: Update status kada 30 seconds while open ang web 🔥
-        setInterval(async () => {
-            const faciId = localStorage.getItem('faci_id');
-            if (faciId) {
-                try {
-                    await supabaseClient
-                        .from('facilitators')
-                        .update({ last_login: new Date().toISOString() })
-                        .eq('id', faciId);
-                } catch (e) { console.error(e); }
-            }
-        }, 30000); 
 
-        // 🔥 INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
+
+        // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
+
         async function faciLogout() {
+
             if(confirm("Are you sure you want to sign out?")) {
+
                 const faciId = localStorage.getItem('faci_id');
+
                 if (faciId) {
+
                     try {
+
+                        // Set last_login to null in Supabase to mark as Inactive
+
                         await supabaseClient
+
                             .from('facilitators')
+
                             .update({ last_login: null })
+
                             .eq('id', faciId);
+
                     } catch (error) {
+
                         console.error("Failed to update status on logout:", error);
+
                     }
+
                 }
+
                 
+
                 localStorage.removeItem('faci_id');
+
                 localStorage.removeItem('faci_name');
+
                 localStorage.removeItem('faci_section');
+
                 localStorage.removeItem('faci_subject');
+
                 localStorage.removeItem('faci_img_url');
+
                 
+
                 window.location.href = 'login.html'; 
+
             }
+
         }
+
     </script>
+
+
+
 </body>
+
 </html>
