@@ -970,7 +970,25 @@
 
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-
+        // Presence heartbeat: refresh last_login while the panel is open so it goes stale once closed.
+        let presenceHeartbeatTimer = null;
+        async function sendPresenceHeartbeat() {
+            const faciId = localStorage.getItem('faci_id');
+            if (!faciId) return;
+            try {
+                await supabaseClient
+                    .from('facilitators')
+                    .update({ last_login: new Date().toISOString() })
+                    .eq('id', faciId);
+            } catch (error) {
+                console.error("Presence heartbeat failed:", error);
+            }
+        }
+        presenceHeartbeatTimer = setInterval(sendPresenceHeartbeat, 30000);
+        sendPresenceHeartbeat();
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') sendPresenceHeartbeat();
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
 
@@ -981,32 +999,6 @@
             const cachedName = localStorage.getItem('faci_name') || 'User';
 
             const cachedImg = localStorage.getItem('faci_img_url'); 
-
-
-
-            // 🔥 1. AUTO-ACTIVE LOGIC (PAG-OPEN SANG APP) 🔥
-
-            if (faciId) {
-
-                try {
-
-                    await supabaseClient
-
-                        .from('facilitators')
-
-                        .update({ last_login: new Date().toISOString() })
-
-                        .eq('id', faciId);
-
-                    console.log("Status updated to Active.");
-
-                } catch (error) {
-
-                    console.error("Failed to auto-update status:", error);
-
-                }
-
-            }
 
 
 
@@ -1269,6 +1261,8 @@
         async function faciLogout() {
 
             if(confirm("Are you sure you want to sign out?")) {
+
+                clearInterval(presenceHeartbeatTimer);
 
                 const faciId = localStorage.getItem('faci_id');
 
