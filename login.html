@@ -1,1160 +1,497 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Login | Management System</title>
-
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-
-
-    <link rel="manifest" href="manifest.json">
-
-    <link rel="icon" type="image/jpeg" href="logo.jpg">
-
-    <link rel="apple-touch-icon" href="logo.jpg">
-
-    <meta name="theme-color" content="#3b82f6">
-
-
-
-<style>
-
-*, *::before, *::after{ box-sizing:border-box; }
-
-
-
-body{
-
-    margin:0;
-
-    font-family:'Inter',sans-serif;
-
-    background:linear-gradient(135deg,#eef2f7 0%,#dbeafe 40%,#c7d2fe 100%);
-
-    min-height:100vh;
-
-    display:flex;
-
-    flex-direction:column;
-
-}
-
-
-
-/* --- SPLASH SCREEN STYLES --- */
-
-.splash-screen {
-
-    position: fixed;
-
-    top: 0;
-
-    left: 0;
-
-    width: 100%;
-
-    height: 100vh;
-
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-
-    z-index: 99999;
-
-    display: flex;
-
-    justify-content: center;
-
-    align-items: center;
-
-    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
-
-}
-
-
-
-.splash-content {
-
-    text-align: center;
-
-    color: white;
-
-    animation: fadeIn 1s ease-in-out;
-
-}
-
-
-
-.splash-logo-container {
-
-    width: 90px;
-
-    height: 90px;
-
-    background: white;
-
-    border-radius: 20px;
-
-    display: flex;
-
-    justify-content: center;
-
-    align-items: center;
-
-    margin: 0 auto 15px;
-
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-
-    overflow: hidden;
-
-}
-
-
-
-.splash-logo-container img {
-
-    width: 100%;
-
-    height: 100%;
-
-    object-fit: cover;
-
-}
-
-
-
-.splash-title {
-
-    font-size: 1.8rem;
-
-    font-weight: 800;
-
-    margin-bottom: 5px;
-
-    letter-spacing: 1px;
-
-}
-
-
-
-.splash-subtitle {
-
-    font-size: 0.9rem;
-
-    opacity: 0.8;
-
-    margin-bottom: 30px;
-
-}
-
-
-
-.splash-loader {
-
-    width: 40px;
-
-    height: 4px;
-
-    background: rgba(255, 255, 255, 0.3);
-
-    margin: 0 auto;
-
-    border-radius: 4px;
-
-    position: relative;
-
-    overflow: hidden;
-
-}
-
-
-
-.splash-loader::after {
-
-    content: '';
-
-    position: absolute;
-
-    top: 0;
-
-    left: -20px;
-
-    width: 20px;
-
-    height: 100%;
-
-    background: white;
-
-    border-radius: 4px;
-
-    animation: loading 1s infinite ease-in-out;
-
-}
-
-
-
-@keyframes loading {
-
-    0% { left: -20px; }
-
-    100% { left: 100%; }
-
-}
-
-
-
-@keyframes fadeIn {
-
-    from { opacity: 0; transform: translateY(20px); }
-
-    to { opacity: 1; transform: translateY(0); }
-
-}
-
-
-
-/* --- MAIN LOGIN STYLES --- */
-
-.auth-main{
-
-    flex:1;
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-    padding:24px;
-
-}
-
-
-
-.login-card{
-
-    width:100%;
-
-    max-width:420px;
-
-    padding:40px 32px;
-
-    border-radius:22px;
-
-    background:rgba(255,255,255,0.92);
-
-    backdrop-filter:blur(16px);
-
-    border:1px solid rgba(255,255,255,0.7);
-
-    box-shadow:
-
-        0 25px 60px rgba(0,0,0,.15),
-
-        0 10px 25px rgba(0,0,0,.08);
-
-    text-align:center;
-
-}
-
-
-
-.login-card h2{
-
-    margin:0 0 6px;
-
-    font-size:26px;
-
-    font-weight:700;
-
-}
-
-
-
-.login-subtitle{
-
-    font-size:13.5px;
-
-    color:#64748b;
-
-    margin-bottom:18px;
-
-}
-
-
-
-.google-btn{
-
-    width:100%;
-
-    padding:12px;
-
-    border-radius:12px;
-
-    border:1px solid #e5e7eb;
-
-    background:#fff;
-
-    font-weight:600;
-
-    cursor:pointer;
-
-    transition:.2s;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:center;
-
-    gap:10px;
-
-    text-decoration:none;
-
-    color:#111;
-
-    font-family:'Inter',sans-serif;
-
-    font-size: 14px;
-
-}
-
-
-
-.google-btn:hover{
-
-    background:#f9fafb;
-
-    box-shadow:0 4px 12px rgba(0,0,0,.08);
-
-}
-
-
-
-.divider{
-
-    margin:18px 0;
-
-    font-size:12px;
-
-    color:#64748b;
-
-    display:flex;
-
-    align-items:center;
-
-    gap:10px;
-
-}
-
-
-
-.divider::before,
-
-.divider::after{
-
-    content:"";
-
-    flex:1;
-
-    height:1px;
-
-    background:#e5e7eb;
-
-}
-
-
-
-.form-group{
-
-    position:relative;
-
-    margin-top:16px;
-
-    text-align: left;
-
-}
-
-
-
-.form-group input{
-
-    width:100%;
-
-    padding:14px;
-
-    border-radius:12px;
-
-    border:1px solid #d1d5db;
-
-    background:#f8fafc;
-
-    font-size:14px;
-
-    outline:none;
-
-    transition:.2s;
-
-}
-
-
-
-.form-group label{
-
-    position:absolute;
-
-    left:12px;
-
-    top:50%;
-
-    transform:translateY(-50%);
-
-    background:#fff;
-
-    padding:0 6px;
-
-    font-size:13px;
-
-    color:#64748b;
-
-    pointer-events:none;
-
-    transition:.2s;
-
-}
-
-
-
-.form-group input:focus{
-
-    border-color:#2563eb;
-
-    box-shadow:0 0 0 3px rgba(37,99,235,.15);
-
-    background:#fff;
-
-}
-
-
-
-.form-group input:focus + label,
-
-.form-group input:not(:placeholder-shown) + label{
-
-    top:-8px;
-
-    font-size:11px;
-
-    color:#2563eb;
-
-}
-
-
-
-.login-options{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    margin-top:12px;
-
-    font-size:13px;
-
-}
-
-
-
-.remember-me{
-
-    display:flex;
-
-    align-items:center;
-
-    gap:6px;
-
-    cursor:pointer;
-
-}
-
-
-
-.forgot-link{
-
-    color:#2563eb;
-
-    text-decoration:none;
-
-    font-weight:500;
-
-    cursor: pointer;
-
-}
-
-
-
-.forgot-link:hover{
-
-    text-decoration:underline;
-
-}
-
-
-
-.btn-login{
-
-    width:100%;
-
-    margin-top:20px;
-
-    padding:14px;
-
-    border:none;
-
-    border-radius:12px;
-
-    font-weight:600;
-
-    color:white;
-
-    cursor:pointer;
-
-    background:linear-gradient(135deg,#3b82f6,#2563eb);
-
-    transition:.25s;
-
-    font-family:'Inter',sans-serif;
-
-    font-size: 14.5px;
-
-}
-
-
-
-.btn-login:hover{
-
-    transform:translateY(-1px);
-
-    box-shadow:0 14px 28px rgba(37,99,235,.35);
-
-}
-
-
-
-.btn-login:disabled{
-
-    background: #9ca3af;
-
-    cursor: not-allowed;
-
-    box-shadow: none;
-
-    transform: none;
-
-}
-
-
-
-.login-text{margin-top:16px;font-size:13.5px}
-
-.login-text a{color:#2563eb;font-weight:600;text-decoration:none}
-
-
-
-/* TOAST NOTIFICATION STYLES */
-
-.toast-notification {
-
-    position: fixed;
-
-    top: 24px;
-
-    right: -350px; 
-
-    background: #10b981; 
-
-    color: white;
-
-    padding: 16px 24px;
-
-    border-radius: 12px;
-
-    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
-
-    font-size: 14.5px;
-
-    font-weight: 600;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    transition: right 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    z-index: 9999;
-
-}
-
-
-
-.toast-notification.show { right: 24px; }
-
-.toast-notification.error {
-
-    background: #ef4444; 
-
-    box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
-
-}
-
-.toast-notification.info {
-
-    background: #3b82f6; 
-
-    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
-
-}
-
-
-
-/* MODAL STYLES */
-
-.modal-overlay {
-
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-
-    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
-
-    z-index: 9999; display: flex; align-items: center; justify-content: center;
-
-}
-
-.modal-content { background: white; padding: 30px; border-radius: 18px; width: 100%; max-width: 400px; margin: 20px; text-align: center; }
-
-</style>
-
-
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator Login | Management System</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#3b82f6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            /* MATCHING THE IMAGE DESIGN VARIABLES */
+            --main-bg: #e8f0fe;       /* Soft light blue background */
+            --card-bg: #ffffff;       /* Pure white card */
+            --text-main: #111827;     /* Dark text */
+            --text-muted: #6b7280;    /* Muted text for subtitle */
+            --label-color: #3b82f6;   /* Blueish label color like in the image */
+            --border-color: #e5e7eb;  /* Light gray border */
+            --input-bg: #ffffff;      
+            --input-bg-focus: #f8fafc;
+            
+            --accent-blue: #3b82f6;   /* Main button blue */
+            --accent-hover: #2563eb;  
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e4effe 0%, #f0f5ff 100%);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            overflow: hidden; /* Prevent scrollbar during splash */
+        }
+
+        /* --- SPLASH SCREEN STYLES --- */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+        }
+
+        .splash-content {
+            text-align: center;
+            color: white;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .splash-logo-container {
+            width: 90px;
+            height: 90px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .splash-logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .splash-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .splash-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .splash-loader {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            margin: 0 auto;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .splash-loader::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -20px;
+            width: 20px;
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            animation: loading 1s infinite ease-in-out;
+        }
+
+        @keyframes loading {
+            0% { left: -20px; }
+            100% { left: 100%; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Clean White Card */
+        .login-container {
+            background: var(--card-bg);
+            padding: 45px 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .login-header h2 {
+            font-size: 1.6rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+            color: var(--label-color);
+            font-weight: 600;
+        }
+
+        /* Wrapper for the password eye icon */
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* HIDE DEFAULT BROWSER EYE ICON (Edge/IE) */
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear {
+            display: none;
+        }
+
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-blue);
+            background: var(--input-bg-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
+        }
+
+        /* Eye Icon Styling */
+        .toggle-password {
+            position: absolute;
+            right: 16px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: var(--accent-blue);
+        }
+
+        /* Remember me & Forgot Password Row */
+        .options-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            font-size: 0.8rem;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .remember-me input {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent-blue);
+        }
+
+        .forgot-password {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s;
+        }
+
+        .login-btn:hover {
+            background-color: var(--accent-hover);
+        }
+        
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* --- CUSTOM ALERT POPUP --- */
+        .custom-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 200000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
+        .custom-alert-box {
+            background: var(--card-bg); padding: 25px 20px; border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
+            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid var(--border-color);
+        }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
+        .custom-alert-icon { font-size: 3rem; margin-bottom: 15px; }
+        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-btn {
+            background: var(--accent-blue); color: white; border: none; padding: 12px 20px;
+            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-alert-btn:hover { background: var(--accent-hover); }
+    </style>
 </head>
-
-
-
 <body>
 
-
-
-<div id="splashScreen" class="splash-screen">
-
-    <div class="splash-content">
-
-        <div class="splash-logo-container">
-
-            <img src="logo.jpg" alt="Logo">
-
-        </div>
-
-        <h1 class="splash-title">Management System</h1>
-
-        <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
-
-        <div class="splash-loader" id="splashLoaderEl"></div>
-
-    </div>
-
-</div>
-
-
-
-<main class="auth-main">
-
-    <div class="login-card">
-
-
-
-        <h2>Welcome Teacher</h2>
-
-        <p class="login-subtitle">Login to your account</p>
-
-
-
-        <button type="button" id="googleBtn" onclick="loginWithGoogle()" class="google-btn">
-
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="18">
-
-            Continue with Google
-
-        </button>
-
-
-
-        <div class="divider">or continue with email</div>
-
-
-
-        <form id="loginForm" onsubmit="handleLogin(event)">
-
-
-
-            <div class="form-group">
-
-                <input type="email" name="email" id="email" required placeholder=" ">
-
-                <label>Email Address</label>
-
-            </div>
-
-
-
-            <div class="form-group">
-
-                <input type="password" name="password" id="password" required placeholder=" ">
-
-                <label>Password</label>
-
-            </div>
-
-
-
-            <div class="login-options">
-
-                <label class="remember-me">
-
-                    <input type="checkbox" id="rememberMe">
-
-                    Remember me
-
-                </label>
-
-
-
-                <a class="forgot-link" onclick="toggleForgotModal()">
-
-                    Forgot password?
-
-                </a>
-
-            </div>
-
-
-
-            <button type="submit" class="btn-login" id="loginBtn">Login</button>
-
-        </form>
-
-
-
-        <div class="login-text">
-
-            Don't have an account?
-
-            <a href="sign.html">Sign up</a>
-
-        </div>
-
-
-
-    </div>
-
-</main>
-
-
-
-<div id="toastMessage" class="toast-notification">
-
-    <svg id="toastIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-
-        <polyline points="20 6 9 17 4 12"></polyline>
-
-    </svg>
-
-    <span id="toastText">Logged in successfully!</span>
-
-</div>
-
-
-
-<div id="forgotModal" class="modal-overlay" style="display: none;">
-
-    <div class="modal-content">
-
-        <h3 style="margin-top:0; margin-bottom:10px; font-size: 1.3rem;">Reset Password</h3>
-
-        <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 20px;">Enter your email address and we will send you a password reset link.</p>
-
-        
-
-        <div class="form-group" style="margin-bottom: 20px;">
-
-            <input type="email" id="resetEmail" placeholder=" " required style="background: white;">
-
-            <label>Email Address</label>
-
-        </div>
-
-        
-
-        <div style="display:flex; gap:10px;">
-
-            <button type="button" onclick="toggleForgotModal()" style="flex:1; padding:12px; border-radius:10px; border:none; cursor:pointer; background: #f1f5f9; color: #333; font-weight: 600;">Cancel</button>
-
-            <button type="button" id="resetBtn" onclick="sendResetLink()" style="flex:2; background:#3b82f6; color:white; padding:12px; border-radius:10px; border:none; cursor:pointer; font-weight:600;">Send Link</button>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-
-<script>
-
-    // 🔒 REVERSE SECURITY GUARD SANG PAGE (Para sa Teacher Login)
-
-    if (localStorage.getItem('access_token') && localStorage.getItem('user_id')) {
-
-        document.addEventListener('DOMContentLoaded', () => {
-
-            const loader = document.getElementById('splashLoaderEl');
-
-            if (loader) loader.style.display = 'none';
-
-            const subtitle = document.getElementById('splashSubtitle');
-
-            if (subtitle) subtitle.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Loading your workspace...';
-
-            
-
-            setTimeout(() => {
-
-                window.location.href = 'index.html'; 
-
-            }, 800);
-
-        });
-
-    }
-
-
-
-    const SUPABASE_URL ='https://njzvuwkepaasnsvuujgx.supabase.co'; 
-
-    const SUPABASE_ANON_KEY ='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0'; 
-
-
-
-    // FIXED: Removed global headers for auto-refresh to work!
-
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-
-
-    window.addEventListener('DOMContentLoaded', () => {
-
-        // Normal Load: Handle Remember Me fields
-
-        const savedEmail = localStorage.getItem('remembered_email');
-
-        if (savedEmail) {
-
-            document.getElementById('email').value = savedEmail;
-
-            document.getElementById('rememberMe').checked = true;
-
-        }
-
-    });
-
-
-
-    // 🌟 SPLASH SCREEN LOGIC 🌟
-
-    window.addEventListener('load', function() {
-
-        if (!localStorage.getItem('access_token') || !localStorage.getItem('user_id')) {
-
-            const splashScreen = document.getElementById('splashScreen');
-
-            setTimeout(() => {
-
-                splashScreen.style.opacity = '0';
-
-                splashScreen.style.visibility = 'hidden';
-
-            }, 1500); 
-
-        }
-
-    });
-
-
-
-    /* TOAST FUNCTION */
-
-    function showToast(message, type = "success") {
-
-        const toast = document.getElementById("toastMessage");
-
-        const text = document.getElementById("toastText");
-
-        const icon = document.getElementById("toastIcon");
-
-
-
-        text.textContent = message;
-
-        toast.className = "toast-notification"; 
-
-
-
-        if (type === "error") {
-
-            toast.classList.add("error");
-
-            icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'; 
-
-        } else if (type === "info") {
-
-            toast.classList.add("info");
-
-            icon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'; 
-
-        } else {
-
-            icon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>'; 
-
-        }
-
-
-
-        toast.classList.add("show");
-
-        setTimeout(() => { toast.classList.remove("show"); }, 3000);
-
-    }
-
-
-
-    /* GOOGLE LOGIN */
-
-    async function loginWithGoogle() {
-
-        const btn = document.getElementById('googleBtn');
-
-        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...';
-
-        
-
-        try {
-
-            const { data, error } = await supabaseClient.auth.signInWithOAuth({
-
-                provider: 'google',
-
-                options: {
-
-                    redirectTo: 'http://127.0.0.1:5500/index.html',
-
-                    queryParams: {
-
-                        prompt: 'select_account' 
-
-                    }
-
-                }
-
-            });
-
-
-
-            if (error) throw error;
-
-        } catch (error) {
-
-            console.error("Google login error:", error);
-
-            showToast("Connection failed. Please check your internet.", "error");
-
-            btn.innerHTML = `<img src="https://www.svgrepo.com/show/475656/google-color.svg" width="18"> Continue with Google`;
-
-        }
-
-    }
-
-
-
-    /* NORMAL EMAIL/PASSWORD LOGIN */
-
-    async function handleLogin(event) {
-
-        event.preventDefault();
-
-        
-
-        const emailInput = document.getElementById('email').value.trim();
-
-        const passInput = document.getElementById('password').value.trim();
-
-        const rememberChecked = document.getElementById('rememberMe').checked;
-
-        const btn = document.getElementById("loginBtn");
-
-
-
-        btn.disabled = true;
-
-        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...';
-
-
-
-        if (rememberChecked) {
-
-            localStorage.setItem('remembered_email', emailInput);
-
-        } else {
-
-            localStorage.removeItem('remembered_email');
-
-        }
-
-
-
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-
-            email: emailInput,
-
-            password: passInput,
-
-        });
-
-
-
-        if (error) {
-
-            showToast("Incorrect email or password. Please try again.", "error");
-
-            btn.disabled = false;
-
-            btn.innerText = "Login";
-
-        } else {
-
-            localStorage.removeItem('faci_id');
-
-            localStorage.setItem('access_token', data.session.access_token);
-
-            localStorage.setItem('user_id', data.user.id);
-
-
-
-            showToast("Login successful. Redirecting...");
-
-            
-
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> Authentication Successful';
-
-            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-
-            
-
-            setTimeout(() => {
-
-                window.location.href = "index.html"; 
-
-            }, 1000);
-
-        }
-
-    }
-
-
-
-    /* FORGOT PASSWORD MODAL */
-
-    function toggleForgotModal() {
-
-        const m = document.getElementById('forgotModal');
-
-        m.style.display = (m.style.display === 'none' || m.style.display === '') ? 'flex' : 'none';
-
-        document.getElementById('resetEmail').value = ''; 
-
-    }
-
-
-
-    /* FORGOT PASSWORD SEND LOGIC */
-
-    async function sendResetLink() {
-
-        const resetEmail = document.getElementById('resetEmail').value.trim();
-
-        if (!resetEmail) {
-
-            showToast("Please enter an email address", "error");
-
-            return;
-
-        }
-
-
-
-        const btn = document.getElementById('resetBtn');
-
-        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
-
-        btn.disabled = true;
-
-
-
-        const { data, error } = await supabaseClient.auth.resetPasswordForEmail(resetEmail, {
-
-            redirectTo: 'http://127.0.0.1:5500/login.html', 
-
-        });
-
-
-
-        if (error) {
-
-            showToast("Error: Could not send link", "error");
-
-            console.error(error);
-
-        } else {
-
-            showToast("Password reset link sent to your email!", "info");
-
-            toggleForgotModal();
-
-        }
-
-
-
-        btn.innerText = "Send Link";
-
-        btn.disabled = false;
-
-    }
-
-</script>
-
-
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo-container">
+                <img src="logo.jpg" alt="Logo">
+            </div>
+            <h1 class="splash-title">Management System</h1>
+            <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
+            <div class="splash-loader" id="splashLoaderEl"></div>
+        </div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h2>Welcome Facilitator</h2>
+            <p>Login to your account</p>
+        </div>
+
+        <form id="faciLoginForm">
+            <div class="input-group">
+                <label for="accountId">Facilitator ID</label>
+                <input type="text" id="accountId" placeholder="e.g. FACI-1234" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                    <i class="fa-solid fa-eye toggle-password" id="togglePassword" title="Show/Hide Password"></i>
+                </div>
+            </div>
+
+            <div class="options-row">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe"> Remember me
+                </label>
+                <a href="#" class="forgot-password">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">Login</button>
+        </form>
+    </div>
+
+    <div id="customAlertOverlay" class="custom-alert-overlay">
+        <div class="custom-alert-box">
+            <i class="fa-solid fa-circle-xmark custom-alert-icon" id="alertIcon" style="color: #ef4444;"></i>
+            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
+            <p id="customAlertMessage" class="custom-alert-msg"></p>
+            <button onclick="closeAlert()" class="custom-alert-btn">Okay</button>
+        </div>
+    </div>
+
+    <script>
+        // UPDATED: Render Backend URL
+        const API_URL = 'https://teacher-panel-d1kw.onrender.com'; 
+
+        // 🌟 WAKE UP SERVER (PRE-WARMING) 🌟
+        fetch(`${API_URL}/`).catch(() => console.log("Server initialized."));
+
+        // 🌟 CUSTOM ALERT FUNCTIONS 🌟
+        function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
+            document.getElementById('customAlertTitle').textContent = title;
+            document.getElementById('customAlertMessage').textContent = message;
+            
+            const iconEl = document.getElementById('alertIcon');
+            iconEl.className = `fa-solid ${iconClass} custom-alert-icon`;
+            iconEl.style.color = iconColor;
+            
+            document.getElementById('customAlertOverlay').classList.add('show');
+        }
+
+        function closeAlert() {
+            document.getElementById('customAlertOverlay').classList.remove('show');
+        }
+
+        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
+        window.addEventListener('DOMContentLoaded', () => {
+            const activeFaciId = localStorage.getItem('faci_id');
+            if (activeFaciId) {
+                document.getElementById('splashLoaderEl').style.display = 'none';
+                document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html'; 
+                }, 800);
+                return; 
+            }
+
+            // Check if Faci ID was remembered
+            const rememberedId = localStorage.getItem('remembered_faci_id');
+            if (rememberedId) {
+                document.getElementById('accountId').value = rememberedId;
+                document.getElementById('rememberMe').checked = true;
+            }
+        });
+
+        // 🌟 SPLASH SCREEN LOGIC 🌟
+        window.addEventListener('load', function() {
+            if (!localStorage.getItem('faci_id')) {
+                const splashScreen = document.getElementById('splashScreen');
+                setTimeout(() => {
+                    splashScreen.style.opacity = '0';
+                    splashScreen.style.visibility = 'hidden';
+                    document.body.style.overflow = 'auto';
+                }, 1500); 
+            }
+        });
+
+        // Password Visibility Toggle Logic
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // 🌟 FAST & PROFESSIONAL LOGIN LOGIC 🌟
+        document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); 
+
+            const accountId = document.getElementById('accountId').value.trim();
+            const password = passwordInput.value.trim();
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
+            loginBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/api/faci/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_id: accountId,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (rememberMe) {
+                        localStorage.setItem('remembered_faci_id', accountId);
+                    } else {
+                        localStorage.removeItem('remembered_faci_id');
+                    }
+
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('cached_user_name');
+                    localStorage.removeItem('cached_user_avatar');
+
+                    localStorage.setItem('faci_id', data.faci.id);
+                    localStorage.setItem('faci_name', data.faci.full_name);
+                    localStorage.setItem('faci_section', data.faci.section);
+                    localStorage.setItem('faci_subject', data.faci.subject);
+
+                    loginBtn.style.backgroundColor = '#10b981'; 
+                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
+                    
+                    setTimeout(() => {
+                        window.location.href = 'index.html'; 
+                    }, 800);
+
+                } else {
+                    // SIMPLE ERROR MESSAGE VIA POPUP
+                    showAlert(
+                        "Login Failed", 
+                        "We couldn't find an account with those details. Please check your ID and password.", 
+                        "fa-circle-xmark", 
+                        "#ef4444"
+                    );
+                    loginBtn.innerHTML = 'Login';
+                    loginBtn.disabled = false;
+                }
+
+            } catch (error) {
+                console.error('Login request failed:', error);
+                // SIMPLE ERROR MESSAGE VIA POPUP
+                showAlert(
+                    "Connection Error", 
+                    "We're having trouble connecting. Please check your internet connection and try again.", 
+                    "fa-wifi", 
+                    "#f59e0b"
+                );
+                loginBtn.innerHTML = 'Login';
+                loginBtn.disabled = false;
+            }
+        });
+    </script>
 
 </body>
-
-</html> 
-
+</html>
