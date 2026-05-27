@@ -489,11 +489,11 @@
         
         // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
-        
+
         async function sendPresenceHeartbeat(online = true) {
             const faciId = localStorage.getItem('faci_id');
             if (!faciId) return;
-            
+
             const statusVal = online ? 'Active' : 'Inactive';
             const nowIso = new Date().toISOString();
 
@@ -507,22 +507,41 @@
                 console.error('Presence update failed:', error);
             }
         }
-        
-        // Timer for every 30 seconds
-        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
-        sendPresenceHeartbeat(true);
-        
-        // Detect if user minimizes browser, switches tab, or locks screen
+
+        function startPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) return;
+            presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
+        }
+
+        function stopPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) {
+                clearInterval(presenceHeartbeatTimer);
+                presenceHeartbeatTimer = null;
+            }
+        }
+
+        // Start heartbeat only when the page is actually visible.
+        if (document.visibilityState === 'visible') {
+            sendPresenceHeartbeat(true);
+            startPresenceHeartbeat();
+        }
+
+        // Detect if user minimizes browser, switches tab, or locks screen.
+        // We MUST stop the timer when hidden, otherwise it will keep overwriting
+        // status back to "Active" every 30s even though the user has left.
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 sendPresenceHeartbeat(true);
+                startPresenceHeartbeat();
             } else {
+                stopPresenceHeartbeat();
                 sendPresenceHeartbeat(false); // Inactive immediately
             }
         });
 
         // Detect if user fully closes the tab / window ('X' button)
         window.addEventListener('pagehide', () => {
+            stopPresenceHeartbeat();
             sendPresenceHeartbeat(false);
         });
 
@@ -662,7 +681,7 @@
         // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
         async function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
-                clearInterval(presenceHeartbeatTimer);
+                stopPresenceHeartbeat();
                 await sendPresenceHeartbeat(false); // Sigurado Inactive bago mag clear localStorage
                 
                 localStorage.removeItem('faci_id');

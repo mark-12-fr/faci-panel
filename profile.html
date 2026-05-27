@@ -317,21 +317,35 @@
             }
         }
 
-        // Timer for every 30 seconds
-        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
-        sendPresenceHeartbeat(true);
+        function startPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) return;
+            presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
+        }
 
-        // Detect if user minimizes browser, switches tab, or locks screen
+        function stopPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) {
+                clearInterval(presenceHeartbeatTimer);
+                presenceHeartbeatTimer = null;
+            }
+        }
+
+        if (document.visibilityState === 'visible') {
+            sendPresenceHeartbeat(true);
+            startPresenceHeartbeat();
+        }
+
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 sendPresenceHeartbeat(true);
+                startPresenceHeartbeat();
             } else {
-                sendPresenceHeartbeat(false); // Inactive immediately
+                stopPresenceHeartbeat();
+                sendPresenceHeartbeat(false);
             }
         });
 
-        // Detect if user fully closes the tab / window ('X' button)
         window.addEventListener('pagehide', () => {
+            stopPresenceHeartbeat();
             sendPresenceHeartbeat(false);
         });
 
@@ -488,7 +502,7 @@
         // 🌟 SAFE LOGOUT FUNCTION 🌟
         async function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
-                clearInterval(presenceHeartbeatTimer);
+                stopPresenceHeartbeat();
                 await sendPresenceHeartbeat(false);
                 localStorage.removeItem('faci_id');
                 localStorage.removeItem('faci_name');

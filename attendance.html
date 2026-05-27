@@ -249,11 +249,11 @@
 
         // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
-        
+
         async function sendPresenceHeartbeat(online = true) {
             const faciId = localStorage.getItem('faci_id');
             if (!faciId) return;
-            
+
             const statusVal = online ? 'Active' : 'Inactive';
             const nowIso = new Date().toISOString();
 
@@ -266,22 +266,36 @@
                 console.error('Presence update failed:', error);
             }
         }
-        
-        // Timer for every 30 seconds
-        presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
-        sendPresenceHeartbeat(true);
-        
-        // Detect if user minimizes browser, switches tab, or locks screen
+
+        function startPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) return;
+            presenceHeartbeatTimer = setInterval(() => sendPresenceHeartbeat(true), 30000);
+        }
+
+        function stopPresenceHeartbeat() {
+            if (presenceHeartbeatTimer) {
+                clearInterval(presenceHeartbeatTimer);
+                presenceHeartbeatTimer = null;
+            }
+        }
+
+        if (document.visibilityState === 'visible') {
+            sendPresenceHeartbeat(true);
+            startPresenceHeartbeat();
+        }
+
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 sendPresenceHeartbeat(true);
+                startPresenceHeartbeat();
             } else {
-                sendPresenceHeartbeat(false); // Inactive immediately
+                stopPresenceHeartbeat();
+                sendPresenceHeartbeat(false);
             }
         });
 
-        // Detect if user fully closes the tab / window ('X' button)
         window.addEventListener('pagehide', () => {
+            stopPresenceHeartbeat();
             sendPresenceHeartbeat(false);
         });
 
