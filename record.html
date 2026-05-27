@@ -250,6 +250,15 @@
             <h3 id="infoSubject">...</h3>
         </div>
         <div class="info-box">
+            <p>Quarter</p>
+            <select id="quarterSelect" style="border:none; background:transparent; font-weight:700; font-size:1.1rem; color:var(--accent-blue); cursor:pointer; padding:0;">
+                <option value="1">Q1</option>
+                <option value="2">Q2</option>
+                <option value="3">Q3</option>
+                <option value="4">Q4</option>
+            </select>
+        </div>
+        <div class="info-box">
             <p>Total Students</p>
             <h3 id="infoTotal">0</h3>
         </div>
@@ -430,6 +439,16 @@
             document.getElementById('infoSection').textContent = sectionTitle;
             document.getElementById('infoSubject').textContent = subject.substring(0, 15);
 
+            // Restore the quarter the user last picked on this device.
+            const savedQuarter = localStorage.getItem(QUARTER_STORAGE_KEY);
+            if (savedQuarter && /^[1-4]$/.test(savedQuarter)) {
+                document.getElementById('quarterSelect').value = savedQuarter;
+            }
+            document.getElementById('quarterSelect').addEventListener('change', (e) => {
+                localStorage.setItem(QUARTER_STORAGE_KEY, e.target.value);
+                loadClassRecordData(sectionTitle);
+            });
+
             await loadClassRecordData(sectionTitle);
             listenForTeacherUpdates();
         });
@@ -447,9 +466,16 @@
                 ).subscribe();
         }
 
+        const QUARTER_STORAGE_KEY = 'mjr_current_quarter';
+
+        function getCurrentQuarter() {
+            const sel = document.getElementById('quarterSelect');
+            return sel ? sel.value : '1';
+        }
+
         async function loadClassRecordData(sectionTitle) {
             const tbody = document.getElementById('recordTableBody');
-            
+
             try {
                 const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', sectionTitle).single();
                 if(sectionData) {
@@ -464,7 +490,12 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                const { data: existingRecords } = await supabaseClient.from('class_records').select('*').eq('section_id', currentSectionId);
+                const quarter = getCurrentQuarter();
+                const { data: existingRecords } = await supabaseClient
+                    .from('class_records')
+                    .select('*')
+                    .eq('section_id', currentSectionId)
+                    .or(`quarter.eq.${quarter},quarter.is.null`);
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
@@ -498,9 +529,15 @@
         function createInputRow(student, index, existingRecords) {
             const tr = document.createElement('tr');
             tr.className = 'student-data-row';
-            tr.dataset.uuid = student.id; 
+            tr.dataset.uuid = student.id;
 
-            const record = existingRecords ? existingRecords.find(r => r.student_id === student.id) : null;
+            const quarter = getCurrentQuarter();
+            const studentRecs = existingRecords ? existingRecords.filter(r => r.student_id === student.id) : [];
+            // Prefer the row tagged with the current quarter; fall back to a
+            // legacy row whose quarter hasn't been stamped yet.
+            const record = studentRecs.find(r => String(r.quarter) === String(quarter))
+                         || studentRecs.find(r => r.quarter === null || r.quarter === undefined)
+                         || null;
             if (record && record.id) tr.dataset.recordid = record.id;
             
             let safeName = student.full_name.replace(/'/g, "\\'");
@@ -627,7 +664,7 @@
                 const studUuid = row.dataset.uuid;
                 const recordId = row.dataset.recordid; 
 
-                let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr };
+                let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr, quarter: getCurrentQuarter() };
                 
                 if (recordId) {
                     dataObj.id = recordId; 
