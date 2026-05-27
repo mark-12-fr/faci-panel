@@ -456,8 +456,17 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'class_records' }, (payload) => {
                         if (currentSectionId && ((payload.new && payload.new.section_id == currentSectionId) || (payload.old && payload.old.section_id == currentSectionId))) {
                             const sectionTitle = localStorage.getItem('faci_section');
-                            loadClassRecordData(sectionTitle); 
+                            loadClassRecordData(sectionTitle);
                             showUpdateToast("Live Update: A score was modified by the Teacher.");
+
+                            // Cross-device notification — skip self-echo.
+                            if (window.MJR_notify && !(window.MJR_isLikelyOwnChange && window.MJR_isLikelyOwnChange())) {
+                                window.MJR_notify({
+                                    title: 'Teacher updated scores — ' + (sectionTitle || 'your section'),
+                                    body: 'A score in the class record was changed.',
+                                    tag: 'mjr-classrec-' + currentSectionId
+                                });
+                            }
                         }
                     }
                 ).subscribe();
@@ -692,6 +701,8 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
             btn.disabled = true;
 
+            if (window.MJR_markLocalSave) window.MJR_markLocalSave();
+
             try {
                 const { error: saveError } = await supabaseClient.from('class_records').upsert(recordData);
                 if (saveError) throw saveError;
@@ -724,6 +735,7 @@
             }
         });
     </script>
-    <script src="faci-session.js" defer></script>
+    <script src="mjr-notify.js" defer></script>
+<script src="faci-session.js" defer></script>
 </body>
 </html>

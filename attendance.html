@@ -375,10 +375,22 @@
                         if (affectedSection === section) {
                             const dateStr = document.getElementById('currentDateDisplay').textContent;
                             const affectedDate = payload.new?.date || payload.old?.date;
-                            
+
                             if (affectedDate === dateStr) {
                                 loadDynamicStudents(section);
                                 showUpdateToast("Live Update: Teacher modified the attendance.");
+                            }
+
+                            // Cross-device notification — skip self-echo.
+                            if (window.MJR_notify && !(window.MJR_isLikelyOwnChange && window.MJR_isLikelyOwnChange())) {
+                                const rec = payload.new || payload.old || {};
+                                const who = rec.student_name || 'a student';
+                                const what = (payload.eventType === 'DELETE') ? 'cleared' : (rec.status || 'updated');
+                                window.MJR_notify({
+                                    title: 'Teacher updated attendance — ' + section,
+                                    body: `${who}: ${what} (${rec.date || ''})`,
+                                    tag: 'mjr-attendance-' + section
+                                });
                             }
                         }
                     }
@@ -614,6 +626,8 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
             btn.disabled = true;
 
+            if (window.MJR_markLocalSave) window.MJR_markLocalSave();
+
             try {
                 // Delete previous records for this date/section
                 await supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
@@ -657,6 +671,7 @@
             }
         });
     </script>
-    <script src="faci-session.js" defer></script>
+    <script src="mjr-notify.js" defer></script>
+<script src="faci-session.js" defer></script>
 </body>
 </html>
