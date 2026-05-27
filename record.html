@@ -75,10 +75,23 @@
         .info-box:nth-child(2) h3 { animation-delay: 0.2s; }
         .info-box:nth-child(3) h3 { animation-delay: 0.4s; }
 
-        .section-tag { 
-            background: #eff6ff; color: var(--accent-blue); padding: 4px 10px; 
+        .section-tag {
+            background: #eff6ff; color: var(--accent-blue); padding: 4px 10px;
             border-radius: 15px; font-size: 0.75rem; display: inline-block; font-weight: 800;
             animation: bobbing 2s ease-in-out infinite; animation-delay: 0.6s;
+        }
+
+        .quarter-badge {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white; padding: 6px 14px;
+            border-radius: 15px; font-size: 1rem; display: inline-block; font-weight: 800;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 14px rgba(59, 130, 246, 0.35);
+            animation: floatQuarter 2.6s ease-in-out infinite;
+        }
+        @keyframes floatQuarter {
+            0%, 100% { transform: translateY(0); box-shadow: 0 6px 14px rgba(59, 130, 246, 0.35); }
+            50%      { transform: translateY(-5px); box-shadow: 0 12px 22px rgba(59, 130, 246, 0.45); }
         }
 
         .search-bar { 
@@ -251,12 +264,7 @@
         </div>
         <div class="info-box">
             <p>Quarter</p>
-            <select id="quarterSelect" style="border:none; background:transparent; font-weight:700; font-size:1.1rem; color:var(--accent-blue); cursor:pointer; padding:0;">
-                <option value="1">Q1</option>
-                <option value="2">Q2</option>
-                <option value="3">Q3</option>
-                <option value="4">Q4</option>
-            </select>
+            <span class="quarter-badge" id="infoQuarter">Q1</span>
         </div>
         <div class="info-box">
             <p>Total Students</p>
@@ -439,16 +447,6 @@
             document.getElementById('infoSection').textContent = sectionTitle;
             document.getElementById('infoSubject').textContent = subject.substring(0, 15);
 
-            // Restore the quarter the user last picked on this device.
-            const savedQuarter = localStorage.getItem(QUARTER_STORAGE_KEY);
-            if (savedQuarter && /^[1-4]$/.test(savedQuarter)) {
-                document.getElementById('quarterSelect').value = savedQuarter;
-            }
-            document.getElementById('quarterSelect').addEventListener('change', (e) => {
-                localStorage.setItem(QUARTER_STORAGE_KEY, e.target.value);
-                loadClassRecordData(sectionTitle);
-            });
-
             await loadClassRecordData(sectionTitle);
             listenForTeacherUpdates();
         });
@@ -466,21 +464,24 @@
                 ).subscribe();
         }
 
-        const QUARTER_STORAGE_KEY = 'mjr_current_quarter';
+        // Quarter is read straight from the teacher's sections row.
+        let currentQuarter = '1';
 
         function getCurrentQuarter() {
-            const sel = document.getElementById('quarterSelect');
-            return sel ? sel.value : '1';
+            return currentQuarter;
         }
 
         async function loadClassRecordData(sectionTitle) {
             const tbody = document.getElementById('recordTableBody');
 
             try {
-                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', sectionTitle).single();
+                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester, quarter').eq('title', sectionTitle).single();
                 if(sectionData) {
                     document.getElementById('infoSemester').textContent = sectionData.semester || '1st Sem';
                     currentSectionId = sectionData.id;
+                    currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
+                    const qBadge = document.getElementById('infoQuarter');
+                    if (qBadge) qBadge.textContent = 'Q' + currentQuarter;
                 }
 
                 let students = [];
