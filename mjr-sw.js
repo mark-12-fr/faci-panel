@@ -33,7 +33,7 @@ self.addEventListener('push', (event) => {
         badge: '/logo-192.png',
         tag: payload.tag || 'mjr-push',
         renotify: true,
-        vibrate: [180, 80, 180],
+        silent: true,
         requireInteraction: false,
         data: {
             url: payload.url || '/',
