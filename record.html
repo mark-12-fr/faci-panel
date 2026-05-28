@@ -501,12 +501,14 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                const quarter = getCurrentQuarter();
+                // Fetch every quarter's record. createInputRow shows the
+                // current quarter's value when present, otherwise carries
+                // over the previous quarter's value so scores never look
+                // wiped after the section's quarter changes.
                 const { data: existingRecords } = await supabaseClient
                     .from('class_records')
                     .select('*')
-                    .eq('section_id', currentSectionId)
-                    .or(`quarter.eq.${quarter},quarter.is.null`);
+                    .eq('section_id', currentSectionId);
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
@@ -544,13 +546,32 @@
 
             const quarter = getCurrentQuarter();
             const studentRecs = existingRecords ? existingRecords.filter(r => r.student_id === student.id) : [];
-            // Prefer the row tagged with the current quarter; fall back to a
-            // legacy row whose quarter hasn't been stamped yet.
-            const record = studentRecs.find(r => String(r.quarter) === String(quarter))
-                         || studentRecs.find(r => r.quarter === null || r.quarter === undefined)
-                         || null;
-            if (record && record.id) tr.dataset.recordid = record.id;
-            
+
+            // The row whose quarter matches the section's current quarter
+            // (or a legacy unstamped row). This is the row we'll upsert into.
+            const currentRec = studentRecs.find(r => String(r.quarter) === String(quarter))
+                            || studentRecs.find(r => r.quarter === null || r.quarter === undefined)
+                            || null;
+            if (currentRec && currentRec.id) tr.dataset.recordid = currentRec.id;
+
+            // Rows from OTHER quarters (newest first). When the current
+            // quarter has no value for a field, we display the previous
+            // quarter's value so it doesn't look wiped. These cells are
+            // shown disabled to keep the read-only feel of submitted
+            // scores — the teacher can still edit them via the teacher
+            // panel, which is the source of truth.
+            const fallbackRecs = studentRecs
+                .filter(r => r !== currentRec)
+                .sort((a, b) => Number(b.quarter || 0) - Number(a.quarter || 0));
+
+            function fallbackValue(field) {
+                for (const r of fallbackRecs) {
+                    const v = r[field];
+                    if (v !== null && v !== undefined && v !== '') return v;
+                }
+                return null;
+            }
+
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1">${index}</td>
@@ -562,12 +583,19 @@
             `;
 
             const renderInput = (field) => {
-                let val = record ? record[field] : '';
-                let hasValue = (val !== null && val !== undefined && val !== '');
-                let isDisabled = hasValue ? 'disabled' : '';
-                let titleMsg = hasValue ? 'title="Score submitted. Only the Teacher can edit this."' : '';
+                const currentVal = currentRec ? currentRec[field] : null;
+                const hasCurrent = (currentVal !== null && currentVal !== undefined && currentVal !== '');
+                const carried = hasCurrent ? null : fallbackValue(field);
+                const displayVal = hasCurrent ? currentVal : (carried !== null ? carried : '');
+                const isDisabled = (hasCurrent || carried !== null) ? 'disabled' : '';
+                const carriedAttr = (!hasCurrent && carried !== null) ? 'data-carried="1"' : '';
+                const titleMsg = hasCurrent
+                    ? 'title="Score submitted. Only the Teacher can edit this."'
+                    : (carried !== null
+                        ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
+                        : '');
 
-                return `<td><input type="number" class="score-input" data-field="${field}" value="${hasValue ? val : ''}" ${isDisabled} ${titleMsg}></td>`;
+                return `<td><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
             };
 
             for(let i=1; i<=25; i++) html += renderInput(`module_${i}`);
@@ -684,9 +712,14 @@
                 }
 
                 row.querySelectorAll('.score-input').forEach(input => {
+                    // Skip values that are only being displayed from a
+                    // previous quarter — they live in another row and we
+                    // don't want to copy them into the current quarter.
+                    if (input.dataset.carried === '1') return;
+
                     const val = input.value.trim();
                     dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
-                    
+
                     if (val !== "" && !input.disabled) {
                         hasNewInput = true;
                     }
