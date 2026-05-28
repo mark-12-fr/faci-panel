@@ -351,7 +351,10 @@
         document.addEventListener('DOMContentLoaded', async () => {
             const section = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject') || 'Subject';
-            
+            const faciId = localStorage.getItem('faci_id');
+
+            if (window.MJR_setupPush && faciId) window.MJR_setupPush('faci', faciId);
+
             document.getElementById('subjectDisplay').textContent = subject.substring(0, 7) + '...';
 
             updateDateDisplay();

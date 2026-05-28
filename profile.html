@@ -353,10 +353,12 @@
             let fullName = localStorage.getItem('faci_name') || 'Loading...';
             const section = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject') || 'Subject';
-            const faciId = localStorage.getItem('faci_id'); 
+            const faciId = localStorage.getItem('faci_id');
+
+            if (window.MJR_setupPush && faciId) window.MJR_setupPush('faci', faciId);
 
             if (!faciId || !section) {
-                window.location.href = 'login.html'; 
+                window.location.href = 'login.html';
                 return;
             }
 
