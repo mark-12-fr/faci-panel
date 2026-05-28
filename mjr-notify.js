@@ -160,7 +160,6 @@
         const tag   = (opts && opts.tag)   || 'mjr-notif';
 
         showToast(title, body);
-        playChime();
 
         if (permissionGranted) {
             try {
@@ -169,7 +168,7 @@
                     tag: tag,
                     icon: '/logo-192.png',
                     badge: '/logo-192.png',
-                    silent: false
+                    silent: true
                 });
                 setTimeout(() => { try { n.close(); } catch (e) {} }, 6000);
             } catch (e) { /* ignore */ }
