@@ -549,7 +549,12 @@
             const faciId = localStorage.getItem('faci_id');
             const section = localStorage.getItem('faci_section');
             const cachedName = localStorage.getItem('faci_name') || 'User';
-            const cachedImg = localStorage.getItem('faci_img_url'); 
+            const cachedImg = localStorage.getItem('faci_img_url');
+
+            // Subscribe this device to Web Push so the facilitator gets
+            // OS notifications when the teacher edits attendance or scores.
+            if (window.MJR_setupPush && faciId) window.MJR_setupPush('faci', faciId);
+
 
             if (cachedImg && cachedImg.trim() !== "") {
                 document.getElementById('faciProfileImg').src = cachedImg;

@@ -442,6 +442,8 @@
                 return;
             }
 
+            if (window.MJR_setupPush) window.MJR_setupPush('faci', faciId);
+
             document.getElementById('headerSection').textContent = sectionTitle;
             document.getElementById('infoSection').textContent = sectionTitle;
             document.getElementById('infoSubject').textContent = subject.substring(0, 15);
