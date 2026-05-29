@@ -1,23 +1,6 @@
-/*
- * MJR cross-device notify helper
- *
- * Two layers:
- *   1) In-app notifications (foreground) — the realtime listeners on
- *      class-record / attendance pages call window.MJR_notify() and
- *      get an in-page toast + a triangle-wave bell chime.
- *   2) True Web Push (background) — registers /mjr-sw.js as a service
- *      worker, subscribes the device using the VAPID public key, and
- *      uploads the subscription to Supabase. The Vercel push function
- *      then fans out OS notifications even with every tab closed.
- *
- * Pages should call window.MJR_setupPush('teacher'|'faci', userId)
- * once the user is authenticated so the subscription is stored with
- * the right identity.
- */
 (function () {
-    if (window.MJR_notify) return; // already loaded
+    if (window.MJR_notify) return;
 
-    // === VAPID public key (matches VAPID_PUBLIC_KEY env var) ===
     const VAPID_PUBLIC_KEY = 'BFtf7OOJhwgFropnI9-gshc0TgwbPjy2-AEjdqs1s2kBLig70bcsTK_xsYY1P6f1eLxztvH_Fc0VUkMhbVHIp0g';
 
     const hasNotificationAPI = (typeof Notification !== 'undefined');
@@ -53,60 +36,6 @@
     document.addEventListener('click', arm, { once: true, passive: true });
     document.addEventListener('keydown', arm, { once: true });
     document.addEventListener('touchstart', arm, { once: true, passive: true });
-
-    /* === Polished WebAudio chime — triangle-wave two-note bell ============ */
-    function playChime() {
-        try {
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (!Ctx) return;
-            const ctx = new Ctx();
-            const now = ctx.currentTime;
-
-            // Master gain so it's prominent but not harsh.
-            const master = ctx.createGain();
-            master.gain.value = 0.35;
-            master.connect(ctx.destination);
-
-            // A soft low-pass smooths the high partials.
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 3500;
-            filter.Q.value = 0.7;
-            filter.connect(master);
-
-            function bell(freq, start, dur, peak) {
-                const carrier = ctx.createOscillator();
-                const harmonic = ctx.createOscillator();
-                const g = ctx.createGain();
-
-                carrier.type = 'triangle';
-                carrier.frequency.value = freq;
-                harmonic.type = 'sine';
-                harmonic.frequency.value = freq * 2.0;
-
-                const hg = ctx.createGain();
-                hg.gain.value = 0.18;
-                harmonic.connect(hg).connect(g);
-                carrier.connect(g);
-
-                g.gain.setValueAtTime(0.0001, now + start);
-                g.gain.exponentialRampToValueAtTime(peak, now + start + 0.012);
-                g.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
-                g.connect(filter);
-
-                carrier.start(now + start);
-                harmonic.start(now + start);
-                carrier.stop(now + start + dur + 0.05);
-                harmonic.stop(now + start + dur + 0.05);
-            }
-
-            // High–low descending chime, similar to iOS / Slack DM cue.
-            bell(1318.5, 0.00, 0.55, 0.95);  // E6
-            bell(987.77, 0.13, 0.65, 0.85);  // B5
-
-            setTimeout(() => { try { ctx.close(); } catch (e) {} }, 1200);
-        } catch (e) { /* ignore */ }
-    }
 
     function ensureToastStyles() {
         if (document.getElementById('mjrNotifyToastStyles')) return;
@@ -171,17 +100,14 @@
                     silent: true
                 });
                 setTimeout(() => { try { n.close(); } catch (e) {} }, 6000);
-            } catch (e) { /* ignore */ }
+            } catch (e) {}
         }
     }
 
-    /* === Local-save echo suppression =================================== */
     let lastLocalSaveAt = 0;
     function markLocalSave() { lastLocalSaveAt = Date.now(); }
     function isLikelyOwnChange() { return (Date.now() - lastLocalSaveAt) < 2500; }
 
-    /* === Service worker + Web Push subscription ========================
-       Pages call MJR_setupPush('teacher'|'faci', userId) once authed. */
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -214,21 +140,28 @@
                     || (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
             if (!sb) return;
 
+            const cleanId = String(userId).replace(/['"]+/g, '').trim();
             const subscriptionJson = JSON.parse(JSON.stringify(sub));
+
             await sb.from('push_subscriptions').upsert({
                 user_type: userType,
-                user_id: String(userId).replace(/['"]+/g, '').trim(),
+                user_id: cleanId,
                 endpoint: sub.endpoint,
                 subscription: subscriptionJson,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'endpoint' });
+
+            await sb.from('push_subscriptions')
+                .delete()
+                .eq('user_type', userType)
+                .eq('user_id', cleanId)
+                .neq('endpoint', sub.endpoint);
         } catch (err) {
             console.warn('Push subscription failed:', err);
         }
     }
 
     window.MJR_notify = notify;
-    window.MJR_requestNotifyPermission = ensurePermission;
     window.MJR_markLocalSave = markLocalSave;
     window.MJR_isLikelyOwnChange = isLikelyOwnChange;
     window.MJR_setupPush = setupPush;

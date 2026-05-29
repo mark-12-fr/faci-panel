@@ -1,17 +1,3 @@
-/*
- * MJR Faci Session Tracker
- *
- * Records when a facilitator opens the web panel and when they leave.
- * Maintains a single row in `facilitator_logs` per browser session:
- *
- *   - time_in  is stamped once when the session starts.
- *   - time_out is refreshed on every heartbeat / page navigation / tab close
- *               so the latest value reflects when the facilitator was last
- *               active, even if they don't explicitly log out.
- *
- * The active log id lives in sessionStorage so a fresh browser launch
- * always starts a new row, while navigating across pages reuses it.
- */
 (function () {
     const HEARTBEAT_MS = 30000;
     const LOG_TABLE = 'facilitator_logs';
@@ -76,7 +62,7 @@
         return null;
     }
 
-    async function touchSession() {
+    async function stampOut() {
         const sb = getSupabase();
         const session = readSessionLog();
         if (!sb || !session) return;
@@ -85,23 +71,7 @@
             await sb.from(LOG_TABLE)
                 .update({ time_out: nowIso() })
                 .eq('id', session.id);
-        } catch (err) {
-            console.error('Faci session: heartbeat update failed', err);
-        }
-    }
-
-    async function closeSessionBeacon() {
-        const sb = getSupabase();
-        const session = readSessionLog();
-        if (!sb || !session) return;
-
-        try {
-            await sb.from(LOG_TABLE)
-                .update({ time_out: nowIso() })
-                .eq('id', session.id);
-        } catch (err) {
-            /* tab is closing; nothing to report to */
-        }
+        } catch (err) {}
     }
 
     async function ensureSession() {
@@ -110,7 +80,7 @@
 
         const session = readSessionLog();
         if (session && session.faci === faciId) {
-            await touchSession();
+            await stampOut();
             return;
         }
 
@@ -122,7 +92,7 @@
 
     function startHeartbeat() {
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        heartbeatTimer = setInterval(touchSession, HEARTBEAT_MS);
+        heartbeatTimer = setInterval(stampOut, HEARTBEAT_MS);
     }
 
     function bindLifecycle() {
@@ -130,12 +100,12 @@
             if (document.visibilityState === 'visible') {
                 ensureSession();
             } else {
-                touchSession();
+                stampOut();
             }
         });
 
-        window.addEventListener('pagehide', closeSessionBeacon);
-        window.addEventListener('beforeunload', closeSessionBeacon);
+        window.addEventListener('pagehide', stampOut);
+        window.addEventListener('beforeunload', stampOut);
     }
 
     function wrapLogout() {
@@ -143,7 +113,7 @@
         if (typeof original !== 'function' || original.__mjrSessionWrapped) return;
 
         const wrapped = async function () {
-            await closeSessionBeacon();
+            await stampOut();
             clearSessionLog();
             if (heartbeatTimer) clearInterval(heartbeatTimer);
             return original.apply(this, arguments);
@@ -174,13 +144,6 @@
             }, 4000);
         }
     }
-
-    window.mjrFaciSession = {
-        ensure: ensureSession,
-        touch: touchSession,
-        close: closeSessionBeacon,
-        clear: clearSessionLog
-    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
