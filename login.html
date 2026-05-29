@@ -357,6 +357,9 @@
         const SUPABASE_URL ='https://njzvuwkepaasnsvuujgx.supabase.co'; 
         const SUPABASE_ANON_KEY ='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0'; 
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+            ? 'http://127.0.0.1:5000'
+            : 'https://teacher-panel-d1kw.onrender.com';
 
         // 🌟 CUSTOM ALERT FUNCTIONS 🌟
         function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
@@ -432,15 +435,15 @@
             loginBtn.disabled = true;
 
             try {
-                // Fetch directly from Supabase matching the account_id and temporary_password
-                const { data: faciData, error } = await supabaseClient
-                    .from('facilitators')
-                    .select('*')
-                    .eq('account_id', accountId)
-                    .eq('temporary_password', password)
-                    .single();
+                const res = await fetch(`${API_URL}/api/faci/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accountId, password: password })
+                });
+                const result = await res.json().catch(() => ({}));
+                const faciData = result.faci;
 
-                if (error || !faciData) {
+                if (!res.ok || !faciData) {
                     // Invalid Credentials
                     showAlert(
                         "Login Failed", 
