@@ -245,26 +245,134 @@
         .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
         .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
 
-        .csv-btn {
-            background-color: #3b82f6; color: white;
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            text-decoration: none;
-            display: inline-block;
-            font-weight: 700;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-            transition: all 0.2s ease;
+        .overview-panel { grid-template-columns: repeat(3, 1fr); }
+
+        /* Class Performance */
+        .performance-panel {
+            background-color: var(--panel-bg);
+            padding: 18px 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--premium-shadow);
+            margin-bottom: 20px;
         }
-        .csv-btn:hover { background-color: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
-        .csv-btn:active { transform: scale(0.95); }
+        .perf-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .perf-stat {
+            text-align: center;
+            padding: 12px 6px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        .perf-val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--accent-blue); margin-bottom: 4px; }
+        .perf-label { display: block; font-size: 0.65rem; color: var(--text-sub); text-transform: uppercase; font-weight: 700; }
+        .perf-top { display: flex; flex-direction: column; gap: 8px; }
+        .perf-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            background: #f8fafc; border: 1px solid #e2e8f0;
+        }
+        .perf-rank {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: var(--accent-blue); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.75rem; flex-shrink: 0;
+        }
+        .perf-rank.gold   { background: #f59e0b; }
+        .perf-rank.silver { background: #94a3b8; }
+        .perf-rank.bronze { background: #d97706; }
+        .perf-name { flex: 1; font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+        .perf-grade { font-weight: 800; color: var(--accent-blue); font-size: 1rem; }
+        .perf-empty { text-align: center; color: var(--text-sub); padding: 10px; font-size: 0.85rem; }
+
+        /* Drawer */
+        .drawer-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+            z-index: 1000;
+        }
+        .drawer-backdrop.show { opacity: 1; pointer-events: auto; }
+        .drawer {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--panel-bg);
+            border-radius: 18px 18px 0 0;
+            box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.18);
+            padding: 8px 20px 28px;
+            max-height: 80vh; overflow: hidden;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 1001;
+            display: flex; flex-direction: column;
+        }
+        .drawer.show { transform: translateY(0); }
+        .drawer-handle {
+            width: 42px; height: 4px; background: #cbd5e1;
+            border-radius: 2px; margin: 8px auto 4px;
+        }
+        .drawer-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 0 14px; border-bottom: 1px solid #f1f5f9;
+            margin-bottom: 12px;
+        }
+        .drawer-header h3 { font-size: 1.05rem; font-weight: 800; color: var(--text-main); }
+        .drawer-close {
+            background: #f1f5f9; border: none; width: 32px; height: 32px;
+            border-radius: 50%; color: var(--text-sub); font-size: 0.95rem;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .drawer-close:active { background: #e2e8f0; }
+        .drawer-body {
+            overflow-y: auto; flex: 1; padding-bottom: 8px;
+        }
+        .drawer-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; border-radius: 10px;
+            background: #f8fafc; border: 1px solid #eef2f7;
+            margin-bottom: 8px;
+        }
+        .drawer-row .avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #1e3a8a; color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.85rem; flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .drawer-row .info { flex: 1; min-width: 0; }
+        .drawer-row .info .name { font-weight: 700; font-size: 0.9rem; color: var(--text-main); }
+        .drawer-row .info .sub { font-size: 0.75rem; color: var(--text-sub); }
+        .drawer-row .badge {
+            font-size: 0.7rem; font-weight: 700; padding: 4px 10px;
+            border-radius: 12px; flex-shrink: 0;
+        }
+        .badge-present { background: #dcfce7; color: #15803d; }
+        .badge-absent  { background: #fee2e2; color: #b91c1c; }
+        .badge-late    { background: #fef3c7; color: #b45309; }
+        .badge-excused { background: #e2e8f0; color: #475569; }
+        .badge-score   { background: #eff6ff; color: #1d4ed8; }
+        .drawer-section-title {
+            font-size: 0.75rem; font-weight: 800; color: var(--text-sub);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 12px 4px 6px; border-top: 1px solid #f1f5f9; margin-top: 6px;
+        }
+        .drawer-section-title:first-of-type { border-top: none; padding-top: 4px; }
+        .drawer-empty {
+            text-align: center; color: var(--text-sub); padding: 22px 12px; font-size: 0.85rem;
+        }
 
         /* --- Quick Actions --- */
         .actions-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            gap: 12px;
+            margin-bottom: 16px;
         }
+        .stat-card { cursor: pointer; }
 
         .action-card {
             background-color: var(--panel-bg);
@@ -305,55 +413,6 @@
         .action-text h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
         .action-text p  { font-size: 0.75rem; color: var(--text-sub); }
 
-        /* --- Utility Grid --- */
-        .utility-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 5px;
-        }
-
-        .utility-card {
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--premium-shadow);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .utility-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--hover-shadow);
-            background-color: #f8fafc;
-        }
-        
-        .utility-card:active { transform: scale(0.97); }
-
-        .icon-box {
-            width: 45px;
-            height: 45px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            flex-shrink: 0;
-            transition: transform 0.3s ease;
-        }
-        
-        .utility-card:hover .icon-box { transform: rotate(5deg) scale(1.1); }
-
-        .bg-folder { background-color: #fef3c7; color: #d97706; }
-        .bg-profile { background-color: #f1f5f9; color: #475569; }
-
-        .utility-text h4 { font-size: 0.9rem; color: var(--text-main); font-weight: 700; }
-        .utility-text p { font-size: 0.75rem; color: var(--text-sub); }
-
         /* --- Fixed Bottom Nav --- */
          .bottom-nav {
             position: fixed; bottom: 0; left: 0; width: 100%;
@@ -392,23 +451,23 @@
     </div>
 
     <div class="stats-grid">
-        <div class="stat-card blue fade-in-up delay-1">
+        <div class="stat-card blue fade-in-up delay-1" onclick="openDrawer('students')">
             <h2 id="dashTotalStudents"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">My Students</p>
             <p class="stat-sub" id="faciSectionStat">Section</p>
         </div>
-        <div class="stat-card green fade-in-up delay-1">
+        <div class="stat-card green fade-in-up delay-1" onclick="openDrawer('attendance')">
             <h2 id="dashPresent"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Present Today</p>
             <p class="absent" id="dashAbsent">0 absent/late</p>
         </div>
-        
-        <div class="stat-card yellow fade-in-up delay-2">
+
+        <div class="stat-card yellow fade-in-up delay-2" onclick="openDrawer('modules')">
             <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Modules Done</p>
             <p class="pending" id="dashModulesSub">Calculating...</p>
         </div>
-        <div class="stat-card purple fade-in-up delay-2">
+        <div class="stat-card purple fade-in-up delay-2" onclick="openDrawer('activities')">
             <h2 id="dashActivities"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
             <p class="stat-label">Activities</p>
             <p class="done" id="dashActivitiesSub">Waiting</p>
@@ -429,7 +488,6 @@
             <h3 id="faciTotalStudentsOverview">0</h3>
             <p>Students</p>
         </div>
-        <a href="#" class="csv-btn">↓ CSV</a>
     </div>
 
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
@@ -448,24 +506,65 @@
                 <p>All scores</p>
             </div>
         </a>
-    </div>
-
-    <div class="utility-grid">
-        <a href="#" class="utility-card fade-in-up delay-5">
-            <div class="icon-box bg-folder"><i data-lucide="folder-open"></i></div>
-            <div class="utility-text">
-                <h4>Export CSV</h4>
-                <p>Full report</p>
-            </div>
-        </a>
-
-        <div class="utility-card fade-in-up delay-5" onclick="faciLogout()">
-            <div class="icon-box bg-profile"><i data-lucide="log-out"></i></div>
-            <div class="utility-text">
-                <h4>Logout</h4>
-                <p>Sign out</p>
+        <div class="action-card fade-in-up delay-4" onclick="openDrawer('top')">
+            <div class="action-icon" style="color: #f59e0b; background: #fef3c7;"><i data-lucide="trophy"></i></div>
+            <div class="action-text">
+                <h4>Top Students</h4>
+                <p>Ranked by grade</p>
             </div>
         </div>
+        <div class="action-card fade-in-up delay-4" onclick="openDrawer('modules')">
+            <div class="action-icon" style="color: #eab308; background: #fefce8;"><i data-lucide="book-open"></i></div>
+            <div class="action-text">
+                <h4>Modules</h4>
+                <p>Submitted today</p>
+            </div>
+        </div>
+        <div class="action-card fade-in-up delay-4" onclick="openDrawer('activities')">
+            <div class="action-icon" style="color: #a855f7; background: #faf5ff;"><i data-lucide="pencil-line"></i></div>
+            <div class="action-text">
+                <h4>Activities</h4>
+                <p>Submitted today</p>
+            </div>
+        </div>
+        <div class="action-card fade-in-up delay-4" onclick="openDrawer('exams')">
+            <div class="action-icon" style="color: #ec4899; background: #fdf2f8;"><i data-lucide="award"></i></div>
+            <div class="action-text">
+                <h4>PT &amp; Exam</h4>
+                <p>Performance tasks</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title fade-in-up delay-5">Class Performance</div>
+    <div class="performance-panel fade-in-up delay-5">
+        <div class="perf-stats">
+            <div class="perf-stat">
+                <span class="perf-val" id="perfAverage">0</span>
+                <span class="perf-label">Class Average</span>
+            </div>
+            <div class="perf-stat">
+                <span class="perf-val" id="perfPassing">0%</span>
+                <span class="perf-label">Passing Rate</span>
+            </div>
+            <div class="perf-stat">
+                <span class="perf-val" id="perfHighest">0</span>
+                <span class="perf-label">Highest Grade</span>
+            </div>
+        </div>
+        <div class="perf-top" id="perfTopList">
+            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading performance…</div>
+        </div>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+    <div class="drawer" id="dashDrawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-header">
+            <h3 id="drawerTitle">Details</h3>
+            <button class="drawer-close" onclick="closeDrawer()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
     </div>
 
     <nav class="bottom-nav">
@@ -602,77 +701,70 @@
                 console.error("Error fetching profile:", err); 
             }
 
-            // 2. FETCH LIVE STATS 
             try {
                 const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
-                
-                let totalStudents = 0;
-                
-                if (sectionData) {
-                    document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
-                    
-                    const { data: students } = await supabaseClient.from('students').select('id').eq('section_id', sectionData.id);
-                    totalStudents = students ? students.length : 0;
-                    
-                    document.getElementById('dashTotalStudents').textContent = totalStudents;
-                    document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
 
-                    const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
-                    
-                    let modulesDone = 0;
-                    let activitiesDone = 0;
-
-                    if (recordsData) {
-                        recordsData.forEach(record => {
-                            for(let i=1; i<=25; i++) {
-                                if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined) modulesDone++;
-                            }
-                            for(let i=1; i<=10; i++) {
-                                if (record[`activity_${i}`] !== null && record[`activity_${i}`] !== undefined) activitiesDone++;
-                            }
-                        });
-                    }
-
-                    const totalPossibleModules = totalStudents * 25;
-                    const totalPossibleActivities = totalStudents * 10;
-                    const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
-                    const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
-
-                    document.getElementById('dashModules').textContent = modulesDone;
-                    document.getElementById('dashModulesSub').textContent = pendingModules > 0 ? `${pendingModules} pending` : (modulesDone > 0 ? 'All done' : '0 pending');
-                    document.getElementById('dashActivities').textContent = activitiesDone;
-                    document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
-
-                } else {
+                if (!sectionData) {
                     document.getElementById('dashTotalStudents').textContent = '0';
                     document.getElementById('faciTotalStudentsOverview').textContent = '0';
                     document.getElementById('dashModules').textContent = '0';
                     document.getElementById('dashActivities').textContent = '0';
                     document.getElementById('dashModulesSub').textContent = '0 pending';
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
+                    return;
                 }
 
-                const { data: attendanceData } = await supabaseClient
+                document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
+
+                const { data: students } = await supabaseClient
+                    .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true });
+                cachedStudents = students || [];
+                const totalStudents = cachedStudents.length;
+
+                document.getElementById('dashTotalStudents').textContent = totalStudents;
+                document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
+
+                const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
+                cachedRecords = recordsData || [];
+
+                let modulesDone = 0, activitiesDone = 0;
+                cachedRecords.forEach(record => {
+                    for (let i = 1; i <= 25; i++) {
+                        if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined && record[`module_${i}`] !== '') modulesDone++;
+                    }
+                    for (let i = 1; i <= 10; i++) {
+                        if (record[`activity_${i}`] !== null && record[`activity_${i}`] !== undefined && record[`activity_${i}`] !== '') activitiesDone++;
+                    }
+                });
+
+                const totalPossibleModules = totalStudents * 25;
+                const totalPossibleActivities = totalStudents * 10;
+                const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
+                const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
+
+                document.getElementById('dashModules').textContent = modulesDone;
+                document.getElementById('dashModulesSub').textContent = pendingModules > 0 ? `${pendingModules} pending` : (modulesDone > 0 ? 'All done' : '0 pending');
+                document.getElementById('dashActivities').textContent = activitiesDone;
+                document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
+
+                const { data: attendanceToday } = await supabaseClient
                     .from('attendance')
-                    .select('status')
+                    .select('student_id_no, student_name, status, remarks')
                     .eq('section', section)
                     .eq('date', exactTodayDate);
+                cachedAttendanceToday = attendanceToday || [];
 
-                let present = 0;
-                let absentLate = 0;
-
-                if (attendanceData) {
-                    attendanceData.forEach(record => {
-                        if (record.status === 'Present') present++;
-                        if (record.status === 'Absent' || record.status === 'Late') absentLate++; 
-                    });
-                }
-
+                let present = 0, absentLate = 0;
+                cachedAttendanceToday.forEach(r => {
+                    if (r.status === 'Present') present++;
+                    if (r.status === 'Absent' || r.status === 'Late') absentLate++;
+                });
                 document.getElementById('dashPresent').textContent = present;
                 const absentLabel = document.getElementById('dashAbsent');
                 absentLabel.textContent = `${absentLate} absent/late`;
-                absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a"; 
+                absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a";
 
+                renderPerformance();
             } catch (error) {
                 console.error("Error fetching stats:", error);
                 document.getElementById('dashTotalStudents').textContent = '!';
@@ -682,6 +774,241 @@
                 document.getElementById('dashActivities').textContent = '!';
             }
         });
+
+        let cachedStudents = [];
+        let cachedRecords = [];
+        let cachedAttendanceToday = [];
+
+        function studentRecord(studentId) {
+            return cachedRecords.find(r => r.student_id === studentId) || null;
+        }
+
+        function gradeFor(student) {
+            const rec = studentRecord(student.id);
+            if (!rec) return { grade: 0, ww: 0, pt: 0, qe: 0 };
+            let totalWW = 0, totalPT = 0;
+            const totalQE = Number(rec.qe) || 0;
+            for (const key in rec) {
+                if (key.startsWith('module_') || key.startsWith('activity_') || key === 'at') totalWW += Number(rec[key]) || 0;
+                if (key.startsWith('pt_')) totalPT += Number(rec[key]) || 0;
+            }
+            const ww = Math.min(totalWW, 100);
+            const pt = Math.min(totalPT, 100);
+            const qe = Math.min((totalQE / 50) * 100, 100);
+            return { grade: Math.round((ww * 0.3) + (pt * 0.5) + (qe * 0.2)), ww: totalWW, pt: totalPT, qe: totalQE };
+        }
+
+        function renderPerformance() {
+            const list = document.getElementById('perfTopList');
+            if (!cachedStudents.length) {
+                document.getElementById('perfAverage').textContent = '0';
+                document.getElementById('perfPassing').textContent = '0%';
+                document.getElementById('perfHighest').textContent = '0';
+                list.innerHTML = '<div class="perf-empty">No students yet.</div>';
+                return;
+            }
+
+            const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }));
+            const total = scored.reduce((a, b) => a + b.grade, 0);
+            const avg = Math.round(total / scored.length);
+            const passing = scored.filter(s => s.grade >= 75).length;
+            const passingPct = Math.round((passing / scored.length) * 100);
+            const highest = scored.reduce((m, s) => s.grade > m ? s.grade : m, 0);
+
+            document.getElementById('perfAverage').textContent = avg;
+            document.getElementById('perfPassing').textContent = passingPct + '%';
+            document.getElementById('perfHighest').textContent = highest;
+
+            const top = [...scored].sort((a, b) => b.grade - a.grade).slice(0, 5);
+            if (!top.length || top.every(t => t.grade === 0)) {
+                list.innerHTML = '<div class="perf-empty">Scores will appear once they\'re entered.</div>';
+                return;
+            }
+            list.innerHTML = top.map((t, i) => {
+                const cls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                return `
+                    <div class="perf-row">
+                        <div class="perf-rank ${cls}">${i + 1}</div>
+                        <div class="perf-name">${escapeHtml(t.student.full_name || 'Unknown')}</div>
+                        <div class="perf-grade">${t.grade}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+        }
+
+        function initials(name) {
+            return (name || '?').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2);
+        }
+
+        function openDrawer(type) {
+            const titleEl = document.getElementById('drawerTitle');
+            const bodyEl = document.getElementById('drawerBody');
+            let title = 'Details';
+            let html = '';
+
+            if (type === 'students') {
+                title = 'My Students';
+                if (!cachedStudents.length) {
+                    html = '<div class="drawer-empty">No students assigned yet.</div>';
+                } else {
+                    html = cachedStudents.map(s => `
+                        <div class="drawer-row">
+                            <div class="avatar">${escapeHtml(initials(s.full_name))}</div>
+                            <div class="info">
+                                <div class="name">${escapeHtml(s.full_name)}</div>
+                                <div class="sub">${escapeHtml(s.id_no || '')}${s.gender ? ' · ' + escapeHtml(s.gender) : ''}</div>
+                            </div>
+                        </div>`).join('');
+                }
+            } else if (type === 'attendance') {
+                title = "Today's Attendance";
+                const byKey = {};
+                cachedAttendanceToday.forEach(r => {
+                    const key = (r.student_id_no || '').trim() || ('name:' + (r.student_name || '').trim().toLowerCase());
+                    byKey[key] = r;
+                });
+                const groups = { Present: [], Late: [], Absent: [], Excused: [], Unmarked: [] };
+                cachedStudents.forEach(s => {
+                    const k1 = (s.id_no || '').trim();
+                    const k2 = 'name:' + (s.full_name || '').trim().toLowerCase();
+                    const r = byKey[k1] || byKey[k2];
+                    const status = r ? r.status : 'Unmarked';
+                    (groups[status] || groups.Unmarked).push({ student: s, remarks: r ? r.remarks : '' });
+                });
+                const renderGroup = (label, list, badgeCls) => {
+                    if (!list.length) return '';
+                    return `<div class="drawer-section-title">${label} (${list.length})</div>` +
+                        list.map(({ student, remarks }) => `
+                            <div class="drawer-row">
+                                <div class="avatar">${escapeHtml(initials(student.full_name))}</div>
+                                <div class="info">
+                                    <div class="name">${escapeHtml(student.full_name)}</div>
+                                    <div class="sub">${escapeHtml(remarks || student.id_no || '')}</div>
+                                </div>
+                                <span class="badge ${badgeCls}">${label}</span>
+                            </div>`).join('');
+                };
+                html = renderGroup('Present', groups.Present, 'badge-present') +
+                       renderGroup('Late',    groups.Late,    'badge-late') +
+                       renderGroup('Absent',  groups.Absent,  'badge-absent') +
+                       renderGroup('Excused', groups.Excused, 'badge-excused');
+                const unmarked = groups.Unmarked;
+                if (unmarked.length) {
+                    html += `<div class="drawer-section-title">Not yet marked (${unmarked.length})</div>` +
+                        unmarked.map(({ student }) => `
+                            <div class="drawer-row">
+                                <div class="avatar">${escapeHtml(initials(student.full_name))}</div>
+                                <div class="info">
+                                    <div class="name">${escapeHtml(student.full_name)}</div>
+                                    <div class="sub">${escapeHtml(student.id_no || '')}</div>
+                                </div>
+                            </div>`).join('');
+                }
+                if (!html) html = '<div class="drawer-empty">No attendance recorded today yet.</div>';
+            } else if (type === 'modules' || type === 'activities') {
+                const isMod = type === 'modules';
+                title = isMod ? 'Modules' : 'Activities';
+                const count = isMod ? 25 : 10;
+                const prefix = isMod ? 'module_' : 'activity_';
+                const rows = cachedStudents.map(s => {
+                    const rec = studentRecord(s.id);
+                    if (!rec) return { student: s, done: 0, lastIndex: 0, nextIndex: 1, score: null };
+                    let done = 0, lastIndex = 0;
+                    for (let i = 1; i <= count; i++) {
+                        const v = rec[prefix + i];
+                        if (v !== null && v !== undefined && v !== '') { done++; lastIndex = i; }
+                    }
+                    const lastScore = lastIndex > 0 ? rec[prefix + lastIndex] : null;
+                    const nextIndex = lastIndex < count ? lastIndex + 1 : null;
+                    return { student: s, done, lastIndex, nextIndex, score: lastScore };
+                });
+                const submitted = rows.filter(r => r.done > 0).sort((a, b) => b.done - a.done);
+                const pending = rows.filter(r => r.done === 0);
+                const sectionLabel = isMod ? 'Modules' : 'Activities';
+                const upcoming = isMod ? 'Next module' : 'Next activity';
+                html = '';
+                if (submitted.length) {
+                    html += `<div class="drawer-section-title">Submitted ${sectionLabel.toLowerCase()} (${submitted.length})</div>` +
+                        submitted.map(r => `
+                            <div class="drawer-row">
+                                <div class="avatar">${escapeHtml(initials(r.student.full_name))}</div>
+                                <div class="info">
+                                    <div class="name">${escapeHtml(r.student.full_name)}</div>
+                                    <div class="sub">Latest: ${isMod ? 'Module' : 'Activity'} ${r.lastIndex} · ${r.nextIndex ? upcoming + ' next: ' + (isMod ? 'Module ' : 'Activity ') + r.nextIndex : 'All done'}</div>
+                                </div>
+                                <span class="badge badge-score">${r.done}/${count}</span>
+                            </div>`).join('');
+                }
+                if (pending.length) {
+                    html += `<div class="drawer-section-title">Pending (${pending.length})</div>` +
+                        pending.map(r => `
+                            <div class="drawer-row">
+                                <div class="avatar">${escapeHtml(initials(r.student.full_name))}</div>
+                                <div class="info">
+                                    <div class="name">${escapeHtml(r.student.full_name)}</div>
+                                    <div class="sub">Hasn't submitted any ${sectionLabel.toLowerCase()} yet</div>
+                                </div>
+                                <span class="badge badge-absent">0/${count}</span>
+                            </div>`).join('');
+                }
+                if (!html) html = '<div class="drawer-empty">No data yet.</div>';
+            } else if (type === 'exams') {
+                title = 'Performance Tasks & Exam';
+                const rows = cachedStudents.map(s => {
+                    const rec = studentRecord(s.id) || {};
+                    return {
+                        student: s,
+                        pt1: rec.pt_1, pt2: rec.pt_2, qe: rec.qe, at: rec.at
+                    };
+                });
+                html = rows.map(r => {
+                    const fmt = v => (v === null || v === undefined || v === '') ? '—' : v;
+                    return `
+                        <div class="drawer-row">
+                            <div class="avatar">${escapeHtml(initials(r.student.full_name))}</div>
+                            <div class="info">
+                                <div class="name">${escapeHtml(r.student.full_name)}</div>
+                                <div class="sub">PT1 ${fmt(r.pt1)} · PT2 ${fmt(r.pt2)} · QE ${fmt(r.qe)} · AT ${fmt(r.at)}</div>
+                            </div>
+                        </div>`;
+                }).join('') || '<div class="drawer-empty">No data yet.</div>';
+            } else if (type === 'top') {
+                title = 'Top Students';
+                const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }))
+                                              .sort((a, b) => b.grade - a.grade);
+                if (!scored.length || scored.every(s => s.grade === 0)) {
+                    html = '<div class="drawer-empty">Top performers will appear once scores are entered.</div>';
+                } else {
+                    html = scored.map((r, i) => `
+                        <div class="drawer-row">
+                            <div class="avatar">#${i + 1}</div>
+                            <div class="info">
+                                <div class="name">${escapeHtml(r.student.full_name)}</div>
+                                <div class="sub">WW ${r.ww} · PT ${r.pt} · QE ${r.qe}</div>
+                            </div>
+                            <span class="badge badge-score">${r.grade}</span>
+                        </div>`).join('');
+                }
+            }
+
+            titleEl.textContent = title;
+            bodyEl.innerHTML = html;
+            document.getElementById('drawerBackdrop').classList.add('show');
+            document.getElementById('dashDrawer').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDrawer() {
+            document.getElementById('drawerBackdrop').classList.remove('show');
+            document.getElementById('dashDrawer').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        window.openDrawer = openDrawer;
+        window.closeDrawer = closeDrawer;
 
         // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
         async function faciLogout() {
@@ -701,6 +1028,7 @@
     </script>
 
 <script src="mjr-notify.js" defer></script>
+<script src="mjr-guard.js" defer></script>
 <script src="faci-session.js" defer></script>
 </body>
 </html>
