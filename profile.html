@@ -156,9 +156,6 @@
         .info-value { font-size: 0.95rem; font-weight: 700; color: var(--text-main); display: inline-block;}
         
         /* Bobbing for Stat Numbers */
-        #statAttendance { animation: bobbing 2s ease-in-out infinite; animation-delay: 0s;}
-        #statModules { animation: bobbing 2s ease-in-out infinite; animation-delay: 0.2s;}
-        #statActivities { animation: bobbing 2s ease-in-out infinite; animation-delay: 0.4s;}
 
         /* --- Co-Facilitators Styling --- */
         .co-faci-row {
@@ -235,39 +232,14 @@
             </div>
         </div>
 
-        <h3 class="section-title fade-in-up delay-2">My Stats</h3>
-        <div class="info-card fade-in-up delay-2">
-            <div class="info-row">
-                <div class="icon-box bg-blue-light" style="color: #6366f1; background: #e0e7ff;"><i class="fa-solid fa-clipboard-user"></i></div>
-                <div class="info-text">
-                    <p class="info-label">Attendance Sessions Recorded</p>
-                    <p class="info-value" id="statAttendance">Loading...</p>
-                </div>
-            </div>
-            <div class="info-row">
-                <div class="icon-box bg-blue-light" style="color: #10b981; background: #d1fae5;"><i class="fa-solid fa-layer-group"></i></div>
-                <div class="info-text">
-                    <p class="info-label">Modules Checked</p>
-                    <p class="info-value" id="statModules">Ready</p>
-                </div>
-            </div>
-            <div class="info-row">
-                <div class="icon-box bg-blue-light" style="color: #f59e0b; background: #fef3c7;"><i class="fa-solid fa-pen-nib"></i></div>
-                <div class="info-text">
-                    <p class="info-label">Activities Recorded</p>
-                    <p class="info-value" id="statActivities">Ready</p>
-                </div>
-            </div>
-        </div>
-
-        <h3 class="section-title fade-in-up delay-3">Co-Facilitators</h3>
-        <div class="info-card fade-in-up delay-3" id="coFaciContainer">
+        <h3 class="section-title fade-in-up delay-2">Co-Facilitators</h3>
+        <div class="info-card fade-in-up delay-2" id="coFaciContainer">
             <div style="text-align:center; padding: 15px; color: var(--text-sub); font-size: 0.8rem;">
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading partners...
             </div>
         </div>
 
-        <button class="logout-btn fade-in-up delay-4" onclick="faciLogout()">
+        <button class="logout-btn fade-in-up delay-3" onclick="faciLogout()">
             <i class="fa-solid fa-arrow-right-from-bracket"></i> Log out
         </button>
 
@@ -423,23 +395,6 @@
                 document.getElementById('coFaciContainer').innerHTML = '<div style="text-align:center; padding: 15px; color: #ef4444; font-size: 0.8rem;">Failed to load co-facilitators.</div>';
             }
 
-            // 🌟 FETCH ATTENDANCE STATS 🌟
-            try {
-                const { data: attendanceData } = await supabaseClient
-                    .from('attendance')
-                    .select('date')
-                    .eq('section', section);
-
-                if (attendanceData) {
-                    const uniqueDates = [...new Set(attendanceData.map(item => item.date))];
-                    document.getElementById('statAttendance').textContent = `${uniqueDates.length} sessions`;
-                } else {
-                    document.getElementById('statAttendance').textContent = "0 sessions";
-                }
-            } catch (error) {
-                console.error("Error fetching stats:", error);
-                document.getElementById('statAttendance').textContent = "0 sessions";
-            }
         });
 
         // 🌟 UPLOAD PROFILE PICTURE FUNCTION 🌟

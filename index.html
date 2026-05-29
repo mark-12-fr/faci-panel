@@ -120,15 +120,18 @@
             font-weight: 700;
         }
 
-        .tag-row { display: flex; gap: 8px; flex-wrap: wrap;}
+        .tag-row { display: flex; gap: 8px; flex-wrap: wrap; max-width: calc(100% - 65px); }
         .tag {
             padding: 6px 12px;
             border-radius: 15px;
             font-size: 0.75rem;
             font-weight: 800;
+            line-height: 1.35;
+            white-space: normal;
+            word-break: break-word;
         }
-        .tag-primary { background-color: #eff6ff; color: #3b82f6; } 
-        .tag-secondary { background-color: #faf5ff; color: #a855f7; } 
+        .tag-primary { background-color: #eff6ff; color: #3b82f6; }
+        .tag-secondary { background-color: #faf5ff; color: #a855f7; }
 
         /* --- Profile Avatar --- */
         .profile-avatar {
@@ -270,7 +273,7 @@
         }
         .perf-val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--accent-blue); margin-bottom: 4px; }
         .perf-label { display: block; font-size: 0.65rem; color: var(--text-sub); text-transform: uppercase; font-weight: 700; }
-        .perf-top { display: flex; flex-direction: column; gap: 8px; }
+        .perf-top { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 2px; }
         .perf-row {
             display: flex; align-items: center; gap: 10px;
             padding: 10px 12px; border-radius: 10px;
@@ -435,11 +438,8 @@
     
     <div class="dashboard-header fade-in-up">
         <div class="header-content">
-            <div class="status-badge">
-                  <i class="fa-solid fa-lock"></i> Section-Locked View
-            </div>
             <p class="date" id="currentDate">Loading Date...</p>
-            <h1 id="faciGreeting">Good Day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
+            <h1 id="faciGreeting">Good day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
             <div class="tag-row">
                 <span class="tag tag-primary" id="faciSectionTag">Section</span>
                 <span class="tag tag-secondary" id="faciSubjectTag"><i class="fa-solid fa-spinner fa-spin"></i></span>
@@ -492,20 +492,6 @@
 
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
     <div class="actions-grid">
-        <a href="attendance.html" class="action-card fade-in-up delay-4">
-            <div class="action-icon"><i data-lucide="clipboard-list"></i></div>
-            <div class="action-text">
-                <h4>Attendance</h4>
-                <p>Today's class</p>
-            </div>
-        </a>
-        <a href="record.html" class="action-card fade-in-up delay-4">
-            <div class="action-icon" style="color: #a855f7; background: #faf5ff;"><i data-lucide="bar-chart-2"></i></div>
-            <div class="action-text">
-                <h4>Class Record</h4>
-                <p>All scores</p>
-            </div>
-        </a>
         <div class="action-card fade-in-up delay-4" onclick="openDrawer('top')">
             <div class="action-icon" style="color: #f59e0b; background: #fef3c7;"><i data-lucide="trophy"></i></div>
             <div class="action-text">
@@ -682,9 +668,13 @@
 
                 if (profile) {
                     const firstName = profile.full_name.split(' ')[0];
-                    document.getElementById('faciGreeting').innerHTML = `Good morning,<br>${firstName}! <span class="hand-emoji">👋</span>`;
+                    const hr = new Date().getHours();
+                    const partOfDay = hr < 12 ? 'Good morning'
+                                    : hr < 18 ? 'Good afternoon'
+                                    :           'Good evening';
+                    document.getElementById('faciGreeting').innerHTML = `${partOfDay},<br>${firstName}! <span class="hand-emoji">👋</span>`;
                     document.getElementById('faciSectionTag').textContent = profile.section;
-                    document.getElementById('faciSubjectTag').textContent = profile.subject.substring(0, 10);
+                    document.getElementById('faciSubjectTag').textContent = profile.subject || 'Subject';
                     document.getElementById('faciSectionStat').textContent = profile.section;
                     document.getElementById('faciSubjectOverview').textContent = profile.subject.substring(0, 15) + (profile.subject.length > 15 ? '...' : '');
 
@@ -819,12 +809,12 @@
             document.getElementById('perfPassing').textContent = passingPct + '%';
             document.getElementById('perfHighest').textContent = highest;
 
-            const top = [...scored].sort((a, b) => b.grade - a.grade).slice(0, 5);
-            if (!top.length || top.every(t => t.grade === 0)) {
+            const ranked = [...scored].sort((a, b) => b.grade - a.grade);
+            if (!ranked.length || ranked.every(t => t.grade === 0)) {
                 list.innerHTML = '<div class="perf-empty">Scores will appear once they\'re entered.</div>';
                 return;
             }
-            list.innerHTML = top.map((t, i) => {
+            list.innerHTML = ranked.map((t, i) => {
                 const cls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
                 return `
                     <div class="perf-row">
