@@ -232,7 +232,7 @@
             border-radius: var(--border-radius);
             box-shadow: var(--premium-shadow);
             display: grid;
-            grid-template-columns: repeat(3, 1fr) min-content;
+            grid-template-columns: repeat(3, 1fr);
             align-items: center;
             gap: 15px;
             margin-bottom: 20px;
@@ -247,8 +247,6 @@
         .overview-item { text-align: left; }
         .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
         .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
-
-        .overview-panel { grid-template-columns: repeat(3, 1fr); }
 
         /* Class Performance */
         .performance-panel {
@@ -375,7 +373,6 @@
             gap: 12px;
             margin-bottom: 16px;
         }
-        .stat-card { cursor: pointer; }
 
         .action-card {
             background-color: var(--panel-bg);
