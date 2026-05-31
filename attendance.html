@@ -364,6 +364,12 @@
             listenForTeacherUpdates();
         });
 
+        let realtimeReloadTimer = null;
+        function scheduleRealtimeReload(section) {
+            clearTimeout(realtimeReloadTimer);
+            realtimeReloadTimer = setTimeout(() => loadDynamicStudents(section), 600);
+        }
+
         function listenForTeacherUpdates() {
             supabaseClient
                 .channel('public:attendance_faci')
@@ -371,22 +377,24 @@
                     'postgres_changes',
                     { event: '*', schema: 'public', table: 'attendance' },
                     (payload) => {
-                        console.log('Attendance updated by teacher!', payload);
-                        
+                        // Skip our own just-submitted changes (delete+insert fires
+                        // many row events that would otherwise reload repeatedly).
+                        if (window.MJR_isLikelyOwnChange && window.MJR_isLikelyOwnChange()) return;
+
                         const section = localStorage.getItem('faci_section');
                         const affectedSection = payload.new?.section || payload.old?.section;
-                        
+
                         if (affectedSection === section) {
                             const dateStr = document.getElementById('currentDateDisplay').textContent;
                             const affectedDate = payload.new?.date || payload.old?.date;
 
                             if (affectedDate === dateStr) {
-                                loadDynamicStudents(section);
+                                scheduleRealtimeReload(section);
                                 showUpdateToast("Live Update: Teacher modified the attendance.");
                             }
 
                             // Cross-device notification — skip self-echo.
-                            if (window.MJR_notify && !(window.MJR_isLikelyOwnChange && window.MJR_isLikelyOwnChange())) {
+                            if (window.MJR_notify) {
                                 const rec = payload.new || payload.old || {};
                                 const who = rec.student_name || 'a student';
                                 const what = (payload.eventType === 'DELETE') ? 'cleared' : (rec.status || 'updated');
@@ -640,6 +648,10 @@
 
                 // Insert the new records directly to Supabase
                 const { error } = await supabaseClient.from('attendance').insert(attendanceData);
+
+                // Re-mark so the realtime echo of this submit is treated as our
+                // own change (keeps the list from refreshing multiple times).
+                if (window.MJR_markLocalSave) window.MJR_markLocalSave();
 
                 if (!error) {
                     btn.style.background = '#10b981';
