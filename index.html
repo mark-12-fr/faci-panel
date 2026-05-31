@@ -689,7 +689,7 @@
             }
 
             try {
-                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester').eq('title', section).single();
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, teacher_id');
 
                 if (!sectionData) {
                     document.getElementById('dashTotalStudents').textContent = '0';

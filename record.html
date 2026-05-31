@@ -486,7 +486,7 @@
             const tbody = document.getElementById('recordTableBody');
 
             try {
-                const { data: sectionData } = await supabaseClient.from('sections').select('id, semester, quarter').eq('title', sectionTitle).single();
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, teacher_id');
                 if(sectionData) {
                     document.getElementById('infoSemester').textContent = sectionData.semester || '1st Sem';
                     currentSectionId = sectionData.id;
