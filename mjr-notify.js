@@ -161,6 +161,27 @@
         }
     }
 
+    // Look up the facilitator's own teacher_id (from localStorage, or fetch it
+    // from their record so it works even before the next login).
+    async function getFaciTeacherId(sb) {
+        let tid = localStorage.getItem('faci_teacher_id');
+        if (tid) return tid;
+        const faciId = localStorage.getItem('faci_id');
+        if (!sb || !faciId) return null;
+        try {
+            const { data } = await sb.from('facilitators')
+                .select('teacher_id')
+                .or(`id.eq.${faciId},account_id.eq.${faciId}`)
+                .single();
+            if (data && data.teacher_id) {
+                tid = data.teacher_id;
+                localStorage.setItem('faci_teacher_id', tid);
+                return tid;
+            }
+        } catch (err) {}
+        return null;
+    }
+
     // Resolve the facilitator's own section row. Section titles can repeat
     // across teachers, so prefer the row whose teacher_id matches the
     // facilitator's; fall back to the title-only match for older sessions.
@@ -172,7 +193,7 @@
             const rows = data || [];
             if (rows.length === 0) return null;
             if (rows.length === 1) return rows[0];
-            const teacherId = localStorage.getItem('faci_teacher_id');
+            const teacherId = await getFaciTeacherId(sb);
             if (teacherId) {
                 const mine = rows.find(r => String(r.teacher_id) === String(teacherId));
                 if (mine) return mine;
@@ -188,5 +209,6 @@
     window.MJR_markLocalSave = markLocalSave;
     window.MJR_isLikelyOwnChange = isLikelyOwnChange;
     window.MJR_setupPush = setupPush;
+    window.MJR_getFaciTeacherId = getFaciTeacherId;
     window.MJR_resolveFaciSection = resolveFaciSection;
 })();

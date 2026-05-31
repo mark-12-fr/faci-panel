@@ -333,17 +333,23 @@
             document.getElementById('cardSubject').textContent = subject;
 
             // 🌟 FETCH CURRENT FACILITATOR DATA 🌟
+            let myTeacherId = localStorage.getItem('faci_teacher_id');
             try {
                 const { data: faciData } = await supabaseClient
                     .from('facilitators')
-                    .select('full_name, avatar_url')
+                    .select('full_name, avatar_url, teacher_id')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
                     .single();
 
                 if (faciData) {
                     fullName = faciData.full_name;
-                    localStorage.setItem('faci_name', fullName); 
-                    
+                    localStorage.setItem('faci_name', fullName);
+
+                    if (faciData.teacher_id) {
+                        myTeacherId = faciData.teacher_id;
+                        localStorage.setItem('faci_teacher_id', myTeacherId);
+                    }
+
                     if (faciData.avatar_url) {
                         document.getElementById('faciAvatar').src = faciData.avatar_url;
                     } else {
@@ -366,7 +372,6 @@
                     .select('full_name, avatar_url, teacher_id')
                     .eq('section', section);
 
-                const myTeacherId = localStorage.getItem('faci_teacher_id');
                 if (myTeacherId) coFaciQuery = coFaciQuery.eq('teacher_id', myTeacherId);
 
                 const { data: coFacis, error: coFaciErr } = await coFaciQuery;
