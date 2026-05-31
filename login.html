@@ -475,6 +475,8 @@
                 localStorage.setItem('faci_name', faciData.full_name);
                 localStorage.setItem('faci_section', faciData.section);
                 localStorage.setItem('faci_subject', faciData.subject);
+                if (faciData.teacher_id) localStorage.setItem('faci_teacher_id', faciData.teacher_id);
+                else localStorage.removeItem('faci_teacher_id');
 
                 // Update `last_login` and `status` in Supabase
                 try {

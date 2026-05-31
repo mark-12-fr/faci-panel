@@ -161,8 +161,32 @@
         }
     }
 
+    // Resolve the facilitator's own section row. Section titles can repeat
+    // across teachers, so prefer the row whose teacher_id matches the
+    // facilitator's; fall back to the title-only match for older sessions.
+    async function resolveFaciSection(sb, title, columns) {
+        if (!sb || !title) return null;
+        const cols = columns || 'id, semester, quarter, teacher_id';
+        try {
+            const { data } = await sb.from('sections').select(cols).eq('title', title);
+            const rows = data || [];
+            if (rows.length === 0) return null;
+            if (rows.length === 1) return rows[0];
+            const teacherId = localStorage.getItem('faci_teacher_id');
+            if (teacherId) {
+                const mine = rows.find(r => String(r.teacher_id) === String(teacherId));
+                if (mine) return mine;
+            }
+            return rows[0];
+        } catch (err) {
+            console.error('resolveFaciSection failed', err);
+            return null;
+        }
+    }
+
     window.MJR_notify = notify;
     window.MJR_markLocalSave = markLocalSave;
     window.MJR_isLikelyOwnChange = isLikelyOwnChange;
     window.MJR_setupPush = setupPush;
+    window.MJR_resolveFaciSection = resolveFaciSection;
 })();

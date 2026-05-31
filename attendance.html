@@ -407,15 +407,15 @@
             container.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i></div>';
 
             try {
-                const { data: sections } = await supabaseClient.from('sections').select('id, semester, quarter').eq('title', sectionTitle);
+                const sectionRow = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, teacher_id');
 
-                if (!sections || sections.length === 0) {
+                if (!sectionRow) {
                     container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">Error: Section not found or restricted.</div>';
                     return;
                 }
-                const sectionId = sections[0].id;
-                const semester = sections[0].semester || '1st Sem';
-                currentSectionQuarter = sections[0].quarter ? String(sections[0].quarter) : '1';
+                const sectionId = sectionRow.id;
+                const semester = sectionRow.semester || '1st Sem';
+                currentSectionQuarter = sectionRow.quarter ? String(sectionRow.quarter) : '1';
                 document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • Q${currentSectionQuarter}`;
 
                 const { data: students } = await supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name');
