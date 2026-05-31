@@ -359,17 +359,22 @@
                 document.getElementById('faciName').textContent = fullName;
             }
 
-            // 🌟 FETCH CO-FACILITATORS IN THE SAME SECTION 🌟
+            // 🌟 FETCH CO-FACILITATORS IN THE SAME SECTION (same teacher only) 🌟
             try {
-                const { data: coFacis, error: coFaciErr } = await supabaseClient
+                let coFaciQuery = supabaseClient
                     .from('facilitators')
-                    .select('full_name, avatar_url')
+                    .select('full_name, avatar_url, teacher_id')
                     .eq('section', section);
+
+                const myTeacherId = localStorage.getItem('faci_teacher_id');
+                if (myTeacherId) coFaciQuery = coFaciQuery.eq('teacher_id', myTeacherId);
+
+                const { data: coFacis, error: coFaciErr } = await coFaciQuery;
 
                 if (coFaciErr) throw coFaciErr;
 
                 const coFaciContainer = document.getElementById('coFaciContainer');
-                
+
                 const filteredFacis = coFacis.filter(f => f.full_name !== fullName);
 
                 if (filteredFacis.length === 0) {
