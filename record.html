@@ -134,6 +134,18 @@
         .score-input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         .score-input:disabled { background-color: #f1f5f9; color: #94a3b8; font-weight: 800; cursor: not-allowed; border: 1px solid #e2e8f0; }
 
+        /* Transposed layout: student names on TOP (columns), score items on the SIDE (rows) */
+        table { border-collapse: separate; border-spacing: 0; }
+        thead th { position: sticky; top: 0; z-index: 6; background: #f1f5f9; }
+        .item-col { position: sticky; left: 0; z-index: 5; background: #ffffff; text-align: left; min-width: 92px; max-width: 92px; }
+        thead .item-col { z-index: 14; background: #e2e8f0; }
+        .name-th { min-width: 62px; padding: 9px 6px; font-size: 0.66rem; line-height: 1.15; color: var(--text-main); border-bottom: 2px solid #cbd5e1; vertical-align: bottom; }
+        .name-th .gicon-m { color: #3b82f6; }
+        .name-th .gicon-f { color: #ec4899; }
+        td.item-label { font-weight: 700; font-size: 0.7rem; color: var(--text-main); padding: 9px 10px; }
+        tbody td { text-align: center; border-top: 1px solid #eef2f7; }
+        .clickable-name { cursor: pointer; color: var(--accent-blue); font-weight: 700; }
+
         .submit-btn {
             width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none;
             border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 5px; margin-bottom: 25px;
@@ -503,33 +515,58 @@
                 }
                 document.getElementById('infoTotal').textContent = students.length;
 
-                // Fetch every quarter's record. createInputRow shows the
-                // current quarter's value when present, otherwise carries
-                // over the previous quarter's value so scores never look
-                // wiped after the section's quarter changes.
+                // Fetch every quarter's record. Each cell shows the current
+                // quarter's value when present, otherwise carries over the
+                // previous quarter's value so scores never look wiped after
+                // the section's quarter changes.
                 const { data: existingRecords } = await supabaseClient
                     .from('class_records')
                     .select('*')
                     .eq('section_id', currentSectionId);
 
+                const thead = document.querySelector('table thead');
                 tbody.innerHTML = '';
                 if (students.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    if (thead) thead.innerHTML = '<tr><th class="item-col">ITEM</th></tr>';
+                    tbody.innerHTML = `<tr><td class="item-col" style="color:var(--text-muted); padding:20px;">No students assigned yet.</td></tr>`;
                     return;
                 }
 
+                // Order columns: males, then females, then any other.
                 const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
                 const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
-                let rowCount = 1;
+                const others = students.filter(s => !males.includes(s) && !females.includes(s));
+                const ordered = males.concat(females).concat(others);
 
-                if (males.length > 0) {
-                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2"><i class="fa-solid fa-mars"></i> MALE</td><td colspan="39"></td></tr>`;
-                    males.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
-                }
-                if (females.length > 0) {
-                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2" style="color: #ec4899;"><i class="fa-solid fa-venus"></i> FEMALE</td><td colspan="39"></td></tr>`;
-                    females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
-                }
+                // Per-student metadata (current-quarter record id + carry-over).
+                window.studentRecordIds = {};
+                const metas = ordered.map(s => buildStudentMeta(s, existingRecords));
+                metas.forEach(m => { window.studentRecordIds[m.id] = m.recordId; });
+
+                // Header row: ITEM + one column per student (name on top, tap to open input panel).
+                let headHtml = '<tr><th class="item-col">ITEM</th>';
+                metas.forEach(m => {
+                    const safeName = m.name.replace(/'/g, "\\'");
+                    const gi = m.gender === 'F' ? '<i class="fa-solid fa-venus gicon-f"></i> '
+                            : (m.gender === 'M' ? '<i class="fa-solid fa-mars gicon-m"></i> ' : '');
+                    headHtml += `<th class="name-th" data-student="${m.id}"><span class="clickable-name" onclick="openDrawer('${m.id}', '${safeName}')">${gi}${m.name}</span></th>`;
+                });
+                headHtml += '</tr>';
+                if (thead) thead.innerHTML = headHtml;
+
+                // Body: one row per score item, one input cell per student.
+                const ITEMS = [];
+                for (let i = 1; i <= 25; i++) ITEMS.push({ field: 'module_' + i, label: 'Module ' + i });
+                for (let i = 1; i <= 10; i++) ITEMS.push({ field: 'activity_' + i, label: 'Activity ' + i });
+                ITEMS.push({ field: 'at', label: 'AT' }, { field: 'pt_1', label: 'PT 1' }, { field: 'pt_2', label: 'PT 2' }, { field: 'qe', label: 'QE' });
+
+                let bodyHtml = '';
+                ITEMS.forEach(it => {
+                    bodyHtml += `<tr><td class="item-col item-label">${it.label}</td>`;
+                    metas.forEach(m => { bodyHtml += cellHtml(m, it.field); });
+                    bodyHtml += '</tr>';
+                });
+                tbody.innerHTML = bodyHtml;
 
                 const submitBtn = document.getElementById('submitBtn');
                 submitBtn.style.background = 'var(--accent-blue)';
@@ -541,72 +578,59 @@
             }
         }
 
-        function createInputRow(student, index, existingRecords) {
-            const tr = document.createElement('tr');
-            tr.className = 'student-data-row';
-            tr.dataset.uuid = student.id;
-
+        // Compute a student's current-quarter record id + a carry-over lookup,
+        // exactly as before — just split out so the transposed grid can build
+        // one cell per (student, item).
+        function buildStudentMeta(student, existingRecords) {
             const quarter = getCurrentQuarter();
             const studentRecs = existingRecords ? existingRecords.filter(r => r.student_id === student.id) : [];
 
-            // The row whose quarter matches the section's current quarter
-            // (or a legacy unstamped row). This is the row we'll upsert into.
             const currentRec = studentRecs.find(r => String(r.quarter) === String(quarter))
                             || studentRecs.find(r => r.quarter === null || r.quarter === undefined)
                             || null;
-            if (currentRec && currentRec.id) tr.dataset.recordid = currentRec.id;
 
-            // Rows from OTHER quarters (newest first). When the current
-            // quarter has no value for a field, we display the previous
-            // quarter's value so it doesn't look wiped. These cells are
-            // shown disabled to keep the read-only feel of submitted
-            // scores — the teacher can still edit them via the teacher
-            // panel, which is the source of truth.
             const fallbackRecs = studentRecs
                 .filter(r => r !== currentRec)
                 .sort((a, b) => Number(b.quarter || 0) - Number(a.quarter || 0));
 
-            function fallbackValue(field) {
+            const fallbackValue = (field) => {
                 for (const r of fallbackRecs) {
                     const v = r[field];
                     if (v !== null && v !== undefined && v !== '') return v;
                 }
                 return null;
-            }
-
-            let safeName = student.full_name.replace(/'/g, "\\'");
-            let html = `
-                <td class="td-sticky-1">${index}</td>
-                <td class="td-sticky-2 search-target">
-                    <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
-                        ${student.full_name}
-                    </strong>
-                </td>
-            `;
-
-            const renderInput = (field) => {
-                const currentVal = currentRec ? currentRec[field] : null;
-                const hasCurrent = (currentVal !== null && currentVal !== undefined && currentVal !== '');
-                const carried = hasCurrent ? null : fallbackValue(field);
-                const displayVal = hasCurrent ? currentVal : (carried !== null ? carried : '');
-                const isDisabled = (hasCurrent || carried !== null) ? 'disabled' : '';
-                const carriedAttr = (!hasCurrent && carried !== null) ? 'data-carried="1"' : '';
-                const titleMsg = hasCurrent
-                    ? 'title="Score submitted. Only the Teacher can edit this."'
-                    : (carried !== null
-                        ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
-                        : '');
-
-                return `<td><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
             };
 
-            for(let i=1; i<=25; i++) html += renderInput(`module_${i}`);
-            for(let i=1; i<=10; i++) html += renderInput(`activity_${i}`);
-            const fields = ['at', 'pt_1', 'pt_2', 'qe'];
-            fields.forEach(f => html += renderInput(f));
+            const gender = (student.gender === 'Female' || student.gender === 'F') ? 'F'
+                         : ((student.gender === 'Male' || student.gender === 'M') ? 'M' : '');
 
-            tr.innerHTML = html;
-            return tr;
+            return {
+                id: student.id,
+                name: student.full_name,
+                gender,
+                recordId: (currentRec && currentRec.id) || null,
+                currentRec,
+                fallbackValue
+            };
+        }
+
+        // One score cell. Submitted/carried scores stay disabled (teacher is the
+        // source of truth); carried cells are tagged so submit won't copy them
+        // into the current quarter.
+        function cellHtml(meta, field) {
+            const currentVal = meta.currentRec ? meta.currentRec[field] : null;
+            const hasCurrent = (currentVal !== null && currentVal !== undefined && currentVal !== '');
+            const carried = hasCurrent ? null : meta.fallbackValue(field);
+            const displayVal = hasCurrent ? currentVal : (carried !== null ? carried : '');
+            const isDisabled = (hasCurrent || carried !== null) ? 'disabled' : '';
+            const carriedAttr = (!hasCurrent && carried !== null) ? 'data-carried="1"' : '';
+            const titleMsg = hasCurrent
+                ? 'title="Score submitted. Only the Teacher can edit this."'
+                : (carried !== null
+                    ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
+                    : '');
+
+            return `<td><input type="number" class="score-input" data-field="${field}" data-student="${meta.id}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
         }
 
         function openDrawer(studentId, studentName) {
@@ -614,8 +638,7 @@
             document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
             
             const drawerBody = document.getElementById('drawerBody');
-            const row = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
-            if (!row) return;
+            const cellFor = (f) => document.querySelector(`.score-input[data-student="${studentId}"][data-field="${f}"]`);
 
             const modules = Array.from({length: 25}, (_, i) => `module_${i+1}`);
             const activities = Array.from({length: 10}, (_, i) => `activity_${i+1}`);
@@ -624,7 +647,8 @@
             function createGrid(fields, title) {
                 let html = `<div class="drawer-section-title">${title}</div><div class="drawer-grid">`;
                 fields.forEach(f => {
-                    const tableInput = row.querySelector(`input[data-field="${f}"]`);
+                    const tableInput = cellFor(f);
+                    if (!tableInput) return;
                     const val = tableInput.value;
                     const isDisabled = tableInput.disabled ? 'disabled' : '';
                     const label = f.replace('module_', 'M').replace('activity_', 'A').toUpperCase().replace('_', ' ');
@@ -658,13 +682,10 @@
 
         function applyDrawerScores() {
             if (!currentRowIdForDrawer) return;
-            const row = document.querySelector(`.student-data-row[data-uuid="${currentRowIdForDrawer}"]`);
-            if (!row) return;
-
             const inputs = document.getElementById('drawerBody').querySelectorAll('input');
             inputs.forEach(drawerInput => {
                 const field = drawerInput.id.replace('drawer_', '');
-                const tableInput = row.querySelector(`input[data-field="${field}"]`);
+                const tableInput = document.querySelector(`.score-input[data-student="${currentRowIdForDrawer}"][data-field="${field}"]`);
                 if (tableInput && !tableInput.disabled) {
                     tableInput.value = drawerInput.value;
                     
@@ -681,9 +702,14 @@
 
         document.getElementById('searchInput').addEventListener('input', function(e) {
             const term = e.target.value.toLowerCase();
-            document.querySelectorAll('.student-data-row').forEach(row => {
-                const nameCell = row.querySelector('.search-target');
-                if(nameCell) row.style.display = nameCell.innerText.toLowerCase().includes(term) ? '' : 'none';
+            document.querySelectorAll('.name-th').forEach(th => {
+                const sid = th.dataset.student;
+                const show = th.innerText.toLowerCase().includes(term);
+                th.style.display = show ? '' : 'none';
+                document.querySelectorAll(`.score-input[data-student="${sid}"]`).forEach(inp => {
+                    const td = inp.closest('td');
+                    if (td) td.style.display = show ? '' : 'none';
+                });
             });
         });
 
@@ -701,21 +727,16 @@
             let hasNewInput = false;
             let recordData = [];
 
-            document.querySelectorAll('.student-data-row').forEach(row => {
-                const studUuid = row.dataset.uuid;
-                const recordId = row.dataset.recordid; 
+            const submitIds = window.studentRecordIds ? Object.keys(window.studentRecordIds) : [];
+            submitIds.forEach(studUuid => {
+                const recordId = window.studentRecordIds[studUuid];
 
                 let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr, quarter: getCurrentQuarter() };
-                
-                if (recordId) {
-                    dataObj.id = recordId; 
-                } else {
-                    dataObj.id = crypto.randomUUID(); 
-                }
+                dataObj.id = recordId ? recordId : crypto.randomUUID();
 
-                row.querySelectorAll('.score-input').forEach(input => {
+                document.querySelectorAll(`.score-input[data-student="${studUuid}"]`).forEach(input => {
                     // Skip values that are only being displayed from a
-                    // previous quarter — they live in another row and we
+                    // previous quarter — they belong to another quarter and we
                     // don't want to copy them into the current quarter.
                     if (input.dataset.carried === '1') return;
 
@@ -726,7 +747,7 @@
                         hasNewInput = true;
                     }
                 });
-                
+
                 recordData.push(dataObj);
             });
 
