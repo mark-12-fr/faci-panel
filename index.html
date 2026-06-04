@@ -490,11 +490,11 @@
 
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
     <div class="actions-grid">
-        <div class="action-card fade-in-up delay-4" onclick="openDrawer('top')">
-            <div class="action-icon" style="color: #f59e0b; background: #fef3c7;"><i data-lucide="trophy"></i></div>
+        <div class="action-card fade-in-up delay-4" onclick="openDrawer('missing')">
+            <div class="action-icon" style="color: #ef4444; background: #fef2f2;"><i data-lucide="alert-triangle"></i></div>
             <div class="action-text">
-                <h4>Top Students</h4>
-                <p>Ranked by grade</p>
+                <h4>Missing</h4>
+                <p>Incomplete scores</p>
             </div>
         </div>
         <div class="action-card fade-in-up delay-4" onclick="openDrawer('modules')">
@@ -994,6 +994,46 @@
                             </div>
                             <span class="badge badge-score">${r.grade}</span>
                         </div>`).join('');
+                }
+            } else if (type === 'missing') {
+                title = 'Missing Scores';
+                const fields = [];
+                for (let i = 1; i <= 25; i++) fields.push({ key: 'module_' + i, label: 'M' + i });
+                for (let i = 1; i <= 10; i++) fields.push({ key: 'activity_' + i, label: 'A' + i });
+                fields.push({ key: 'at', label: 'AT' }, { key: 'pt_1', label: 'PT1' }, { key: 'pt_2', label: 'PT2' }, { key: 'qe', label: 'QE' });
+
+                const recOf = (s) => studentRecord(s.id) || {};
+                const has = (rec, k) => { const v = rec[k]; return v !== null && v !== undefined && v !== ''; };
+
+                // An item counts as "expected" only if at least one student has a
+                // score for it — so unused modules/activities aren't flagged.
+                const activeFields = fields.filter(f => cachedStudents.some(s => has(recOf(s), f.key)));
+
+                const rows = cachedStudents.map(s => {
+                    const rec = recOf(s);
+                    const missing = activeFields.filter(f => !has(rec, f.key));
+                    return { student: s, missing };
+                }).filter(r => r.missing.length > 0)
+                  .sort((a, b) => b.missing.length - a.missing.length);
+
+                if (!activeFields.length) {
+                    html = '<div class="drawer-empty">No scores entered yet.</div>';
+                } else if (!rows.length) {
+                    html = '<div class="drawer-empty">All students are complete — no missing scores. 🎉</div>';
+                } else {
+                    html = rows.map(r => {
+                        const labs = r.missing.map(f => f.label);
+                        const shown = labs.length > 8 ? labs.slice(0, 8).join(', ') + ' +' + (labs.length - 8) : labs.join(', ');
+                        return `
+                            <div class="drawer-row">
+                                <div class="avatar">${escapeHtml(initials(r.student.full_name))}</div>
+                                <div class="info">
+                                    <div class="name">${escapeHtml(r.student.full_name)}</div>
+                                    <div class="sub">Missing: ${escapeHtml(shown)}</div>
+                                </div>
+                                <span class="badge badge-absent">${r.missing.length}</span>
+                            </div>`;
+                    }).join('');
                 }
             }
 
