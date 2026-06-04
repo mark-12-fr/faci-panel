@@ -772,13 +772,22 @@
         }
 
         function gradeFor(student) {
-            const rec = studentRecord(student.id);
-            if (!rec) return { grade: 0, ww: 0, pt: 0, qe: 0 };
+            // Merge ALL of a student's records (across quarters) — latest non-empty
+            // value wins per field — exactly like the teacher panel does. This is
+            // what makes the ranking here match the teacher panel's ranking.
+            const recs = cachedRecords.filter(r => r.student_id === student.id);
+            if (!recs.length) return { grade: 0, ww: 0, pt: 0, qe: 0 };
+            const merged = recs.reduce((acc, curr) => {
+                Object.keys(curr).forEach(k => {
+                    if (curr[k] !== null && curr[k] !== undefined && curr[k] !== "") acc[k] = curr[k];
+                });
+                return acc;
+            }, {});
             let totalWW = 0, totalPT = 0;
-            const totalQE = Number(rec.qe) || 0;
-            for (const key in rec) {
-                if (key.startsWith('module_') || key.startsWith('activity_') || key === 'at') totalWW += Number(rec[key]) || 0;
-                if (key.startsWith('pt_')) totalPT += Number(rec[key]) || 0;
+            const totalQE = Number(merged.qe) || 0;
+            for (const key in merged) {
+                if (key.startsWith('module_') || key.startsWith('activity_') || key === 'at') totalWW += Number(merged[key]) || 0;
+                if (key.startsWith('pt_')) totalPT += Number(merged[key]) || 0;
             }
             const ww = Math.min(totalWW, 100);
             const pt = Math.min(totalPT, 100);
