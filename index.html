@@ -816,7 +816,10 @@
             document.getElementById('perfPassing').textContent = passingPct + '%';
             document.getElementById('perfHighest').textContent = highest;
 
-            const ranked = [...scored].sort((a, b) => b.grade - a.grade);
+            const ranked = [...scored].sort((a, b) =>
+                (b.grade - a.grade)
+                || ((b.ww + b.pt + b.qe) - (a.ww + a.pt + a.qe))
+                || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
             if (!ranked.length || ranked.every(t => t.grade === 0)) {
                 list.innerHTML = '<div class="perf-empty">Scores will appear once they\'re entered.</div>';
                 return;
@@ -975,7 +978,10 @@
             } else if (type === 'top') {
                 title = 'Top Students';
                 const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }))
-                                              .sort((a, b) => b.grade - a.grade);
+                                              .sort((a, b) =>
+                                                  (b.grade - a.grade)
+                                                  || ((b.ww + b.pt + b.qe) - (a.ww + a.pt + a.qe))
+                                                  || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
                 if (!scored.length || scored.every(s => s.grade === 0)) {
                     html = '<div class="drawer-empty">Top performers will appear once scores are entered.</div>';
                 } else {
