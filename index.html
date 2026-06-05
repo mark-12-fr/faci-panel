@@ -482,12 +482,12 @@
     <div class="section-title fade-in-up delay-3">Section Overview</div>
     <div class="overview-panel fade-in-up delay-3">
         <div class="overview-item">
-            <h3 id="faciSemesterOverview">1st Sem</h3>
+            <h3 id="faciSemesterOverview">1st</h3>
             <p>Semester</p>
         </div>
         <div class="overview-item">
-            <h3 id="faciSubjectOverview"><i class="fa-solid fa-spinner fa-spin"></i></h3>
-            <p>Subject</p>
+            <h3 id="faciQuarterOverview">1</h3>
+            <p>Quarter</p>
         </div>
         <div class="overview-item">
             <h3 id="faciTotalStudentsOverview">0</h3>
@@ -681,7 +681,6 @@
                     document.getElementById('faciSectionTag').textContent = profile.section;
                     document.getElementById('faciSubjectTag').textContent = profile.subject || 'Subject';
                     document.getElementById('faciSectionStat').textContent = profile.section;
-                    document.getElementById('faciSubjectOverview').textContent = profile.subject.substring(0, 15) + (profile.subject.length > 15 ? '...' : '');
 
                     const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
 
@@ -697,7 +696,7 @@
             }
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, teacher_id');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, quarter, teacher_id');
 
                 if (!sectionData) {
                     document.getElementById('dashTotalStudents').textContent = '0';
@@ -709,7 +708,8 @@
                     return;
                 }
 
-                document.getElementById('faciSemesterOverview').textContent = sectionData.semester || '1st Sem';
+                document.getElementById('faciSemesterOverview').textContent = (sectionData.semester || '1st Sem').replace(/\s*sem(ester)?\.?\s*$/i, '').trim() || '1st';
+                document.getElementById('faciQuarterOverview').textContent = sectionData.quarter || '1';
 
                 const { data: students } = await supabaseClient
                     .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true });
