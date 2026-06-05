@@ -775,7 +775,20 @@
         let cachedAttendanceToday = [];
 
         function studentRecord(studentId) {
-            return cachedRecords.find(r => r.student_id === studentId) || null;
+            // Merge ALL of a student's records across quarters (latest non-empty
+            // value wins per field) — same as gradeFor() and the Class Record
+            // grid's carry-over. Using a single record (.find) wrongly flagged
+            // items as "missing" when they were entered in a different quarter.
+            const recs = cachedRecords
+                .filter(r => r.student_id === studentId)
+                .sort((a, b) => Number(a.quarter || 0) - Number(b.quarter || 0));
+            if (!recs.length) return null;
+            return recs.reduce((acc, curr) => {
+                Object.keys(curr).forEach(k => {
+                    if (curr[k] !== null && curr[k] !== undefined && curr[k] !== '') acc[k] = curr[k];
+                });
+                return acc;
+            }, {});
         }
 
         function gradeFor(student) {
