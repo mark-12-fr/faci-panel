@@ -15,6 +15,7 @@
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="grading.js"></script>
 
     <style>
         /* --- Root Variables & Reset --- */
@@ -722,6 +723,35 @@
                 const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
                 cachedRecords = recordsData || [];
 
+                // Dynamic grading: load THIS subject's weights (set by the teacher
+                // in the Grading System) so the faci's grades match the teacher's.
+                window.FACI_SUBJECT = localStorage.getItem('faci_subject') || '';
+                await window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id);
+                window.FACI_ATT_RATE = {};
+                const _fw = window.MJR_weightsFor(window.FACI_SUBJECT);
+                if (_fw.att > 0) {
+                    try {
+                        const { data: allAtt } = await supabaseClient.from('attendance')
+                            .select('student_id_no, student_name, status').eq('section', section);
+                        const agg = {};
+                        (allAtt || []).forEach(a => {
+                            const k = a.student_id_no ? 'id:' + String(a.student_id_no).trim()
+                                : (a.student_name ? 'nm:' + String(a.student_name).trim().toLowerCase() : null);
+                            if (!k) return;
+                            if (!agg[k]) agg[k] = { present: 0, late: 0, total: 0 };
+                            agg[k].total++;
+                            if (a.status === 'Present') agg[k].present++;
+                            else if (a.status === 'Late') agg[k].late++;
+                        });
+                        cachedStudents.forEach(st => {
+                            const idk = st.id_no ? 'id:' + String(st.id_no).trim() : null;
+                            const nmk = st.full_name ? 'nm:' + String(st.full_name).trim().toLowerCase() : null;
+                            const rec = (idk && agg[idk]) || (nmk && agg[nmk]) || null;
+                            window.FACI_ATT_RATE[st.id] = window.MJR_attScore(rec);
+                        });
+                    } catch (e) { /* attendance optional */ }
+                }
+
                 let modulesDone = 0, activitiesDone = 0;
                 cachedRecords.forEach(record => {
                     for (let i = 1; i <= 25; i++) {
@@ -803,16 +833,13 @@
                 });
                 return acc;
             }, {});
-            let totalWW = 0, totalPT = 0;
-            const totalQE = Number(merged.qe) || 0;
-            for (const key in merged) {
-                if (key.startsWith('module_') || key.startsWith('activity_') || key === 'at') totalWW += Number(merged[key]) || 0;
-                if (key.startsWith('pt_')) totalPT += Number(merged[key]) || 0;
-            }
-            const ww = Math.min(totalWW, 100);
-            const pt = Math.min(totalPT, 100);
-            const qe = Math.min((totalQE / 50) * 100, 100);
-            return { grade: Math.round((ww * 0.3) + (pt * 0.5) + (qe * 0.2)), ww: totalWW, pt: totalPT, qe: totalQE };
+            // Dynamic per-subject weights (shared with the teacher panel via
+            // grading.js). Attendance only counts when this subject weights it (>0).
+            const sc = window.MJR_componentScores(merged);
+            const attScore = (window.FACI_ATT_RATE && window.FACI_ATT_RATE[student.id] != null)
+                ? window.FACI_ATT_RATE[student.id] : 100;
+            const grade = window.MJR_finalGrade(merged, window.FACI_SUBJECT, attScore);
+            return { grade: grade, ww: sc.rawWW, pt: sc.rawPT, qe: sc.rawQE };
         }
 
         function renderPerformance() {
@@ -828,7 +855,8 @@
             const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }));
             const total = scored.reduce((a, b) => a + b.grade, 0);
             const avg = Math.round(total / scored.length);
-            const passing = scored.filter(s => s.grade >= 75).length;
+            const _pass = window.MJR_passingFor(window.FACI_SUBJECT);
+            const passing = scored.filter(s => s.grade >= _pass).length;
             const passingPct = Math.round((passing / scored.length) * 100);
             const highest = scored.reduce((m, s) => s.grade > m ? s.grade : m, 0);
 
