@@ -20,6 +20,44 @@
         return localStorage.getItem('faci_id');
     }
 
+    // If the teacher removed this facilitator's account, force a logout the
+    // next time the app loads / regains focus / heartbeats. Only logs out on a
+    // definitive "row not found" — never on a network error (avoids offline
+    // false logouts).
+    function forceLogout() {
+        try {
+            ['faci_id', 'faci_section', 'faci_name', 'faci_subject', 'faci_teacher_id'].forEach(function (k) {
+                localStorage.removeItem(k);
+            });
+            clearSessionLog();
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+        } catch (e) {}
+        var path = 'login.html';
+        try { window.location.replace(path); } catch (e) { window.location.href = path; }
+    }
+
+    let accountChecking = false;
+    async function verifyAccountExists() {
+        const sb = getSupabase();
+        const faciId = getFaciId();
+        if (!sb || !faciId || accountChecking) return;
+        accountChecking = true;
+        try {
+            const { data, error } = await sb
+                .from('facilitators')
+                .select('id')
+                .eq('id', faciId)
+                .maybeSingle();
+            if (!error && data === null) {
+                forceLogout();
+            }
+        } catch (e) {
+            // network/other error -> stay logged in
+        } finally {
+            accountChecking = false;
+        }
+    }
+
     function nowIso() {
         return new Date().toISOString();
     }
@@ -92,13 +130,14 @@
 
     function startHeartbeat() {
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        heartbeatTimer = setInterval(stampOut, HEARTBEAT_MS);
+        heartbeatTimer = setInterval(function () { stampOut(); verifyAccountExists(); }, HEARTBEAT_MS);
     }
 
     function bindLifecycle() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 ensureSession();
+                verifyAccountExists();
             } else {
                 stampOut();
             }
@@ -124,6 +163,8 @@
 
     async function init() {
         if (!getFaciId()) return;
+        await verifyAccountExists();   // logs out + redirects if the account was deleted
+        if (!getFaciId()) return;      // forceLogout cleared it -> stop here
         await ensureSession();
         startHeartbeat();
         bindLifecycle();
