@@ -825,7 +825,8 @@
             // Merge ALL of a student's records (across quarters) — latest non-empty
             // value wins per field — exactly like the teacher panel does. This is
             // what makes the ranking here match the teacher panel's ranking.
-            const recs = cachedRecords.filter(r => r.student_id === student.id);
+            const recs = cachedRecords.filter(r => r.student_id === student.id)
+                .sort((a, b) => Number(a.quarter || 0) - Number(b.quarter || 0));
             if (!recs.length) return { grade: 0, ww: 0, pt: 0, qe: 0 };
             const merged = recs.reduce((acc, curr) => {
                 Object.keys(curr).forEach(k => {
