@@ -37,7 +37,7 @@
     }
 
     let accountChecking = false;
-    async function verifyAccountExists() {
+    async function verifyAccountExists(allowReload) {
         const sb = getSupabase();
         const faciId = getFaciId();
         if (!sb || !faciId || accountChecking) return;
@@ -45,14 +45,27 @@
         try {
             const { data, error } = await sb
                 .from('facilitators')
-                .select('id')
+                .select('id, section, subject')
                 .eq('id', faciId)
                 .maybeSingle();
-            if (!error && data === null) {
-                forceLogout();
+            if (!error) {
+                if (data === null) { forceLogout(); return; }
+                // Keep this device on the teacher's CURRENT assignment. If the
+                // teacher reassigned this facilitator to a different section/
+                // subject, refresh the cached values so the faci only ever sees
+                // the section they are currently assigned to (reload so every
+                // page — Home, Attendance, Records, Profile — updates at once).
+                let changed = false;
+                if (data.section && data.section !== localStorage.getItem('faci_section')) {
+                    localStorage.setItem('faci_section', data.section); changed = true;
+                }
+                if (data.subject && data.subject !== localStorage.getItem('faci_subject')) {
+                    localStorage.setItem('faci_subject', data.subject); changed = true;
+                }
+                if (changed && allowReload) { window.location.reload(); }
             }
         } catch (e) {
-            // network/other error -> stay logged in
+            // network/other error -> stay logged in, keep the cached assignment
         } finally {
             accountChecking = false;
         }
@@ -130,14 +143,14 @@
 
     function startHeartbeat() {
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        heartbeatTimer = setInterval(function () { stampOut(); verifyAccountExists(); }, HEARTBEAT_MS);
+        heartbeatTimer = setInterval(function () { stampOut(); verifyAccountExists(false); }, HEARTBEAT_MS);
     }
 
     function bindLifecycle() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 ensureSession();
-                verifyAccountExists();
+                verifyAccountExists(true);
             } else {
                 stampOut();
             }
@@ -163,7 +176,7 @@
 
     async function init() {
         if (!getFaciId()) return;
-        await verifyAccountExists();   // logs out + redirects if the account was deleted
+        await verifyAccountExists(true);   // logout if deleted; sync + reload if reassigned
         if (!getFaciId()) return;      // forceLogout cleared it -> stop here
         await ensureSession();
         startHeartbeat();
