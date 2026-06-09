@@ -528,27 +528,6 @@
         </div>
     </div>
 
-    <div class="section-title fade-in-up delay-5">Class Performance</div>
-    <div class="performance-panel fade-in-up delay-5">
-        <div class="perf-stats">
-            <div class="perf-stat">
-                <span class="perf-val" id="perfAverage">0</span>
-                <span class="perf-label">Class Average</span>
-            </div>
-            <div class="perf-stat">
-                <span class="perf-val" id="perfPassing">0%</span>
-                <span class="perf-label">Passing Rate</span>
-            </div>
-            <div class="perf-stat">
-                <span class="perf-val" id="perfHighest">0</span>
-                <span class="perf-label">Highest Grade</span>
-            </div>
-        </div>
-        <div class="perf-top" id="perfTopList">
-            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading performance…</div>
-        </div>
-    </div>
-
     <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
     <div class="drawer" id="dashDrawer">
         <div class="drawer-handle"></div>
@@ -788,8 +767,6 @@
                 const absentLabel = document.getElementById('dashAbsent');
                 absentLabel.textContent = `${absentLate} absent/late`;
                 absentLabel.style.color = (absentLate > 0) ? "#dc2626" : "#16a34a";
-
-                renderPerformance();
             } catch (error) {
                 console.error("Error fetching stats:", error);
                 document.getElementById('dashTotalStudents').textContent = '!';
