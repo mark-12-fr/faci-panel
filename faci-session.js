@@ -20,6 +20,57 @@
         return localStorage.getItem('faci_id');
     }
 
+    // If the teacher removed this facilitator's account, force a logout the
+    // next time the app loads / regains focus / heartbeats. Only logs out on a
+    // definitive "row not found" — never on a network error (avoids offline
+    // false logouts).
+    function forceLogout() {
+        try {
+            ['faci_id', 'faci_section', 'faci_name', 'faci_subject', 'faci_teacher_id'].forEach(function (k) {
+                localStorage.removeItem(k);
+            });
+            clearSessionLog();
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+        } catch (e) {}
+        var path = 'login.html';
+        try { window.location.replace(path); } catch (e) { window.location.href = path; }
+    }
+
+    let accountChecking = false;
+    async function verifyAccountExists(allowReload) {
+        const sb = getSupabase();
+        const faciId = getFaciId();
+        if (!sb || !faciId || accountChecking) return;
+        accountChecking = true;
+        try {
+            const { data, error } = await sb
+                .from('facilitators')
+                .select('id, section, subject')
+                .eq('id', faciId)
+                .maybeSingle();
+            if (!error) {
+                if (data === null) { forceLogout(); return; }
+                // Keep this device on the teacher's CURRENT assignment. If the
+                // teacher reassigned this facilitator to a different section/
+                // subject, refresh the cached values so the faci only ever sees
+                // the section they are currently assigned to (reload so every
+                // page — Home, Attendance, Records, Profile — updates at once).
+                let changed = false;
+                if (data.section && data.section !== localStorage.getItem('faci_section')) {
+                    localStorage.setItem('faci_section', data.section); changed = true;
+                }
+                if (data.subject && data.subject !== localStorage.getItem('faci_subject')) {
+                    localStorage.setItem('faci_subject', data.subject); changed = true;
+                }
+                if (changed && allowReload) { window.location.reload(); }
+            }
+        } catch (e) {
+            // network/other error -> stay logged in, keep the cached assignment
+        } finally {
+            accountChecking = false;
+        }
+    }
+
     function nowIso() {
         return new Date().toISOString();
     }
@@ -92,13 +143,14 @@
 
     function startHeartbeat() {
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        heartbeatTimer = setInterval(stampOut, HEARTBEAT_MS);
+        heartbeatTimer = setInterval(function () { stampOut(); verifyAccountExists(false); }, HEARTBEAT_MS);
     }
 
     function bindLifecycle() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 ensureSession();
+                verifyAccountExists(true);
             } else {
                 stampOut();
             }
@@ -124,6 +176,8 @@
 
     async function init() {
         if (!getFaciId()) return;
+        await verifyAccountExists(true);   // logout if deleted; sync + reload if reassigned
+        if (!getFaciId()) return;      // forceLogout cleared it -> stop here
         await ensureSession();
         startHeartbeat();
         bindLifecycle();
