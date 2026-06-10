@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
     
     <style>
         :root {
@@ -424,20 +425,39 @@
             loginBtn.disabled = true;
 
             try {
-                const res = await fetch(`${API_URL}/api/faci/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ account_id: accountId, password: password })
-                });
-                const result = await res.json().catch(() => ({}));
-                const faciData = result.faci;
+                // Fast path: verify the login in the browser with bcrypt.js, so we
+                // don't wait on the (sleepy free-tier) backend to wake up. Only the
+                // one matching account's row is read. Falls back to the server
+                // endpoint if the crypto library didn't load.
+                const bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
+                let faciData = null;
 
-                if (!res.ok || !faciData) {
+                if (bcryptLib) {
+                    const { data: row, error } = await supabaseClient
+                        .from('facilitators')
+                        .select('id, full_name, section, subject, teacher_id, password')
+                        .eq('account_id', accountId)
+                        .maybeSingle();
+                    if (error) throw error;
+                    if (row && row.password && bcryptLib.compareSync(password, row.password)) {
+                        faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
+                    }
+                } else {
+                    const res = await fetch(`${API_URL}/api/faci/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ account_id: accountId, password: password })
+                    });
+                    const result = await res.json().catch(() => ({}));
+                    if (res.ok) faciData = result.faci;
+                }
+
+                if (!faciData) {
                     // Invalid Credentials
                     showAlert(
-                        "Login Failed", 
-                        "We couldn't find an account with those details. Please check your ID and password.", 
-                        "fa-circle-xmark", 
+                        "Login Failed",
+                        "We couldn't find an account with those details. Please check your ID and password.",
+                        "fa-circle-xmark",
                         "#ef4444"
                     );
                     loginBtn.innerHTML = 'Login';
