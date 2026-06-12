@@ -711,7 +711,7 @@
                 if (_fw.att > 0) {
                     try {
                         const { data: allAtt } = await supabaseClient.from('attendance')
-                            .select('student_id_no, student_name, status').eq('section', section);
+                            .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id);
                         const agg = {};
                         (allAtt || []).forEach(a => {
                             const k = a.student_id_no ? 'id:' + String(a.student_id_no).trim()
@@ -755,6 +755,7 @@
                     .from('attendance')
                     .select('student_id_no, student_name, status, remarks')
                     .eq('section', section)
+                    .eq('teacher_id', sectionData.teacher_id)
                     .eq('date', exactTodayDate);
                 cachedAttendanceToday = attendanceToday || [];
 
