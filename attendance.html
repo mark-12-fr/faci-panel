@@ -442,6 +442,7 @@
                     .from('attendance')
                     .select('*')
                     .eq('section', sectionTitle)
+                    .eq('teacher_id', sectionRow.teacher_id)
                     .eq('date', dateStr);
 
                 let today = new Date();
@@ -645,8 +646,16 @@
             if (window.MJR_markLocalSave) window.MJR_markLocalSave();
 
             try {
-                // Delete previous records for this date/section
-                await supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
+                // Clear previous records for this date/section — but ONLY this
+                // facilitator's own teacher. Section titles repeat across
+                // teachers, so an unscoped delete would wipe another tenant's
+                // attendance. Resolve teacher_id (DB fallback) before deleting.
+                const faciTid = window.MJR_getFaciTeacherId
+                    ? await window.MJR_getFaciTeacherId(supabaseClient)
+                    : localStorage.getItem('faci_teacher_id');
+                let delQ = supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
+                if (faciTid) delQ = delQ.eq('teacher_id', faciTid);
+                await delQ;
 
                 // Insert the new records directly to Supabase
                 const { error } = await supabaseClient.from('attendance').insert(attendanceData);

@@ -368,12 +368,15 @@
 
             // 🌟 FETCH CO-FACILITATORS IN THE SAME SECTION (same teacher only) 🌟
             try {
+                // Require a confirmed teacher scope (resolve via DB if needed).
+                // Titles repeat across teachers, so never list co-facilitators by
+                // title alone — a missing scope must return nothing, not everyone.
+                const coTid = myTeacherId || (window.MJR_getFaciTeacherId ? await window.MJR_getFaciTeacherId(supabaseClient) : null);
                 let coFaciQuery = supabaseClient
                     .from('facilitators')
                     .select('full_name, avatar_url, teacher_id')
-                    .eq('section', section);
-
-                if (myTeacherId) coFaciQuery = coFaciQuery.eq('teacher_id', myTeacherId);
+                    .eq('section', section)
+                    .eq('teacher_id', coTid || '00000000-0000-0000-0000-000000000000');
 
                 const { data: coFacis, error: coFaciErr } = await coFaciQuery;
 

@@ -189,16 +189,21 @@
         if (!sb || !title) return null;
         const cols = columns || 'id, semester, quarter, teacher_id';
         try {
-            const { data } = await sb.from('sections').select(cols).eq('title', title);
-            const rows = data || [];
-            if (rows.length === 0) return null;
-            if (rows.length === 1) return rows[0];
+            // Always scope to the facilitator's OWN teacher_id when known.
+            // Never fall back to an arbitrary row — that points the faci at
+            // another tenant's identically-titled section.
             const teacherId = await getFaciTeacherId(sb);
+            let q = sb.from('sections').select(cols).eq('title', title);
+            if (teacherId) q = q.eq('teacher_id', teacherId);
+            const { data } = await q;
+            const rows = data || [];
+            if (rows.length === 1) return rows[0];
+            if (rows.length === 0) return null;
             if (teacherId) {
                 const mine = rows.find(r => String(r.teacher_id) === String(teacherId));
                 if (mine) return mine;
             }
-            return rows[0];
+            return null;
         } catch (err) {
             console.error('resolveFaciSection failed', err);
             return null;
