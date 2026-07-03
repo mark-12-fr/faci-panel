@@ -508,7 +508,7 @@
             const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
             const delay = Math.min(0.1 + (globalIndex * 0.04), 0.6); // Stagger up to 0.6 seconds
 
-            const record = attendanceData ? attendanceData.find(a => a.student_id_no === student.id_no || a.student_name === student.full_name) : null;
+            const record = attendanceData ? attendanceData.find(a => (student.id_no && a.student_id_no === student.id_no) || a.student_name === student.full_name) : null;
             
             let preP = '', preA = '', preL = '', preE = '';
             let rem = '';
@@ -529,7 +529,7 @@
                 <div class="student-info">
                     <div class="student-name">
                         <h4 class="s-name"><span style="color: var(--accent-blue); opacity: 0.5;">${num}</span> ${student.full_name}</h4>
-                        <p class="s-id">${student.id_no || 'No ID'}</p>
+                        <p class="s-id">${student.id_no || ''}</p>
                     </div>
                     <span class="${tagClass}">${gender}</span>
                 </div>
