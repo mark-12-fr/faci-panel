@@ -685,6 +685,18 @@
                     document.getElementById('dashActivities').textContent = '0';
                     document.getElementById('dashModulesSub').textContent = '0 pending';
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
+                    // The assigned section no longer exists (e.g. the teacher removed
+                    // it). Tell the facilitator clearly instead of showing a silent,
+                    // confusing empty dashboard — the teacher can reassign them to a
+                    // new section from the Facilitators page.
+                    const gEl = document.getElementById('faciGreeting');
+                    if (gEl) gEl.innerHTML = 'No active section <span class="hand-emoji">📭</span>';
+                    ['faciSectionTag', 'faciSubjectTag', 'faciSectionStat'].forEach(idv => {
+                        const el = document.getElementById(idv); if (el) el.textContent = '—';
+                    });
+                    if (typeof showAlert === 'function') {
+                        showAlert('Section unavailable', 'Your assigned section is no longer available — it may have been removed by your teacher. Please contact them to be assigned to a new section.', '#f59e0b');
+                    }
                     return;
                 }
 
