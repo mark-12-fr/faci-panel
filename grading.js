@@ -53,6 +53,29 @@
         return window.MJR_SUBJECT_CFG;
     };
 
+    /**
+     * Fetch ALL rows for a query, paginating past Supabase's default 1000-row
+     * API cap. Without this, a teacher with many students silently loses their
+     * most-recently-entered rows (e.g. Q4 class_records) once the total passes
+     * 1000, so a whole quarter can vanish from the dashboard.
+     *
+     * builderFn receives a fresh `sb.from(table)` and must return it with
+     * .select()/filters applied (NOT .range()); include a stable .order() so
+     * pages don't overlap. Returns the complete array (throws on error).
+     */
+    window.MJR_fetchAll = async function (sb, table, builderFn, pageSize) {
+        var size = pageSize || 1000;
+        var from = 0, all = [], done = false;
+        while (!done) {
+            var res = await builderFn(sb.from(table)).range(from, from + size - 1);
+            if (res.error) throw res.error;
+            var rows = res.data || [];
+            all = all.concat(rows);
+            if (rows.length < size) done = true; else from += size;
+        }
+        return all;
+    };
+
     /** Weights for a subject name; falls back to the classic default. */
     window.MJR_weightsFor = function (subjectName) {
         var c = window.MJR_SUBJECT_CFG[norm(subjectName)];
