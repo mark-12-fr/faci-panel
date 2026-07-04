@@ -564,7 +564,7 @@
             // panel, which is the source of truth.
             const fallbackRecs = studentRecs
                 .filter(r => r !== currentRec)
-                .sort((a, b) => Number(b.quarter || 0) - Number(a.quarter || 0));
+                .sort((a, b) => Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0));
 
             function fallbackValue(field) {
                 for (const r of fallbackRecs) {
