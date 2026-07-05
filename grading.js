@@ -28,14 +28,19 @@
     function num(v, d) { var n = Number(v); return isFinite(n) ? n : d; }
 
     /**
-     * Load every subject config for a teacher into the in-memory map.
-     * Pass teacherId on the teacher panel; omit it on the faci panel
-     * (RLS + the subject name still scope it correctly).
+     * Load a SINGLE teacher's subject configs into the in-memory map.
+     * teacherId is REQUIRED: the teacher panel passes the logged-in user_id,
+     * the faci panel passes its section's teacher_id. Without it we refuse to
+     * load, because the anon read policy would otherwise return EVERY teacher's
+     * subjects — and since the map is keyed by subject name, one teacher's
+     * weights/passing could then be applied to another teacher's data. No id →
+     * keep the safe defaults (30/50/20/0/75) instead of mixing teachers.
      */
     window.MJR_loadSubjectConfigs = async function (sb, teacherId) {
+        if (!teacherId) return window.MJR_SUBJECT_CFG;
         try {
-            var q = sb.from('subjects').select('name, ww_percent, pt_percent, exam_percent, attendance_percent, passing_grade');
-            if (teacherId) q = q.eq('teacher_id', teacherId);
+            var q = sb.from('subjects').select('name, ww_percent, pt_percent, exam_percent, attendance_percent, passing_grade')
+                .eq('teacher_id', teacherId);
             var res = await q;
             if (res.error || !res.data) return window.MJR_SUBJECT_CFG;
             var map = {};
