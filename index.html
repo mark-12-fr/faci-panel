@@ -268,6 +268,12 @@
             grid-template-columns: minmax(140px, 240px);
             justify-content: center;
         }
+        /* Two-tile variant: Highest + Lowest side-by-side. */
+        .perf-stats.perf-stats-two {
+            grid-template-columns: 1fr 1fr;
+        }
+        /* Lowest value uses red so it reads distinctly from Highest (blue). */
+        .perf-val.perf-val-low { color: #dc2626; }
         .perf-stat {
             text-align: center;
             padding: 12px 6px;
@@ -535,10 +541,14 @@
 
     <div class="section-title fade-in-up delay-4">Class Performance</div>
     <div class="performance-panel fade-in-up delay-4">
-        <div class="perf-stats perf-stats-single">
+        <div class="perf-stats perf-stats-two">
             <div class="perf-stat">
                 <span class="perf-val" id="perfHighest">0</span>
                 <span class="perf-label">Highest</span>
+            </div>
+            <div class="perf-stat">
+                <span class="perf-val perf-val-low" id="perfLowest">0</span>
+                <span class="perf-label">Lowest</span>
             </div>
         </div>
         <div class="perf-top" id="perfTopList">
@@ -873,6 +883,7 @@
                 setStat('perfAverage', '0');
                 setStat('perfPassing', '0%');
                 setStat('perfHighest', '0');
+                setStat('perfLowest', '0');
                 list.innerHTML = '<div class="perf-empty">No students yet.</div>';
                 return;
             }
@@ -884,10 +895,19 @@
             const passing = scored.filter(s => s.grade >= _pass).length;
             const passingPct = Math.round((passing / scored.length) * 100);
             const highest = scored.reduce((m, s) => s.grade > m ? s.grade : m, 0);
+            // Lowest is meaningful only among students who actually have a
+            // grade (>0); a student with no records shouldn't drag Lowest
+            // to 0 and mislead the facilitator. Fall back to 0 when
+            // nobody has a real grade yet.
+            const graded = scored.filter(s => s.grade > 0);
+            const lowest = graded.length
+                ? graded.reduce((m, s) => s.grade < m ? s.grade : m, Infinity)
+                : 0;
 
             setStat('perfAverage', avg);
             setStat('perfPassing', passingPct + '%');
             setStat('perfHighest', highest);
+            setStat('perfLowest', lowest);
 
             const ranked = [...scored].sort((a, b) =>
                 (b.grade - a.grade)
