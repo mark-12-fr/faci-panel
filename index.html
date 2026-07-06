@@ -496,6 +496,27 @@
         </div>
     </div>
 
+    <div class="section-title fade-in-up delay-3">Class Performance</div>
+    <div class="performance-panel fade-in-up delay-3">
+        <div class="perf-stats">
+            <div class="perf-stat">
+                <span class="perf-val" id="perfAverage">0</span>
+                <span class="perf-label">Average</span>
+            </div>
+            <div class="perf-stat">
+                <span class="perf-val" id="perfPassing">0%</span>
+                <span class="perf-label">Passing</span>
+            </div>
+            <div class="perf-stat">
+                <span class="perf-val" id="perfHighest">0</span>
+                <span class="perf-label">Highest</span>
+            </div>
+        </div>
+        <div class="perf-top" id="perfTopList">
+            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading ranking...</div>
+        </div>
+    </div>
+
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
     <div class="actions-grid">
         <div class="action-card fade-in-up delay-4" onclick="openDrawer('missing')">
@@ -697,6 +718,10 @@
                     if (typeof showAlert === 'function') {
                         showAlert('Section unavailable', 'Your assigned section is no longer available — it may have been removed by your teacher. Please contact them to be assigned to a new section.', '#f59e0b');
                     }
+                    // Also reset the Class Performance panel to its zero state
+                    // so it doesn't stay stuck on "Loading ranking..." forever.
+                    cachedStudents = []; cachedRecords = [];
+                    renderPerformance();
                     return;
                 }
 
@@ -763,6 +788,11 @@
                 document.getElementById('dashActivities').textContent = activitiesDone;
                 document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
 
+                // Class Performance ranking — uses the shared grading.js engine
+                // (same weights + passing grade as the teacher panel), so the
+                // faci sees the exact same rankings + grades her teacher does.
+                renderPerformance();
+
                 const { data: attendanceToday } = await supabaseClient
                     .from('attendance')
                     .select('student_id_no, student_name, status, remarks')
@@ -787,6 +817,10 @@
                 document.getElementById('dashAbsent').textContent = 'Error';
                 document.getElementById('dashModules').textContent = '!';
                 document.getElementById('dashActivities').textContent = '!';
+                // Show a graceful empty state on the ranking panel instead of
+                // leaving it stuck on the loading spinner.
+                const perfList = document.getElementById('perfTopList');
+                if (perfList) perfList.innerHTML = '<div class="perf-empty">Could not load ranking. Please refresh.</div>';
             }
         });
 
