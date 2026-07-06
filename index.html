@@ -263,6 +263,11 @@
             gap: 10px;
             margin-bottom: 16px;
         }
+        /* Single-tile variant: centered "Highest" tile only. */
+        .perf-stats.perf-stats-single {
+            grid-template-columns: minmax(140px, 240px);
+            justify-content: center;
+        }
         .perf-stat {
             text-align: center;
             padding: 12px 6px;
@@ -496,27 +501,6 @@
         </div>
     </div>
 
-    <div class="section-title fade-in-up delay-3">Class Performance</div>
-    <div class="performance-panel fade-in-up delay-3">
-        <div class="perf-stats">
-            <div class="perf-stat">
-                <span class="perf-val" id="perfAverage">0</span>
-                <span class="perf-label">Average</span>
-            </div>
-            <div class="perf-stat">
-                <span class="perf-val" id="perfPassing">0%</span>
-                <span class="perf-label">Passing</span>
-            </div>
-            <div class="perf-stat">
-                <span class="perf-val" id="perfHighest">0</span>
-                <span class="perf-label">Highest</span>
-            </div>
-        </div>
-        <div class="perf-top" id="perfTopList">
-            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading ranking...</div>
-        </div>
-    </div>
-
     <div class="section-title fade-in-up delay-4">Quick Actions</div>
     <div class="actions-grid">
         <div class="action-card fade-in-up delay-4" onclick="openDrawer('missing')">
@@ -546,6 +530,19 @@
                 <h4>PT &amp; Exam</h4>
                 <p>Performance tasks</p>
             </div>
+        </div>
+    </div>
+
+    <div class="section-title fade-in-up delay-4">Class Performance</div>
+    <div class="performance-panel fade-in-up delay-4">
+        <div class="perf-stats perf-stats-single">
+            <div class="perf-stat">
+                <span class="perf-val" id="perfHighest">0</span>
+                <span class="perf-label">Highest</span>
+            </div>
+        </div>
+        <div class="perf-top" id="perfTopList">
+            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading ranking...</div>
         </div>
     </div>
 
@@ -869,10 +866,13 @@
 
         function renderPerformance() {
             const list = document.getElementById('perfTopList');
+            // Optional stat tiles: guarded so removing Average/Passing from the
+            // dashboard doesn't throw a null-textContent error when this runs.
+            const setStat = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
             if (!cachedStudents.length) {
-                document.getElementById('perfAverage').textContent = '0';
-                document.getElementById('perfPassing').textContent = '0%';
-                document.getElementById('perfHighest').textContent = '0';
+                setStat('perfAverage', '0');
+                setStat('perfPassing', '0%');
+                setStat('perfHighest', '0');
                 list.innerHTML = '<div class="perf-empty">No students yet.</div>';
                 return;
             }
@@ -885,9 +885,9 @@
             const passingPct = Math.round((passing / scored.length) * 100);
             const highest = scored.reduce((m, s) => s.grade > m ? s.grade : m, 0);
 
-            document.getElementById('perfAverage').textContent = avg;
-            document.getElementById('perfPassing').textContent = passingPct + '%';
-            document.getElementById('perfHighest').textContent = highest;
+            setStat('perfAverage', avg);
+            setStat('perfPassing', passingPct + '%');
+            setStat('perfHighest', highest);
 
             const ranked = [...scored].sort((a, b) =>
                 (b.grade - a.grade)
