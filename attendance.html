@@ -844,7 +844,7 @@
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            const maxW = 1200;
+            const maxW = 1600;
             const scale = Math.min(maxW / img.width, 1);
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
@@ -854,35 +854,40 @@
             const data = imageData.data;
 
             const rowH = canvas.height / cards.length;
-            const checkXStart = Math.round(canvas.width * 0.45);
-            const checkXEnd = Math.round(canvas.width * 0.75);
-            const checkW = checkXEnd - checkXStart;
-            const dotThreshold = 15;
             let presentCount = 0, absentCount = 0;
+
+            function isDark(r, g, b) {
+                return (r + g + b) / 3 < 100;
+            }
 
             cards.forEach((card, idx) => {
                 const yStart = Math.round(idx * rowH);
-                const yEnd = Math.round((idx + 1) * rowH) - 2;
-                const rh = yEnd - yStart;
+                const yEnd = Math.round((idx + 1) * rowH);
 
-                let darkPixels = 0, totalPixels = 0;
-                const step = Math.max(1, Math.round(Math.min(checkW, rh) / 80));
+                let bestDensity = 0;
+                const windowSize = Math.max(8, Math.round(rowH * 0.25));
+                const step = Math.max(2, Math.round(rowH / 30));
 
-                for (let y = yStart + Math.round(rh * 0.15); y < yEnd - Math.round(rh * 0.15); y += step) {
-                    for (let x = checkXStart + Math.round(checkW * 0.05); x < checkXEnd - Math.round(checkW * 0.05); x += step) {
-                        const i = (y * canvas.width + x) * 4;
-                        const r = data[i], g = data[i + 1], b = data[i + 2];
-                        const brightness = (r + g + b) / 3;
-                        if (brightness < 100) darkPixels++;
-                        totalPixels++;
+                for (let wx = 0; wx <= canvas.width - windowSize; wx += Math.max(4, Math.round(windowSize / 4))) {
+                    let darkCount = 0, totalCount = 0;
+                    for (let y = yStart + Math.round(rowH * 0.1); y < yEnd - Math.round(rowH * 0.15); y += step) {
+                        for (let x = wx; x < wx + windowSize; x += step) {
+                            const i = (y * canvas.width + x) * 4;
+                            if (isDark(data[i], data[i + 1], data[i + 2])) darkCount++;
+                            totalCount++;
+                        }
                     }
+                    const density = totalCount > 0 ? darkCount / totalCount : 0;
+                    if (density > bestDensity) bestDensity = density;
                 }
 
-                const pct = totalPixels > 0 ? (darkPixels / totalPixels) * 100 : 0;
+                const absThreshold = 0.04;
+                const presentThreshold = 0.08;
+
                 const buttons = card.querySelectorAll('.opt-btn');
                 buttons.forEach(b => b.classList.remove('active'));
 
-                if (pct > dotThreshold) {
+                if (bestDensity >= presentThreshold) {
                     const pBtn = card.querySelector('.opt-btn.present');
                     if (pBtn) pBtn.classList.add('active');
                     presentCount++;
@@ -899,7 +904,7 @@
             btn.style.color = 'white';
             btn.style.borderColor = '#22c55e';
 
-            showAlert('Auto-Detect Complete', presentCount + ' marked Present, ' + absentCount + ' marked Absent. Review and submit if correct.', '#22c55e');
+            showAlert('Auto-Detect Complete', presentCount + ' marked Present, ' + absentCount + ' marked Absent. Review and adjust if needed.', '#22c55e');
 
             setTimeout(() => {
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Auto Detect ✓';
