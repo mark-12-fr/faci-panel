@@ -174,7 +174,7 @@ async function groqVision(apiKey, prompt, imageBase64, mimeType) {
                         ]
                     }],
                     temperature: 0.1,
-                    max_tokens: 4096,
+                    max_tokens: 16384,
                     response_format: { type: 'json_object' }
                 })
             });
@@ -219,7 +219,10 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
     for (const m of models) {
         for (const useJsonMime of [true, false]) {
             try {
-                const gen = { temperature: 0.1, maxOutputTokens: 4096 };
+                // 4k was not enough for a 50-student roster in JSON; bump to
+                // 32k so we can comfortably fit ~200 students with room for
+                // scores. Gemini 2.5 Flash supports up to 65535.
+                const gen = { temperature: 0.1, maxOutputTokens: 32768 };
                 if (useJsonMime) gen.responseMimeType = 'application/json';
                 const r = await fetch(
                     'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent?key=' + apiKey,
@@ -269,27 +272,157 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
     throw err;
 }
 
+// Strip JSON-comments (// line, /* block */) that live OUTSIDE of string
+// literals. Gemini occasionally emits a comment mid-response even when
+// asked for strict JSON; JSON.parse can't handle either kind.
+function _stripJsonComments(s) {
+    let out = '';
+    let i = 0;
+    const n = s.length;
+    let inStr = false;
+    let esc = false;
+    while (i < n) {
+        const c = s[i];
+        if (inStr) {
+            out += c;
+            if (esc) { esc = false; }
+            else if (c === '\\') { esc = true; }
+            else if (c === '"') { inStr = false; }
+            i++;
+            continue;
+        }
+        if (c === '"') { inStr = true; out += c; i++; continue; }
+        // Line comment
+        if (c === '/' && s[i + 1] === '/') {
+            i += 2;
+            while (i < n && s[i] !== '\n') i++;
+            continue;
+        }
+        // Block comment
+        if (c === '/' && s[i + 1] === '*') {
+            i += 2;
+            while (i < n && !(s[i] === '*' && s[i + 1] === '/')) i++;
+            i += 2;
+            continue;
+        }
+        out += c;
+        i++;
+    }
+    return out;
+}
+
 function parseVisionJSON(raw) {
     // The model was asked for strict JSON, but be defensive: strip code fences,
-    // normalize smart quotes, and drop trailing commas before parsing the
-    // first {...} block we find. Gemini sometimes wraps JSON in prose or
-    // emits Markdown fences even when asked for strict JSON.
+    // strip invisible chars + JSON comments, normalize smart quotes, drop
+    // trailing commas, and finally try to close truncated brackets before
+    // giving up. Gemini + Groq have all been observed doing at least one of
+    // these things.
     let s = String(raw || '').trim();
     // Strip any leading/trailing code fences (```json ... ``` OR ``` ... ```).
     s = s.replace(/```(?:json|JSON)?\s*/g, '').replace(/```/g, '').trim();
-    // Extract the outermost {...} block.
-    const start = s.indexOf('{');
-    const end = s.lastIndexOf('}');
-    if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
-    // Try a strict parse first — cheap.
-    try { return JSON.parse(s); } catch (_) { /* fall through to lenient */ }
-    // Lenient pass: normalize smart quotes → ASCII quotes, remove trailing
-    // commas before ] or }, and try again.
-    let s2 = s
+    // Kill zero-width / BOM chars that JSON.parse tokenizes as unknown.
+    s = s.replace(/[﻿​‌‍⁠]/g, '');
+    // Extract the outermost {...} block ONLY if there's clearly a prose prefix
+    // (i.e. the first non-whitespace char isn't `{`). Doing this
+    // unconditionally would slice off a truncated tail and prevent salvage.
+    if (s.length && s[0] !== '{') {
+        const start = s.indexOf('{');
+        if (start !== -1) s = s.slice(start);
+    }
+    // Same for prose SUFFIX: only trim to last `}` when the string ends
+    // with non-JSON content beyond a fully closed object.
+    if (s.length && s[s.length - 1] !== '}' && s[s.length - 1] !== ']') {
+        // Look for a fully-balanced object; if there is one, keep it.
+        const balanced = _findBalancedPrefix(s);
+        if (balanced) s = balanced;
+    }
+
+    const attempts = [];
+    attempts.push(s);
+    // Lenient pass: strip comments, normalize smart quotes → ASCII, drop
+    // trailing commas before ] or }.
+    let s2 = _stripJsonComments(s)
         .replace(/[“”]/g, '"')
         .replace(/[‘’]/g, "'")
         .replace(/,\s*(?=[}\]])/g, '');
-    return JSON.parse(s2);
+    attempts.push(s2);
+    // Best-effort salvage: if the AI response was cut off (maxOutputTokens),
+    // trim to the last complete top-level object in students[] and close
+    // whatever brackets remain open. Better a partial student list than none.
+    const salvaged = _salvageTruncatedJson(s2);
+    if (salvaged) attempts.push(salvaged);
+
+    let lastErr;
+    for (const candidate of attempts) {
+        try { return JSON.parse(candidate); }
+        catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('unparseable');
+}
+
+// Return the substring from position 0 through the first fully-balanced
+// top-level object, or null if the string never balances.
+function _findBalancedPrefix(s) {
+    let d = 0, inStr = false, esc = false;
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (inStr) {
+            if (esc) { esc = false; }
+            else if (c === '\\') { esc = true; }
+            else if (c === '"') { inStr = false; }
+            continue;
+        }
+        if (c === '"') { inStr = true; continue; }
+        if (c === '{' || c === '[') d++;
+        else if (c === '}' || c === ']') {
+            d--;
+            if (d === 0) return s.slice(0, i + 1);
+        }
+    }
+    return null;
+}
+
+// If the JSON was truncated in the middle of an object, trim to the last
+// safe cut point (a comma at depth 2 = inside students[]) and then close
+// the brackets that were actually open AT THAT POINT (not at end-of-input).
+// Yields a shorter-but-parseable object with the students we did fully see.
+function _salvageTruncatedJson(s) {
+    // First pass: is the whole string balanced? If yes, no salvage needed.
+    // Also find the last comma at depth 2 (top-level of students[]).
+    let d = 0, inStr = false, esc = false;
+    let cut = -1;
+    const stackAtCut = [];
+    let currentStack = [];
+    let stackAtCutSnapshot = null;
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (inStr) {
+            if (esc) { esc = false; }
+            else if (c === '\\') { esc = true; }
+            else if (c === '"') { inStr = false; }
+            continue;
+        }
+        if (c === '"') { inStr = true; continue; }
+        if (c === '{' || c === '[') { currentStack.push(c); d++; continue; }
+        if (c === '}' || c === ']') { currentStack.pop(); d--; continue; }
+        // A comma at depth 2 while directly inside students[] is a safe cut.
+        // Depth 2 here means: main {, then students [, so d===2.
+        if (c === ',' && d === 2 && currentStack[currentStack.length - 1] === '[') {
+            cut = i;
+            stackAtCutSnapshot = currentStack.slice();
+        }
+    }
+    // Balanced already → nothing to salvage.
+    if (d === 0 && !inStr && currentStack.length === 0) return null;
+    if (cut === -1 || !stackAtCutSnapshot) return null;
+
+    // Trim to the safe cut position (exclusive of the comma) and close the
+    // brackets that were open THEN, in reverse (LIFO) order.
+    let trimmed = s.slice(0, cut);
+    for (let i = stackAtCutSnapshot.length - 1; i >= 0; i--) {
+        trimmed += (stackAtCutSnapshot[i] === '{') ? '}' : ']';
+    }
+    return trimmed;
 }
 
 function sanitizeStudents(list, rosterSet) {
