@@ -1014,9 +1014,29 @@
             const notesEl = document.getElementById('reviewNotes');
             const thumbEl = document.getElementById('reviewThumb');
 
-            const students = Array.isArray(payload.students) ? payload.students : [];
+            let students = Array.isArray(payload.students) ? payload.students : [];
             const unmatched = Array.isArray(payload.unmatched) ? payload.unmatched : [];
-            const notes = String(payload.notes || '').trim();
+            let notes = String(payload.notes || '').trim();
+
+            // Safety net: if the AI missed any roster students entirely (a common
+            // failure mode when a blank/faint "absent" mark is left unrecognized),
+            // insert them as Absent with a low confidence so the facilitator can
+            // still see + verify them in the review UI. Preserves roster order.
+            const roster = currentRoster();
+            const seen = new Set(students.map(s => String(s.name || '')));
+            const missingNames = roster.filter(n => !seen.has(n));
+            if (missingNames.length && roster.length) {
+                missingNames.forEach(n => {
+                    students.push({ name: n, status: 'Absent', confidence: 0.2 });
+                });
+                // Re-sort so the review UI displays in roster order.
+                const rosterIdx = new Map(roster.map((n, i) => [n, i]));
+                students.sort((a, b) => (rosterIdx.get(a.name) ?? 1e9) - (rosterIdx.get(b.name) ?? 1e9));
+                const added = missingNames.length;
+                notes = (notes ? notes + ' — ' : '') +
+                    'Added ' + added + ' student' + (added === 1 ? '' : 's') +
+                    ' as Absent (AI did not read them). Please verify from the sheet.';
+            }
 
             thumbEl.src = thumbDataUrl || '';
 
