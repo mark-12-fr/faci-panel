@@ -1,16 +1,22 @@
 /**
  * api/vision-analyze.js — Vercel Serverless Function: photo → structured data.
  * =====================================================================
- * Takes a photo of an attendance sheet, sends it to Gemini Vision, and returns
+ * Takes a photo of an attendance sheet, sends it to a vision LLM, and returns
  * each recognized student's attendance status (Present / Absent / Late /
  * Excused) matched against the roster the caller passed in. The client shows a
  * preview + review UI so a facilitator can correct any AI mistake before
  * applying to the actual attendance form.
  *
- * Required Vercel env var:
- *   GEMINI_API_KEY   — Google AI Studio key with Gemini access.
- * Optional:
- *   GEMINI_VISION_MODEL — pin a specific model (default: gemini-2.0-flash).
+ * Primary provider: Groq (Llama 4 Scout / Maverick vision models).
+ * Optional fallback: Google Gemini (only used if GEMINI_API_KEY is set AND
+ * Groq is either unconfigured or hitting a rate limit).
+ *
+ * Required Vercel env vars (either one is enough; Groq is preferred):
+ *   GROQ_API_KEY     — primary provider.
+ *   GEMINI_API_KEY   — optional fallback.
+ * Optional model overrides:
+ *   GROQ_VISION_MODEL       — pin a specific Groq vision model
+ *   GEMINI_VISION_MODEL     — pin a specific Gemini model
  *
  * Request (POST JSON):
  *   {
@@ -31,7 +37,11 @@
  *   }
  */
 
-const DEFAULT_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+const GROQ_MODELS = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct'
+];
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024; // 6 MB after base64 decode — Vercel body limit is 4.5MB raw
 const MAX_ROSTER = 200;
 
@@ -65,9 +75,70 @@ function buildAttendancePrompt(roster) {
     );
 }
 
+/**
+ * Call Groq's OpenAI-compatible chat completions with a vision model.
+ * Groq's Llama 4 Scout / Maverick models accept image_url content parts,
+ * same shape as OpenAI. Uses `response_format: json_object` to force strict
+ * JSON, and iterates through model fallbacks if the pinned one is retired.
+ */
+async function groqVision(apiKey, prompt, imageBase64, mimeType) {
+    const pinned = process.env.GROQ_VISION_MODEL;
+    const models = (pinned ? [pinned] : []).concat(GROQ_MODELS.filter((m) => m !== pinned));
+    const dataUrl = 'data:' + mimeType + ';base64,' + imageBase64;
+    let lastErr = null;
+    for (const m of models) {
+        try {
+            const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: m,
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: prompt },
+                            { type: 'image_url', image_url: { url: dataUrl } }
+                        ]
+                    }],
+                    temperature: 0.1,
+                    max_tokens: 4096,
+                    response_format: { type: 'json_object' }
+                })
+            });
+            if (r.status === 200) {
+                const data = await r.json();
+                const reply = ((((data.choices || [{}])[0] || {}).message || {}).content || '').trim();
+                if (reply) return reply;
+                lastErr = 'empty reply';
+            } else {
+                const txt = await r.text();
+                lastErr = r.status + ' ' + txt.slice(0, 300);
+                // Rate/quota errors: propagate so the caller can decide to try Gemini.
+                if (r.status === 429 || /rate|quota|limit/i.test(txt)) {
+                    const e = new Error('rate limit');
+                    e.code = 429;
+                    throw e;
+                }
+                // Model-not-found / bad-request: try the next model.
+                if (r.status !== 400 && r.status !== 404) break;
+            }
+        } catch (e) {
+            if (e && e.code === 429) throw e;
+            lastErr = String((e && e.message) || e);
+        }
+    }
+    const err = new Error(lastErr || 'Groq returned no reply');
+    err.raw = lastErr || '';
+    throw err;
+}
+
+/**
+ * Optional Gemini fallback — used only if GEMINI_API_KEY is set AND Groq is
+ * missing or rate-limited. Same output contract as groqVision.
+ */
 async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
     const pinned = process.env.GEMINI_VISION_MODEL;
-    const models = pinned ? [pinned] : DEFAULT_MODELS;
+    const models = pinned ? [pinned] : GEMINI_MODELS;
     let lastErr = null;
     for (const m of models) {
         try {
@@ -186,27 +257,53 @@ module.exports = async (req, res) => {
         return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const groqKey = process.env.GROQ_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!groqKey && !geminiKey) {
         res.status(503).json({
-            error: 'Gemini vision is not configured on Vercel yet. Add GEMINI_API_KEY in the faci-panel Vercel project environment variables.'
+            error: 'AI vision is not configured on Vercel yet. Add GROQ_API_KEY (or GEMINI_API_KEY) in the faci-panel Vercel project environment variables.'
         });
         return;
     }
 
     const prompt = buildAttendancePrompt(roster);
 
-    let rawReply;
-    try {
-        rawReply = await geminiVision(apiKey, prompt, imageBase64, mimeType);
-    } catch (e) {
-        if (e && e.code === 429) {
-            res.status(429).json({ error: 'The AI hit its free-tier rate limit. Please wait a moment and try again.' });
+    // Step 1: Groq (primary)
+    let rawReply = null;
+    if (groqKey) {
+        try {
+            rawReply = await groqVision(groqKey, prompt, imageBase64, mimeType);
+        } catch (e) {
+            const msg = String((e && (e.raw || e.message)) || '').toLowerCase();
+            const isLimit = e && e.code === 429 || ['429', 'limit', 'rate', 'quota'].some((x) => msg.includes(x));
+            if (!(geminiKey && isLimit)) {
+                console.error('Groq vision upstream error:', (e && (e.raw || e.message)) || e);
+                res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
+                return;
+            }
+            // rate-limited → fall through to Gemini
+        }
+    }
+
+    // Step 2: Gemini (fallback — only if configured)
+    if (!rawReply) {
+        if (!geminiKey) {
+            res.status(503).json({
+                error: 'AI vision is not configured on Vercel yet. Add GROQ_API_KEY (or GEMINI_API_KEY) in the faci-panel Vercel project environment variables.'
+            });
             return;
         }
-        console.error('Gemini vision upstream error:', (e && e.message) || e);
-        res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
-        return;
+        try {
+            rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType);
+        } catch (e) {
+            if (e && e.code === 429) {
+                res.status(429).json({ error: 'The AI hit its free-tier rate limit. Please wait a moment and try again.' });
+                return;
+            }
+            console.error('Gemini vision upstream error:', (e && e.message) || e);
+            res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
+            return;
+        }
     }
 
     let parsed;
