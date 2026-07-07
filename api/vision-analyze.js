@@ -74,29 +74,28 @@ const MAX_ROSTER = 200;
 function buildAttendancePrompt(roster) {
     return (
         "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. " +
-        "Your job is to detect the attendance status (Present, Absent, Late, or Excused) for every " +
-        "student on the ROSTER below.\n\n" +
-        "CRITICAL — RETURN EVERY ROSTER STUDENT:\n" +
-        "- The `students` array MUST have one entry for every single name on the ROSTER, in ROSTER " +
-        "order, with no duplicates and no omissions. If the roster has " + roster.length + " names, " +
-        "the array MUST have exactly " + roster.length + " entries.\n" +
-        "- If you can find a student's row in the photo but the mark is unclear/faint/blank, return " +
-        "them as \"Absent\" with a LOW confidence (e.g. 0.4). Do NOT omit them.\n" +
-        "- If you cannot find a student's row in the photo at all, still include them as \"Absent\" " +
-        "with a very low confidence (e.g. 0.2) so the facilitator sees them in the review UI.\n\n" +
-        "ATTENDANCE MARK CONVENTIONS (Philippine schools; both printed and handwritten):\n" +
-        "- Diagonal slash '/', check mark '✓', 'P', or a clearly ticked box → PRESENT.\n" +
-        "- Blank cell, dash '-', dot '•', 'x'/'X', 'A', or clearly-empty box → ABSENT. (This is the " +
-        "MOST COMMONLY MISSED status — please read the entire column top-to-bottom and count.)\n" +
-        "- 'L', 'Late', or a slash with 'L' → LATE.\n" +
-        "- 'E', 'Ex', 'Excused' → EXCUSED.\n" +
-        "- When in doubt between Present and Absent, prefer ABSENT (safer default; the facilitator " +
-        "can override in the review UI).\n\n" +
+        "Return the attendance status for EVERY student on the ROSTER below.\n\n" +
+        "SIMPLE BINARY RULE (this is the whole task — don't overthink it):\n" +
+        "  • Cell has ANY mark inside it (a slash '/', a check '✓', an 'x'/'X', a dot, the letter 'P', " +
+        "any pen stroke, any tick, any scribble — anything at all that is NOT completely blank) " +
+        "→ status = \"Present\".\n" +
+        "  • Cell is COMPLETELY BLANK / EMPTY / just the empty box → status = \"Absent\".\n\n" +
+        "EXCEPTIONS (only when clearly labeled with a specific letter):\n" +
+        "  • Cell explicitly contains the letter 'L' or the word 'Late' → status = \"Late\".\n" +
+        "  • Cell explicitly contains 'E', 'Ex', or 'Excused' → status = \"Excused\".\n" +
+        "Everything else that is NOT blank counts as Present (even if the mark is faint, tiny, " +
+        "smudged, or you're unsure what it is — a mark is a mark).\n\n" +
+        "CRITICAL — RETURN EVERY ROSTER STUDENT (all " + roster.length + " of them):\n" +
+        "  • students[] MUST have exactly " + roster.length + " entries, in the same order as the " +
+        "ROSTER below. No duplicates, no omissions.\n" +
+        "  • Read each row LEFT-TO-RIGHT and match it to the corresponding roster name. Then " +
+        "inspect the attendance cell to the right of the name for that day/column.\n" +
+        "  • If you cannot find a student's row at all in the photo, still include them as Absent " +
+        "with confidence 0.2 so the facilitator sees them.\n\n" +
         "MATCHING RULES:\n" +
-        "- The ROSTER below is the ground truth. Match each row in the photo to the CLOSEST roster " +
-        "name, tolerating small OCR mistakes (missing accents, wrong middle initial, transposed letters).\n" +
-        "- Never invent students not on the roster. Never include duplicates. Names must match the " +
-        "roster EXACTLY (copy the string, do not re-format).\n\n" +
+        "  • The ROSTER below is the ground truth. Match each row in the photo to the CLOSEST " +
+        "roster name (tolerate OCR errors: missing accents, wrong middle initial, transposed letters).\n" +
+        "  • Never invent students not on the roster. Names must match the roster string EXACTLY.\n\n" +
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences, no code blocks. " +
         "Exactly this shape:\n" +
         "{\n" +
