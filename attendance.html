@@ -97,6 +97,36 @@
         .search-container:focus-within { transform: translateY(-2px); border-color: var(--accent-blue); }
         .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
 
+        /* Photo Upload */
+        .photo-upload-area {
+            background: var(--panel-bg); border-radius: var(--border-radius);
+            box-shadow: var(--premium-shadow); margin-bottom: 16px; overflow: hidden;
+            border: 2px dashed #cbd5e1; transition: all 0.3s;
+        }
+        .photo-upload-area.has-photo { border-color: var(--accent-blue); border-style: solid; }
+        .photo-upload-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 14px; cursor: pointer; color: var(--text-sub); font-weight: 600;
+            font-size: 0.85rem; transition: all 0.2s;
+        }
+        .photo-upload-btn:hover { background: #f8fafc; color: var(--accent-blue); }
+        .photo-upload-btn i { font-size: 1.2rem; }
+        .photo-preview-wrap { position: relative; display: none; }
+        .photo-preview-wrap.show { display: block; }
+        .photo-preview-wrap img { width: 100%; max-height: 300px; object-fit: contain; display: block; background: #000; }
+        .photo-actions {
+            display: flex; gap: 8px; padding: 8px 10px; background: #f8fafc;
+            border-top: 1px solid #e2e8f0; flex-wrap: wrap;
+        }
+        .photo-action-btn {
+            padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+        }
+        .photo-action-btn:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .photo-action-btn.remove:hover { background: #ef4444; color: white; border-color: #ef4444; }
+        .photo-action-btn:active { transform: scale(0.95); }
+
         /* --- STUDENT CARDS --- */
         .gender-divider { font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 15px 0 10px 5px; }
         .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; transition: all 0.3s ease; }
@@ -332,6 +362,20 @@
     <div class="search-container fade-in-up delay-3">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
         <input type="text" id="searchInput" placeholder="Search student name..." onkeyup="filterStudents()">
+    </div>
+
+    <div class="photo-upload-area fade-in-up delay-3" id="photoUploadArea">
+        <label class="photo-upload-btn" id="photoUploadLabel">
+            <i class="fa-solid fa-camera"></i> Upload Attendance Photo
+            <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+        </label>
+        <div class="photo-preview-wrap" id="photoPreviewWrap">
+            <img id="photoPreview" alt="Attendance photo">
+            <div class="photo-actions">
+                <button class="photo-action-btn" id="autoDetectBtn"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto Detect ✓</button>
+                <button class="photo-action-btn remove" id="removePhotoBtn"><i class="fa-solid fa-trash-can"></i> Remove</button>
+            </div>
+        </div>
     </div>
 
     <div id="studentListContainer" class="fade-in-up delay-4">
@@ -746,6 +790,125 @@
                 card.style.display = name.includes(query) ? 'block' : 'none';
             });
         }
+
+        /* ── Photo Upload & Auto-Detect ── */
+        let uploadedPhotoData = null;
+
+        document.getElementById('photoInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                uploadedPhotoData = ev.target.result;
+                document.getElementById('photoPreview').src = uploadedPhotoData;
+                document.getElementById('photoPreviewWrap').classList.add('show');
+                document.getElementById('photoUploadArea').classList.add('has-photo');
+                document.getElementById('photoUploadLabel').querySelector('i').className = 'fa-solid fa-rotate';
+                document.getElementById('photoUploadLabel').childNodes[1].textContent = ' Change Photo';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('removePhotoBtn').addEventListener('click', function() {
+            uploadedPhotoData = null;
+            document.getElementById('photoPreviewWrap').classList.remove('show');
+            document.getElementById('photoUploadArea').classList.remove('has-photo');
+            document.getElementById('photoInput').value = '';
+            document.getElementById('photoUploadLabel').querySelector('i').className = 'fa-solid fa-camera';
+            document.getElementById('photoUploadLabel').childNodes[1].textContent = ' Upload Attendance Photo';
+        });
+
+        document.getElementById('autoDetectBtn').addEventListener('click', async function() {
+            const btn = this;
+            if (!uploadedPhotoData) {
+                showAlert('No Photo', 'Please upload an attendance photo first.', '#f59e0b');
+                return;
+            }
+            const cards = document.querySelectorAll('.student-card');
+            if (!cards.length) {
+                showAlert('No Students', 'No students loaded to mark attendance.', '#f59e0b');
+                return;
+            }
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Detecting...';
+            btn.disabled = true;
+
+            await new Promise(r => setTimeout(r, 50));
+
+            const img = new Image();
+            img.src = uploadedPhotoData;
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxW = 1200;
+            const scale = Math.min(maxW / img.width, 1);
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            const rowH = canvas.height / cards.length;
+            const checkXStart = Math.round(canvas.width * 0.45);
+            const checkXEnd = Math.round(canvas.width * 0.75);
+            const checkW = checkXEnd - checkXStart;
+            const dotThreshold = 15;
+            let presentCount = 0, absentCount = 0;
+
+            cards.forEach((card, idx) => {
+                const yStart = Math.round(idx * rowH);
+                const yEnd = Math.round((idx + 1) * rowH) - 2;
+                const rh = yEnd - yStart;
+
+                let darkPixels = 0, totalPixels = 0;
+                const step = Math.max(1, Math.round(Math.min(checkW, rh) / 80));
+
+                for (let y = yStart + Math.round(rh * 0.15); y < yEnd - Math.round(rh * 0.15); y += step) {
+                    for (let x = checkXStart + Math.round(checkW * 0.05); x < checkXEnd - Math.round(checkW * 0.05); x += step) {
+                        const i = (y * canvas.width + x) * 4;
+                        const r = data[i], g = data[i + 1], b = data[i + 2];
+                        const brightness = (r + g + b) / 3;
+                        if (brightness < 100) darkPixels++;
+                        totalPixels++;
+                    }
+                }
+
+                const pct = totalPixels > 0 ? (darkPixels / totalPixels) * 100 : 0;
+                const buttons = card.querySelectorAll('.opt-btn');
+                buttons.forEach(b => b.classList.remove('active'));
+
+                if (pct > dotThreshold) {
+                    const pBtn = card.querySelector('.opt-btn.present');
+                    if (pBtn) pBtn.classList.add('active');
+                    presentCount++;
+                } else {
+                    const aBtn = card.querySelector('.opt-btn.absent');
+                    if (aBtn) aBtn.classList.add('active');
+                    absentCount++;
+                }
+            });
+
+            updateStats();
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Done!';
+            btn.style.background = '#22c55e';
+            btn.style.color = 'white';
+            btn.style.borderColor = '#22c55e';
+
+            showAlert('Auto-Detect Complete', presentCount + ' marked Present, ' + absentCount + ' marked Absent. Review and submit if correct.', '#22c55e');
+
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Auto Detect ✓';
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.borderColor = '';
+                btn.disabled = false;
+            }, 2500);
+        });
 
         document.getElementById('submitBtn').addEventListener('click', async () => {
             const btn = document.getElementById('submitBtn');
