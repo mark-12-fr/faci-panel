@@ -55,7 +55,19 @@ const GROQ_MODELS = [
     'meta-llama/llama-4-scout-17b-16e-instruct',
     'meta-llama/llama-4-maverick-17b-128e-instruct'
 ];
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+// Prioritized list of Gemini model IDs to try. The list is generous on purpose:
+// Google renames/retires models over time, so we walk down until one accepts the
+// request. Auto-follow aliases first, then explicit stable IDs, then older
+// still-available fallbacks.
+const GEMINI_MODELS = [
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash'
+];
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024; // 6 MB after base64 decode — Vercel body limit is 4.5MB raw
 const MAX_ROSTER = 200;
 
@@ -201,48 +213,60 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
     const pinned = process.env.GEMINI_VISION_MODEL;
     const models = pinned ? [pinned] : GEMINI_MODELS;
     let lastErr = null;
+    // Try each model up to twice: once WITH responseMimeType=application/json,
+    // then WITHOUT it if the model rejects the field (Gemini sometimes returns
+    // 400 INVALID_ARGUMENT on that param for older/preview models).
     for (const m of models) {
-        try {
-            const r = await fetch(
-                'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent?key=' + apiKey,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inline_data: { mime_type: mimeType, data: imageBase64 } }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            responseMimeType: 'application/json',
-                            maxOutputTokens: 4096
-                        }
-                    })
+        for (const useJsonMime of [true, false]) {
+            try {
+                const gen = { temperature: 0.1, maxOutputTokens: 4096 };
+                if (useJsonMime) gen.responseMimeType = 'application/json';
+                const r = await fetch(
+                    'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent?key=' + apiKey,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: prompt },
+                                    { inline_data: { mime_type: mimeType, data: imageBase64 } }
+                                ]
+                            }],
+                            generationConfig: gen
+                        })
+                    }
+                );
+                const data = await r.json().catch(() => ({}));
+                if (r.status === 200) {
+                    const parts = (((data.candidates || [{}])[0] || {}).content || {}).parts || [];
+                    const text = parts.map((p) => (p && p.text) || '').join('').trim();
+                    if (text) return text;
+                    lastErr = '[' + m + '] empty reply';
+                    break; // next model
                 }
-            );
-            const data = await r.json().catch(() => ({}));
-            if (r.status === 200) {
-                const parts = (((data.candidates || [{}])[0] || {}).content || {}).parts || [];
-                const text = parts.map((p) => (p && p.text) || '').join('').trim();
-                if (text) return text;
-                lastErr = 'empty reply';
-            } else {
-                lastErr = r.status + ' ' + JSON.stringify(data).slice(0, 300);
+                lastErr = '[' + m + '] ' + r.status + ' ' + JSON.stringify(data).slice(0, 300);
                 if (r.status === 429 || /RESOURCE_EXHAUSTED/i.test(lastErr)) {
                     const e = new Error('rate limit');
                     e.code = 429;
                     throw e;
                 }
+                // If the model rejected responseMimeType, retry without it. Any
+                // other 400 → next model. 404/403 → next model.
+                if (useJsonMime && r.status === 400 && /responseMimeType|response_mime_type/i.test(lastErr)) {
+                    continue;
+                }
+                break; // give up on this model, try the next
+            } catch (e) {
+                if (e && e.code === 429) throw e;
+                lastErr = '[' + m + '] ' + String((e && e.message) || e);
+                break;
             }
-        } catch (e) {
-            if (e && e.code === 429) throw e;
-            lastErr = String((e && e.message) || e);
         }
     }
-    throw new Error(lastErr || 'No usable Gemini model.');
+    const err = new Error(lastErr || 'No usable Gemini model.');
+    err.raw = lastErr || '';
+    throw err;
 }
 
 function parseVisionJSON(raw) {
@@ -368,17 +392,36 @@ module.exports = async (req, res) => {
 
     const prompt = type === 'record' ? buildRecordPrompt(roster) : buildAttendancePrompt(roster);
 
+    // Sanitize an upstream error message before sending it back to the client.
+    // We include enough detail that a facilitator can screenshot + report it,
+    // but strip anything that could look like a key or a full URL.
+    function safeUpstreamMessage(raw) {
+        let s = String(raw || '').trim();
+        if (!s) return '';
+        // Redact anything that looks like an API key or query key= value.
+        s = s.replace(/(key=)[^&\s"]+/gi, '$1[redacted]');
+        s = s.replace(/AIzaSy[a-zA-Z0-9_-]{10,}/g, '[redacted-key]');
+        s = s.replace(/gsk_[a-zA-Z0-9_-]{10,}/g, '[redacted-key]');
+        // Cap length so we don't dump 10KB HTML.
+        if (s.length > 260) s = s.slice(0, 260) + '…';
+        return s;
+    }
+
     // Step 1: Gemini (primary)
     let rawReply = null;
     if (geminiKey) {
         try {
             rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType);
         } catch (e) {
-            const msg = String((e && e.message) || '').toLowerCase();
+            const detail = (e && (e.raw || e.message)) || String(e);
+            const msg = String(detail || '').toLowerCase();
             const isLimit = e && e.code === 429 || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
             if (!(groqKey && isLimit)) {
-                console.error('Gemini vision upstream error:', (e && e.message) || e);
-                res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
+                console.error('Gemini vision upstream error:', detail);
+                res.status(502).json({
+                    error: 'The AI vision service is having trouble right now. Please try again in a moment.',
+                    upstream: safeUpstreamMessage(detail)
+                });
                 return;
             }
             // rate-limited → fall through to Groq
@@ -400,8 +443,12 @@ module.exports = async (req, res) => {
                 res.status(429).json({ error: 'The AI hit its free-tier rate limit. Please wait a moment and try again.' });
                 return;
             }
-            console.error('Groq vision upstream error:', (e && (e.raw || e.message)) || e);
-            res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
+            const detail = (e && (e.raw || e.message)) || String(e);
+            console.error('Groq vision upstream error:', detail);
+            res.status(502).json({
+                error: 'The AI vision service is having trouble right now. Please try again in a moment.',
+                upstream: safeUpstreamMessage(detail)
+            });
             return;
         }
     }

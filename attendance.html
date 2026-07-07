@@ -266,7 +266,7 @@
         .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
         .custom-alert-icon { font-size: 3rem; color: var(--accent-blue); margin-bottom: 15px; }
         .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
-        .custom-alert-msg { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 25px; line-height: 1.5; white-space: pre-line; word-break: break-word; }
         .custom-alert-btn {
             background: var(--text-main); color: white; border: none; padding: 12px 20px;
             border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
@@ -978,7 +978,13 @@
                 try { payload = await resp.json(); } catch (e) { payload = {}; }
 
                 if (!resp.ok) {
-                    throw new Error((payload && payload.error) || ('Analyze failed (' + resp.status + ')'));
+                    const baseMsg = (payload && payload.error) || ('Analyze failed (' + resp.status + ')');
+                    // If the server included an upstream detail (safe-sanitized),
+                    // pass it through so we can diagnose what actually broke.
+                    const upstream = payload && payload.upstream ? ('\n\nDetail: ' + payload.upstream) : '';
+                    const e = new Error(baseMsg + upstream);
+                    e.__handled = true;
+                    throw e;
                 }
                 openReviewModal(payload, thumbDataUrl);
             } catch (err) {
