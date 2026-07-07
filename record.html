@@ -240,6 +240,116 @@
             border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif;
         }
         .apply-drawer-btn:active { transform: scale(0.98); }
+
+        /* PHOTO UPLOAD (record-by-photo) */
+        .upload-record-btn {
+            width: 100%;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 14px 18px;
+            border: 2px dashed var(--accent-blue);
+            background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+            color: var(--accent-blue);
+            border-radius: 12px;
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.95rem; font-weight: 700;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 8px;
+        }
+        .upload-record-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -8px rgba(59,130,246,0.35); }
+        .upload-record-btn:active { transform: scale(0.98); }
+        .upload-sub-hint {
+            font-size: 0.72rem; color: var(--text-sub); text-align: center;
+            margin: -6px 0 12px; padding: 0 6px;
+        }
+        /* Analyzing overlay */
+        .analyze-overlay {
+            position: fixed; inset: 0; z-index: 2900;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(3px);
+            display: none; align-items: center; justify-content: center;
+        }
+        .analyze-overlay.show { display: flex; }
+        .analyze-box {
+            background: #fff; border-radius: 16px; padding: 24px 30px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); min-width: 240px;
+        }
+        .analyze-box i { font-size: 1.6rem; color: var(--accent-blue); }
+        .analyze-box p { font-size: 0.9rem; color: var(--text-main); font-weight: 700; }
+        .analyze-box small { font-size: 0.75rem; color: var(--text-sub); text-align: center; }
+        /* Review modal (record) */
+        .review-overlay {
+            position: fixed; inset: 0; z-index: 3000;
+            background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(3px);
+            display: none; align-items: flex-end; justify-content: center;
+        }
+        .review-overlay.show { display: flex; }
+        .review-box {
+            background: #fff; width: 100%; max-width: 720px;
+            border-radius: 18px 18px 0 0;
+            max-height: 90vh; display: flex; flex-direction: column;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+        }
+        .review-handle { width: 42px; height: 4px; background: #cbd5e1; border-radius: 2px; margin: 8px auto 4px; }
+        .review-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 18px 14px; border-bottom: 1px solid #f1f5f9;
+        }
+        .review-head h3 { font-size: 1.05rem; font-weight: 800; color: var(--text-main); }
+        .review-close {
+            background: #f1f5f9; border: none; width: 34px; height: 34px;
+            border-radius: 50%; color: var(--text-sub); font-size: 0.95rem; cursor: pointer;
+        }
+        .review-body { overflow-y: auto; padding: 12px 16px 16px; flex: 1; }
+        .review-thumb-wrap { text-align: center; margin-bottom: 12px; }
+        .review-thumb {
+            max-width: 100%; max-height: 180px; border-radius: 10px;
+            border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .review-notes {
+            font-size: 0.8rem; color: #b45309; background: #fef3c7;
+            border: 1px solid #fde68a; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px;
+        }
+        .rev-summary {
+            display: flex; gap: 8px; padding: 10px; background: #f8fafc;
+            border-radius: 10px; margin-bottom: 12px; font-size: 0.85rem;
+        }
+        .rev-summary strong { color: var(--accent-blue); font-weight: 800; }
+        .rev-student-card {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .rev-student-head {
+            display: flex; align-items: baseline; justify-content: space-between;
+            gap: 8px; margin-bottom: 8px;
+        }
+        .rev-student-head .name { font-weight: 700; font-size: 0.9rem; color: var(--text-main); flex:1; min-width:0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rev-student-head .conf { font-size: 0.7rem; color: var(--text-sub); }
+        .rev-student-head .conf.low-conf { color: #b91c1c; font-weight: 700; }
+        .rev-fields {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px;
+        }
+        .rev-field {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 4px 6px; display: flex; flex-direction: column; gap: 2px; text-align: center;
+        }
+        .rev-field .flabel { font-size: 0.6rem; font-weight: 800; color: var(--text-sub); }
+        .rev-field input {
+            width: 100%; text-align: center; border: 1px solid transparent; background: #fff;
+            border-radius: 4px; padding: 4px 0; font-weight: 800; font-size: 0.85rem;
+            outline: none; font-family: 'Inter','Segoe UI',sans-serif; color: var(--text-main);
+        }
+        .rev-field input:focus { border-color: var(--accent-blue); background: #eff6ff; }
+        .review-empty { padding: 16px; text-align: center; color: var(--text-sub); }
+        .review-actions {
+            display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px;
+            padding: 12px 16px; border-top: 1px solid #f1f5f9;
+        }
+        .review-btn {
+            padding: 12px 16px; border-radius: 10px; border: none; cursor: pointer;
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.9rem; font-weight: 800;
+        }
+        .review-btn.cancel { background: #f1f5f9; color: var(--text-sub); }
+        .review-btn.apply  { background: var(--accent-blue); color: #fff; }
+        .review-btn.apply:disabled { background: #94a3b8; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -276,6 +386,16 @@
             <span class="section-tag" id="infoSection">...</span>
         </div>
     </div>
+
+    <!-- Photo-to-record: pick a photo, let AI extract scores, then review + apply. -->
+    <button type="button" class="upload-record-btn fade-in-up delay-2" id="uploadRecordBtn"
+            onclick="triggerRecordPhoto()">
+        <i class="fa-solid fa-camera"></i>
+        Upload Record Photo
+    </button>
+    <div class="upload-sub-hint fade-in-up delay-2">Take a clear photo of the class record. AI will read the scores.</div>
+    <input type="file" id="recordPhotoInput" accept="image/*" capture="environment" style="display:none"
+           onchange="handleRecordPhotoPicked(event)">
 
     <div class="search-bar fade-in-up delay-2">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
@@ -334,6 +454,39 @@
     <div id="updateToast" class="toast-notification">
         <i class="fa-solid fa-arrows-rotate"></i>
         <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
+    </div>
+
+    <!-- Analyzing spinner shown while the record photo is uploaded/parsed. -->
+    <div id="analyzeOverlay" class="analyze-overlay">
+        <div class="analyze-box">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <p>Analyzing record photo...</p>
+            <small>Reading each student's scores. This usually takes 10-25 seconds.</small>
+        </div>
+    </div>
+
+    <!-- Review modal: shows every extracted score so the facilitator can
+         verify + edit before it lands in the actual table. -->
+    <div id="reviewOverlay" class="review-overlay" onclick="closeReviewIfBackdrop(event)">
+        <div class="review-box">
+            <div class="review-handle"></div>
+            <div class="review-head">
+                <h3>Review AI results</h3>
+                <button class="review-close" onclick="closeReview()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="review-body">
+                <div class="review-thumb-wrap"><img id="reviewThumb" class="review-thumb" alt="Preview"></div>
+                <div class="rev-summary" id="revSummary">Detected 0 students, 0 scores.</div>
+                <div id="reviewNotes" class="review-notes" style="display:none"></div>
+                <div id="reviewList"></div>
+            </div>
+            <div class="review-actions">
+                <button type="button" class="review-btn cancel" onclick="closeReview()">Cancel</button>
+                <button type="button" class="review-btn apply" id="reviewApplyBtn" onclick="applyReviewedRecord()">
+                    Apply to Table
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="inputDrawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
@@ -773,6 +926,227 @@
                 btn.disabled = false;
             }
         });
+
+        /* ═══════════════════════════════════════════════════════════════
+           PHOTO-TO-RECORD (Upload → AI Vision → Review → Apply)
+           ═══════════════════════════════════════════════════════════════
+           Same shape as attendance.html: pick photo → downsize to JPEG →
+           POST /api/vision-analyze with type="record" → review modal shows
+           every extracted score (editable) → Apply fills only the ENABLED
+           inputs in the table (disabled ones = already-submitted scores,
+           only the teacher can edit those, so we never overwrite them).
+           The facilitator still presses Submit New Scores to save.
+        */
+
+        const REC_FIELDS = (function () {
+            const arr = [];
+            for (let i = 1; i <= 25; i++) arr.push('module_' + i);
+            for (let i = 1; i <= 10; i++) arr.push('activity_' + i);
+            arr.push('at', 'pt_1', 'pt_2', 'qe');
+            return arr;
+        })();
+        const REC_FIELD_LABEL = (f) => f
+            .replace('module_', 'M')
+            .replace('activity_', 'A')
+            .toUpperCase()
+            .replace('_', ' ');
+
+        function triggerRecordPhoto() {
+            document.getElementById('recordPhotoInput').click();
+        }
+
+        // Read a picked file → downsize (JPEG, longest side ≤ 1800 for records
+        // so column headers stay readable) → return { base64, mimeType, thumbDataUrl }.
+        async function _recFileToBase64Jpeg(file) {
+            const dataUrl = await new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(r.result);
+                r.onerror = () => reject(new Error('Could not read file.'));
+                r.readAsDataURL(file);
+            });
+            const img = await new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => resolve(im);
+                im.onerror = () => reject(new Error('Could not decode the image. Try another photo.'));
+                im.src = dataUrl;
+            });
+            const side = 1800;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (!w || !h) throw new Error('Empty image.');
+            if (Math.max(w, h) > side) {
+                const scale = side / Math.max(w, h);
+                w = Math.round(w * scale); h = Math.round(h * scale);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            const outDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const base64 = outDataUrl.split(',')[1] || '';
+            return { base64, mimeType: 'image/jpeg', thumbDataUrl: outDataUrl };
+        }
+
+        function _recCurrentRoster() {
+            // Grab the names in the same order they're rendered in the table.
+            return Array.from(document.querySelectorAll('.student-data-row .clickable-name'))
+                .map(el => (el.textContent || '').trim())
+                .filter(Boolean);
+        }
+
+        async function handleRecordPhotoPicked(event) {
+            const input = event.target;
+            const file = (input.files || [])[0];
+            input.value = '';
+            if (!file) return;
+            if (!/^image\//i.test(file.type || '')) {
+                showAlert('Not an image', 'Please pick a photo (JPEG, PNG, or WebP).', '#ef4444');
+                return;
+            }
+
+            const roster = _recCurrentRoster();
+            if (roster.length === 0) {
+                showAlert('No students yet', 'Wait for the class list to load first, then try again.', '#f59e0b');
+                return;
+            }
+
+            const overlay = document.getElementById('analyzeOverlay');
+            overlay.classList.add('show');
+            try {
+                const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
+
+                const resp = await fetch('/api/vision-analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'record',
+                        imageBase64: base64,
+                        mimeType: mimeType,
+                        roster: roster
+                    })
+                });
+                let payload;
+                try { payload = await resp.json(); } catch (e) { payload = {}; }
+                if (!resp.ok) throw new Error((payload && payload.error) || ('Analyze failed (' + resp.status + ')'));
+                openRecordReviewModal(payload, thumbDataUrl);
+            } catch (err) {
+                console.error('Record photo analyze error:', err);
+                showAlert('Could not analyze photo', String((err && err.message) || err) || 'Please try another photo.', '#ef4444');
+            } finally {
+                overlay.classList.remove('show');
+            }
+        }
+
+        function escapeReviewText(s) {
+            return String(s || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        }
+
+        function openRecordReviewModal(payload, thumbDataUrl) {
+            const overlay = document.getElementById('reviewOverlay');
+            const listEl = document.getElementById('reviewList');
+            const notesEl = document.getElementById('reviewNotes');
+            const thumbEl = document.getElementById('reviewThumb');
+
+            const students = Array.isArray(payload.students) ? payload.students : [];
+            const unmatched = Array.isArray(payload.unmatched) ? payload.unmatched : [];
+            const notes = String(payload.notes || '').trim();
+
+            thumbEl.src = thumbDataUrl || '';
+
+            let noteHtml = '';
+            if (notes) noteHtml += '<div><i class="fa-solid fa-circle-info"></i> ' + escapeReviewText(notes) + '</div>';
+            if (unmatched.length) {
+                noteHtml += '<div style="margin-top:4px"><strong>Not matched to roster:</strong> ' +
+                    unmatched.map(escapeReviewText).join(', ') + '</div>';
+            }
+            notesEl.innerHTML = noteHtml;
+            notesEl.style.display = noteHtml ? 'block' : 'none';
+
+            const totalScores = students.reduce((s, st) => s + Object.keys(st.scores || {}).length, 0);
+            document.getElementById('revSummary').innerHTML =
+                'Detected <strong>' + students.length + '</strong> student' + (students.length === 1 ? '' : 's') +
+                ', <strong>' + totalScores + '</strong> score' + (totalScores === 1 ? '' : 's') + '.';
+
+            if (students.length === 0) {
+                listEl.innerHTML = '<div class="review-empty">No students were confidently recognized. Please try a clearer photo.</div>';
+                document.getElementById('reviewApplyBtn').disabled = true;
+            } else {
+                document.getElementById('reviewApplyBtn').disabled = false;
+                listEl.innerHTML = students.map((st) => {
+                    const scores = (st.scores && typeof st.scores === 'object') ? st.scores : {};
+                    // Preserve REC_FIELDS order for consistent display.
+                    const shown = REC_FIELDS.filter(f => scores[f] !== undefined && scores[f] !== null && scores[f] !== '');
+                    if (shown.length === 0) return '';   // shouldn't happen after sanitize, but safe
+                    const conf = Number(st.confidence) || 0;
+                    const confPct = Math.round(conf * 100);
+                    const confClass = conf < 0.6 ? 'low-conf' : '';
+                    const fieldsHtml = shown.map(f => `
+                        <div class="rev-field">
+                            <span class="flabel">${REC_FIELD_LABEL(f)}</span>
+                            <input type="number" step="any" min="0" data-field="${f}" value="${escapeReviewText(scores[f])}">
+                        </div>`).join('');
+                    return `
+                        <div class="rev-student-card" data-name="${escapeReviewText(st.name)}">
+                            <div class="rev-student-head">
+                                <span class="name">${escapeReviewText(st.name)}</span>
+                                <span class="conf ${confClass}">AI conf ${confPct}%</span>
+                            </div>
+                            <div class="rev-fields">${fieldsHtml}</div>
+                        </div>`;
+                }).filter(Boolean).join('');
+            }
+
+            overlay.classList.add('show');
+        }
+
+        function closeReviewIfBackdrop(ev) {
+            if (ev.target && ev.target.id === 'reviewOverlay') closeReview();
+        }
+
+        function closeReview() {
+            document.getElementById('reviewOverlay').classList.remove('show');
+        }
+
+        function applyReviewedRecord() {
+            const cards = document.querySelectorAll('.student-data-row');
+            const rowByName = new Map();
+            cards.forEach(row => {
+                const nameEl = row.querySelector('.clickable-name');
+                if (!nameEl) return;
+                rowByName.set((nameEl.textContent || '').trim(), row);
+            });
+
+            const studentCards = document.querySelectorAll('#reviewList .rev-student-card');
+            let applied = 0, skippedLocked = 0, skippedInvalid = 0;
+
+            studentCards.forEach(card => {
+                const name = card.dataset.name || '';
+                const row = rowByName.get(name);
+                if (!row) { skippedInvalid++; return; }
+
+                card.querySelectorAll('.rev-field input').forEach(inp => {
+                    const field = inp.dataset.field;
+                    const raw = String(inp.value || '').trim();
+                    if (!raw) return;                          // user cleared
+                    const n = Number(raw);
+                    if (!isFinite(n) || n < 0) { skippedInvalid++; return; }
+
+                    // Only fill an ENABLED table input. Disabled = already
+                    // submitted (only teacher can edit), so we never overwrite.
+                    const target = row.querySelector(`input.score-input[data-field="${field}"]`);
+                    if (!target || target.disabled) { skippedLocked++; return; }
+                    target.value = n;
+                    applied++;
+                });
+            });
+
+            closeReview();
+            const msg = 'Applied ' + applied + ' score(s).' +
+                (skippedLocked ? ' Skipped ' + skippedLocked + ' locked cell(s).' : '') +
+                ' Please review and press Submit New Scores to save.';
+            showAlert('Applied to table', msg, '#22c55e');
+        }
     </script>
     <script src="mjr-notify.js" defer></script>
 <script src="mjr-guard.js" defer></script>

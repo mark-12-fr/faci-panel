@@ -20,20 +20,34 @@
  *
  * Request (POST JSON):
  *   {
- *     type: "attendance",
+ *     type: "attendance" | "record",
  *     imageBase64: "...",         // no "data:image/...;base64," prefix
  *     mimeType: "image/jpeg",     // MUST be provided; jpeg/png/webp
  *     roster: ["ALISEN, JOHN REN ALAGOS", ...]  // canonical names to match
  *   }
  *
- * Response (200):
+ * Response (200) for "attendance":
  *   {
  *     students: [
  *       { name: "ALISEN, JOHN REN ALAGOS", status: "Present", confidence: 0.95 },
  *       ...
  *     ],
- *     unmatched: ["... any names the AI saw but couldn't match to the roster"],
- *     notes: "one-line AI observation (optional)"
+ *     unmatched: [...],
+ *     notes: "..."
+ *   }
+ *
+ * Response (200) for "record":
+ *   {
+ *     students: [
+ *       {
+ *         name: "ALISEN, JOHN REN ALAGOS",
+ *         scores: { module_1: 8, module_2: 10, ..., pt_1: 45, qe: 47 },
+ *         confidence: 0.85
+ *       },
+ *       ...
+ *     ],
+ *     unmatched: [...],
+ *     notes: "..."
  *   }
  */
 
@@ -69,6 +83,53 @@ function buildAttendancePrompt(roster) {
         '  "students": [ { "name": "<exact roster name>", "status": "Present"|"Absent"|"Late"|"Excused", "confidence": <0..1> } ],\n' +
         '  "unmatched": [ "<name text seen in photo>" ],\n' +
         '  "notes": "<optional one-line observation, e.g. photo blur or missing students>"\n' +
+        "}\n\n" +
+        "ROSTER (match names to these exact strings):\n" +
+        roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+    );
+}
+
+// Every score-holding field on the class_records table. The client and API
+// both refer to this list to validate what the AI is allowed to return.
+const RECORD_FIELDS = (function () {
+    const arr = [];
+    for (let i = 1; i <= 25; i++) arr.push('module_' + i);
+    for (let i = 1; i <= 10; i++) arr.push('activity_' + i);
+    arr.push('at', 'pt_1', 'pt_2', 'qe');
+    return arr;
+})();
+const RECORD_FIELD_SET = new Set(RECORD_FIELDS);
+
+function buildRecordPrompt(roster) {
+    return (
+        "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the " +
+        "Philippines. Rows are students, columns are score-holding fields. Read the header row to " +
+        "identify each column, then read the score cell for each student × column pair, and match " +
+        "each recognized student to the ROSTER below.\n\n" +
+        "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n" +
+        "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n" +
+        "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n" +
+        "- 'AT' / 'Attendance' → at\n" +
+        "- 'PT 1' / 'PT1' / 'Performance Task 1' → pt_1\n" +
+        "- 'PT 2' / 'PT2' / 'Performance Task 2' → pt_2\n" +
+        "- 'QE' / 'Q.E.' / 'Quarterly Exam' / 'Exam' → qe\n" +
+        "- If a header does not clearly map to one of the above field keys, IGNORE that entire column.\n\n" +
+        "SCORE READING RULES:\n" +
+        "- Only include a numeric value if you can read the cell clearly. Empty/blank cells, dashes, " +
+        "'-', or clearly-unreadable cells are OMITTED (do not include the field at all for that student).\n" +
+        "- Numbers must be non-negative and at most 200. Decimals are allowed but rare; prefer integers.\n" +
+        "- If you're not confident about a value, still return your best guess and lower the confidence.\n\n" +
+        "MATCHING RULES:\n" +
+        "- The ROSTER below is the ground truth. Match each detected student's name to the CLOSEST " +
+        "roster entry, tolerating small OCR mistakes.\n" +
+        "- Only include a student in the `students` array if you can confidently match them to a " +
+        "roster name. Any name you see but can't match goes into `unmatched` verbatim.\n" +
+        "- Never invent students not seen in the photo. Never include duplicates.\n\n" +
+        "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n" +
+        "{\n" +
+        '  "students": [ { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> } ],\n' +
+        '  "unmatched": [ "<name text seen in photo>" ],\n' +
+        '  "notes": "<optional one-line observation>"\n' +
         "}\n\n" +
         "ROSTER (match names to these exact strings):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
@@ -215,6 +276,45 @@ function sanitizeStudents(list, rosterSet) {
     return out;
 }
 
+/**
+ * Sanitize the AI's per-student score payload:
+ *   - drop names not in the roster
+ *   - drop unknown field keys
+ *   - drop non-numeric, negative, or absurdly-large values (>200)
+ *   - clamp confidence to [0..1]
+ *   - dedupe by name (first entry wins)
+ */
+function sanitizeRecordStudents(list, rosterSet) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const item of list) {
+        if (!item || typeof item !== 'object') continue;
+        const name = String(item.name || '').trim();
+        if (!name || !rosterSet.has(name) || seen.has(name)) continue;
+
+        const rawScores = item.scores && typeof item.scores === 'object' ? item.scores : {};
+        const scores = {};
+        for (const field of Object.keys(rawScores)) {
+            if (!RECORD_FIELD_SET.has(field)) continue;
+            const n = Number(rawScores[field]);
+            if (!isFinite(n) || n < 0 || n > 200) continue;
+            // Round to 2 dp so integer-shaped fields don't display awkward floats.
+            scores[field] = Math.round(n * 100) / 100;
+        }
+        // Only keep a student who has at least one usable score.
+        if (Object.keys(scores).length === 0) continue;
+
+        let conf = Number(item.confidence);
+        if (!isFinite(conf) || conf < 0) conf = 0;
+        if (conf > 1) conf = 1;
+
+        seen.add(name);
+        out.push({ name, scores, confidence: conf });
+    }
+    return out;
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -232,8 +332,8 @@ module.exports = async (req, res) => {
     const mimeType = String(body.mimeType || '').trim().toLowerCase();
     const roster = Array.isArray(body.roster) ? body.roster.map((n) => String(n || '').trim()).filter(Boolean) : [];
 
-    if (type !== 'attendance') {
-        res.status(400).json({ error: 'Only type="attendance" is supported right now.' });
+    if (type !== 'attendance' && type !== 'record') {
+        res.status(400).json({ error: 'type must be "attendance" or "record".' });
         return;
     }
     if (!imageBase64) {
@@ -266,7 +366,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    const prompt = buildAttendancePrompt(roster);
+    const prompt = type === 'record' ? buildRecordPrompt(roster) : buildAttendancePrompt(roster);
 
     // Step 1: Gemini (primary)
     let rawReply = null;
@@ -316,7 +416,9 @@ module.exports = async (req, res) => {
     }
 
     const rosterSet = new Set(roster);
-    const students = sanitizeStudents(parsed && parsed.students, rosterSet);
+    const students = type === 'record'
+        ? sanitizeRecordStudents(parsed && parsed.students, rosterSet)
+        : sanitizeStudents(parsed && parsed.students, rosterSet);
     const unmatched = Array.isArray(parsed && parsed.unmatched)
         ? parsed.unmatched.map((n) => String(n || '').trim()).filter(Boolean).slice(0, 30)
         : [];
