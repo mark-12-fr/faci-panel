@@ -964,7 +964,7 @@
             analyzeOverlay.classList.add('show');
 
             try {
-                const { base64, mimeType, thumbDataUrl } = await fileToBase64Jpeg(file, 1600);
+                const { base64, mimeType, thumbDataUrl } = await fileToBase64Jpeg(file, 1200);
 
                 const resp = await fetch('/api/vision-analyze', {
                     method: 'POST',

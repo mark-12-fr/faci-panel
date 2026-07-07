@@ -60,9 +60,9 @@ const GROQ_MODELS = [
 // request. Auto-follow aliases first, then explicit stable IDs, then older
 // still-available fallbacks.
 const GEMINI_MODELS = [
+    'gemini-2.5-flash-lite',
     'gemini-flash-latest',
     'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
     'gemini-2.5-pro',
     'gemini-2.0-flash',
     'gemini-2.0-flash-exp',
@@ -74,36 +74,29 @@ const MAX_ROSTER = 200;
 function buildAttendancePrompt(roster) {
     return (
         "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. " +
-        "Return the attendance status for EVERY student on the ROSTER below.\n\n" +
-        "SIMPLE BINARY RULE (this is the whole task — don't overthink it):\n" +
-        "  • Cell has ANY mark inside it (a slash '/', a check '✓', an 'x'/'X', a dot, the letter 'P', " +
-        "any pen stroke, any tick, any scribble — anything at all that is NOT completely blank) " +
-        "→ status = \"Present\".\n" +
-        "  • Cell is COMPLETELY BLANK / EMPTY / just the empty box → status = \"Absent\".\n\n" +
-        "EXCEPTIONS (only when clearly labeled with a specific letter):\n" +
-        "  • Cell explicitly contains the letter 'L' or the word 'Late' → status = \"Late\".\n" +
-        "  • Cell explicitly contains 'E', 'Ex', or 'Excused' → status = \"Excused\".\n" +
-        "Everything else that is NOT blank counts as Present (even if the mark is faint, tiny, " +
-        "smudged, or you're unsure what it is — a mark is a mark).\n\n" +
-        "CRITICAL — RETURN EVERY ROSTER STUDENT (all " + roster.length + " of them):\n" +
-        "  • students[] MUST have exactly " + roster.length + " entries, in the same order as the " +
-        "ROSTER below. No duplicates, no omissions.\n" +
-        "  • Read each row LEFT-TO-RIGHT and match it to the corresponding roster name. Then " +
-        "inspect the attendance cell to the right of the name for that day/column.\n" +
-        "  • If you cannot find a student's row at all in the photo, still include them as Absent " +
-        "with confidence 0.2 so the facilitator sees them.\n\n" +
+        "Your ONLY job: for each student on the ROSTER below, look at their attendance column/cell and decide:\n\n" +
+        "  ✅ CELL HAS A MARK (check ✓, slash /, X, dot •, letter P, any pen stroke, any scribble, any visible mark at all) → \"Present\"\n" +
+        "  ❌ CELL IS BLANK (completely empty, no mark, just the box) → \"Absent\"\n\n" +
+        "EXCEPTIONS (only if the cell explicitly has a letter label):\n" +
+        "  Letter 'L' or 'Late' → \"Late\"\n" +
+        "  Letter 'E', 'Ex', or 'Excused' → \"Excused\"\n\n" +
+        "CRITICAL — You MUST return ALL " + roster.length + " roster students:\n" +
+        "  • students[] MUST have exactly " + roster.length + " entries in ROSTER ORDER. No omissions, no duplicates.\n" +
+        "  • Read each row left-to-right, match to the roster name, check the attendance cell.\n" +
+        "  • If you CANNOT find a student's row, still include them as Absent with confidence 0.2.\n\n" +
         "MATCHING RULES:\n" +
-        "  • The ROSTER below is the ground truth. Match each row in the photo to the CLOSEST " +
-        "roster name (tolerate OCR errors: missing accents, wrong middle initial, transposed letters).\n" +
-        "  • Never invent students not on the roster. Names must match the roster string EXACTLY.\n\n" +
-        "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences, no code blocks. " +
-        "Exactly this shape:\n" +
-        "{\n" +
-        '  "students": [ { "name": "<exact roster name>", "status": "Present"|"Absent"|"Late"|"Excused", "confidence": <0..1> } ],\n' +
-        '  "unmatched": [ "<any name text seen in the photo that does NOT match a roster name>" ],\n' +
-        '  "notes": "<optional one-line observation, e.g. photo blur>"\n' +
-        "}\n\n" +
-        "ROSTER (" + roster.length + " names — return exactly this many entries):\n" +
+        "  • Match photo names to the closest roster name (ignore missing accents, wrong middle initial).\n" +
+        "  • Never invent names not on the roster. Names must match EXACTLY.\n\n" +
+        "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n" +
+        '{\n' +
+        '  "students": [\n' +
+        '    { "name": "<exact roster name>", "status": "Present", "confidence": 1.0 },\n' +
+        '    { "name": "<exact roster name>", "status": "Absent", "confidence": 0.9 }\n' +
+        '  ],\n' +
+        '  "unmatched": [],\n' +
+        '  "notes": ""\n' +
+        '}\n\n' +
+        "ROSTER (" + roster.length + " names — return exactly this many):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
     );
 }
