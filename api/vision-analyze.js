@@ -270,14 +270,26 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
 }
 
 function parseVisionJSON(raw) {
-    // The model was asked for strict JSON, but be defensive: strip code fences
-    // if any, then parse the first {...} block we find.
+    // The model was asked for strict JSON, but be defensive: strip code fences,
+    // normalize smart quotes, and drop trailing commas before parsing the
+    // first {...} block we find. Gemini sometimes wraps JSON in prose or
+    // emits Markdown fences even when asked for strict JSON.
     let s = String(raw || '').trim();
-    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+    // Strip any leading/trailing code fences (```json ... ``` OR ``` ... ```).
+    s = s.replace(/```(?:json|JSON)?\s*/g, '').replace(/```/g, '').trim();
+    // Extract the outermost {...} block.
     const start = s.indexOf('{');
     const end = s.lastIndexOf('}');
     if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
-    return JSON.parse(s);
+    // Try a strict parse first — cheap.
+    try { return JSON.parse(s); } catch (_) { /* fall through to lenient */ }
+    // Lenient pass: normalize smart quotes → ASCII quotes, remove trailing
+    // commas before ] or }, and try again.
+    let s2 = s
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/,\s*(?=[}\]])/g, '');
+    return JSON.parse(s2);
 }
 
 function sanitizeStudents(list, rosterSet) {
@@ -458,7 +470,13 @@ module.exports = async (req, res) => {
         parsed = parseVisionJSON(rawReply);
     } catch (e) {
         console.error('Vision parse error:', e && e.message, '| raw:', String(rawReply || '').slice(0, 400));
-        res.status(502).json({ error: 'The AI reply was not valid JSON. Please try another photo.' });
+        // Surface a preview of what the AI actually said so we can see if it
+        // refused ("I'm not able to analyze this…"), replied with prose, or
+        // returned near-JSON we can't quite parse. Sanitized to protect keys.
+        res.status(502).json({
+            error: 'The AI reply was not valid JSON. Please try another photo.',
+            upstream: safeUpstreamMessage('parse:' + (e && e.message ? e.message + ' | ' : '') + 'raw:' + String(rawReply || '').slice(0, 220))
+        });
         return;
     }
 
