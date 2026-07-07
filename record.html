@@ -614,6 +614,7 @@
             document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
             
             const drawerBody = document.getElementById('drawerBody');
+            drawerBody.innerHTML = '';
             const row = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
             if (!row) return;
 
@@ -653,6 +654,7 @@
         function closeDrawer() {
             document.getElementById('inputDrawerOverlay').classList.remove('show');
             document.getElementById('inputDrawer').classList.remove('show');
+            document.getElementById('drawerBody').innerHTML = '';
             currentRowIdForDrawer = null;
         }
 
