@@ -7,16 +7,16 @@
  * preview + review UI so a facilitator can correct any AI mistake before
  * applying to the actual attendance form.
  *
- * Primary provider: Groq (Llama 4 Scout / Maverick vision models).
- * Optional fallback: Google Gemini (only used if GEMINI_API_KEY is set AND
- * Groq is either unconfigured or hitting a rate limit).
+ * Primary provider: Google Gemini (fast, free-tier friendly, native vision).
+ * Optional fallback: Groq (Llama 4 Scout / Maverick) — only used if Gemini
+ * is unconfigured or hitting its free-tier rate limit AND GROQ_API_KEY is set.
  *
- * Required Vercel env vars (either one is enough; Groq is preferred):
- *   GROQ_API_KEY     — primary provider.
- *   GEMINI_API_KEY   — optional fallback.
+ * Required Vercel env vars (either one is enough; Gemini is preferred):
+ *   GEMINI_API_KEY   — primary provider.
+ *   GROQ_API_KEY     — optional fallback.
  * Optional model overrides:
- *   GROQ_VISION_MODEL       — pin a specific Groq vision model
  *   GEMINI_VISION_MODEL     — pin a specific Gemini model
+ *   GROQ_VISION_MODEL       — pin a specific Groq vision model
  *
  * Request (POST JSON):
  *   {
@@ -257,50 +257,50 @@ module.exports = async (req, res) => {
         return;
     }
 
-    const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
-    if (!groqKey && !geminiKey) {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!geminiKey && !groqKey) {
         res.status(503).json({
-            error: 'AI vision is not configured on Vercel yet. Add GROQ_API_KEY (or GEMINI_API_KEY) in the faci-panel Vercel project environment variables.'
+            error: 'AI vision is not configured on Vercel yet. Add GEMINI_API_KEY (or GROQ_API_KEY) in the faci-panel Vercel project environment variables.'
         });
         return;
     }
 
     const prompt = buildAttendancePrompt(roster);
 
-    // Step 1: Groq (primary)
+    // Step 1: Gemini (primary)
     let rawReply = null;
-    if (groqKey) {
+    if (geminiKey) {
         try {
-            rawReply = await groqVision(groqKey, prompt, imageBase64, mimeType);
+            rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType);
         } catch (e) {
-            const msg = String((e && (e.raw || e.message)) || '').toLowerCase();
-            const isLimit = e && e.code === 429 || ['429', 'limit', 'rate', 'quota'].some((x) => msg.includes(x));
-            if (!(geminiKey && isLimit)) {
-                console.error('Groq vision upstream error:', (e && (e.raw || e.message)) || e);
+            const msg = String((e && e.message) || '').toLowerCase();
+            const isLimit = e && e.code === 429 || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
+            if (!(groqKey && isLimit)) {
+                console.error('Gemini vision upstream error:', (e && e.message) || e);
                 res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
                 return;
             }
-            // rate-limited → fall through to Gemini
+            // rate-limited → fall through to Groq
         }
     }
 
-    // Step 2: Gemini (fallback — only if configured)
+    // Step 2: Groq (fallback — only if configured)
     if (!rawReply) {
-        if (!geminiKey) {
+        if (!groqKey) {
             res.status(503).json({
-                error: 'AI vision is not configured on Vercel yet. Add GROQ_API_KEY (or GEMINI_API_KEY) in the faci-panel Vercel project environment variables.'
+                error: 'AI vision is not configured on Vercel yet. Add GEMINI_API_KEY (or GROQ_API_KEY) in the faci-panel Vercel project environment variables.'
             });
             return;
         }
         try {
-            rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType);
+            rawReply = await groqVision(groqKey, prompt, imageBase64, mimeType);
         } catch (e) {
             if (e && e.code === 429) {
                 res.status(429).json({ error: 'The AI hit its free-tier rate limit. Please wait a moment and try again.' });
                 return;
             }
-            console.error('Gemini vision upstream error:', (e && e.message) || e);
+            console.error('Groq vision upstream error:', (e && (e.raw || e.message)) || e);
             res.status(502).json({ error: 'The AI vision service is having trouble right now. Please try again in a moment.' });
             return;
         }
