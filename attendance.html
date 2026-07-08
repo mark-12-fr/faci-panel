@@ -112,10 +112,7 @@
         .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; transform: scale(1.05); }
         .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; transform: scale(1.05); }
         .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; transform: scale(1.05); }
-        .opt-btn.excuse.active { background: #64748b; color: white; border-color: #64748b; transform: scale(1.05); }
-        
-        .remarks-input { width: 100%; margin-top: 12px; padding: 10px; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; outline: none; transition: 0.2s; }
-        .remarks-input:focus { border-color: var(--accent-blue); background: white; }
+
 
         .submit-btn { width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 15px; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: all 0.2s; }
         .submit-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
@@ -494,19 +491,15 @@
 
             const record = attendanceData ? attendanceData.find(a => (student.id_no && a.student_id_no === student.id_no) || a.student_name === student.full_name) : null;
             
-            let preP = '', preA = '', preL = '', preE = '';
-            let rem = '';
+            let preP = '', preA = '', preL = '';
 
             if (record) {
                 if(record.status === 'Present') preP = 'active';
                 else if(record.status === 'Absent') preA = 'active';
                 else if(record.status === 'Late') preL = 'active';
-                else if(record.status === 'Excused') preE = 'active';
-                rem = record.remarks || '';
             }
 
             const disabledBtnAttr = isLocked ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '';
-            const disabledInputAttr = isLocked ? 'disabled style="opacity:0.6; background:#e2e8f0; cursor:not-allowed;"' : '';
 
             return `
             <div class="student-card student-item fade-in-up" style="animation-delay: ${delay}s;">
@@ -520,9 +513,7 @@
                     <button class="opt-btn present ${preP}" ${disabledBtnAttr}>Present</button>
                     <button class="opt-btn absent ${preA}" ${disabledBtnAttr}>Absent</button>
                     <button class="opt-btn late ${preL}" ${disabledBtnAttr}>Late</button>
-                    <button class="opt-btn excuse ${preE}" ${disabledBtnAttr}>Excused</button>
                 </div>
-                <input type="text" class="remarks-input" value="${rem}" placeholder="Add optional remark..." ${disabledInputAttr}>
             </div>`;
         }
 
@@ -593,14 +584,12 @@
                 
                 const idNo = card.querySelector('.s-id').textContent.trim();
                 const activeBtn = card.querySelector('.opt-btn.active');
-                const remarks = card.querySelector('.remarks-input').value.trim();
 
                 if (!activeBtn) {
                     allMarked = false;
                 } else {
                     let statusText = activeBtn.textContent.trim();
-                    if(statusText === 'Excused') statusText = 'Excused';
-                    
+
                     attendanceData.push({
                         date: dateStr,
                         section: section,
@@ -610,7 +599,6 @@
                         student_name: cleanName,
                         student_id_no: idNo,
                         status: statusText,
-                        remarks: remarks,
                         quarter: currentSectionQuarter
                     });
                 }
@@ -657,12 +645,6 @@
                         b.disabled = true;
                         b.style.opacity = '0.6';
                         b.style.cursor = 'not-allowed';
-                    });
-                    document.querySelectorAll('.remarks-input').forEach(input => {
-                        input.disabled = true;
-                        input.style.opacity = '0.6';
-                        input.style.background = '#e2e8f0';
-                        input.style.cursor = 'not-allowed';
                     });
                     
                     setTimeout(async () => { 
