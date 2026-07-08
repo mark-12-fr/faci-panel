@@ -287,10 +287,19 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
     ];
     const models = pinned ? [pinned] : (preferAccurate ? RECORD_MODEL_ORDER : GEMINI_MODELS);
     let lastErr = null;
+    // Track whether EVERY model we tried came back rate-limited. Only then do
+    // we surface a 429 to the caller -- a per-model 429 should just skip to
+    // the next model. This matters for gemini-2.5-pro which is heavily rate-
+    // limited on the free tier; the fallbacks (flash-latest, 2.5-flash) still
+    // have plenty of headroom.
+    let modelsTried = 0;
+    let modelsRateLimited = 0;
     // Try each model up to twice: once WITH responseMimeType=application/json,
     // then WITHOUT it if the model rejects the field (Gemini sometimes returns
     // 400 INVALID_ARGUMENT on that param for older/preview models).
     for (const m of models) {
+        modelsTried++;
+        let modelRateLimited = false;
         for (const useJsonMime of [true, false]) {
             try {
                 // 4k was not enough for a 50-student roster in JSON; bump to
@@ -324,9 +333,11 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
                 }
                 lastErr = '[' + m + '] ' + r.status + ' ' + JSON.stringify(data).slice(0, 300);
                 if (r.status === 429 || /RESOURCE_EXHAUSTED/i.test(lastErr)) {
-                    const e = new Error('rate limit');
-                    e.code = 429;
-                    throw e;
+                    // This ONE model is rate-limited; skip to the next model.
+                    // Only propagate a 429 to the caller after every model in
+                    // the fallback list has been tried and rate-limited.
+                    modelRateLimited = true;
+                    break;
                 }
                 // If the model rejected responseMimeType, retry without it. Any
                 // other 400 → next model. 404/403 → next model.
@@ -335,11 +346,20 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
                 }
                 break; // give up on this model, try the next
             } catch (e) {
-                if (e && e.code === 429) throw e;
                 lastErr = '[' + m + '] ' + String((e && e.message) || e);
                 break;
             }
         }
+        if (modelRateLimited) modelsRateLimited++;
+    }
+    // Every model rate-limited → surface a 429 to the caller (so the handler
+    // can fall through to Groq if it's configured). Otherwise raise the last
+    // non-429 error we saw.
+    if (modelsTried > 0 && modelsRateLimited === modelsTried) {
+        const e = new Error(lastErr || 'rate limit');
+        e.code = 429;
+        e.raw = lastErr || '';
+        throw e;
     }
     const err = new Error(lastErr || 'No usable Gemini model.');
     err.raw = lastErr || '';
