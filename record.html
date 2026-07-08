@@ -411,6 +411,31 @@
         .review-btn.cancel { background: #f1f5f9; color: var(--text-sub); }
         .review-btn.apply  { background: var(--accent-blue); color: #fff; }
         .review-btn.apply:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Source picker: Camera vs Gallery choice after picking a field. */
+        .source-picker-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            padding: 8px 4px 4px;
+        }
+        .source-tile {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            padding: 22px 12px;
+            border: 2px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: 0.15s ease;
+            font-family: 'Inter','Segoe UI',sans-serif;
+        }
+        .source-tile:hover { transform: translateY(-2px); border-color: var(--accent-blue); background: #eff6ff; }
+        .source-tile:active { transform: scale(0.97); }
+        .source-tile i {
+            font-size: 1.9rem; color: var(--accent-blue);
+            width: 56px; height: 56px; border-radius: 50%;
+            background: #eff6ff; display: flex; align-items: center; justify-content: center;
+        }
+        .source-tile .tile-label { font-weight: 800; color: var(--text-main); font-size: 0.95rem; }
+        .source-tile .tile-sub   { font-size: 0.7rem; color: var(--text-sub); text-align: center; }
     </style>
 </head>
 <body>
@@ -454,8 +479,13 @@
         <i class="fa-solid fa-camera"></i>
         Upload Record Photo
     </button>
-    <div class="upload-sub-hint fade-in-up delay-2">Pick a field, then take a photo of that column. AI will read only that column's scores.</div>
-    <input type="file" id="recordPhotoInput" accept="image/*" capture="environment" style="display:none"
+    <div class="upload-sub-hint fade-in-up delay-2">Pick a field, then take (or pick) a photo of that column. AI will read only that column's scores.</div>
+    <!-- Two hidden file inputs: one forces the camera (capture=environment),
+         the other omits capture so the OS shows the photo gallery/picker.
+         Both dispatch to the same handleRecordPhotoPicked handler. -->
+    <input type="file" id="recordPhotoInputCamera" accept="image/*" capture="environment" style="display:none"
+           onchange="handleRecordPhotoPicked(event)">
+    <input type="file" id="recordPhotoInputGallery" accept="image/*" style="display:none"
            onchange="handleRecordPhotoPicked(event)">
 
     <!-- Field picker: shown when the facilitator taps "Upload Record Photo".
@@ -475,6 +505,34 @@
                     scores — much more accurate than auto-detecting headers.
                 </div>
                 <div id="fieldPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Source picker: shown after the facilitator chooses a field. Lets them
+         pick whether to take a fresh camera shot or pick an existing photo
+         from the gallery, then triggers the appropriate hidden file input. -->
+    <div id="sourcePickerOverlay" class="review-overlay" onclick="closeSourcePickerIfBackdrop(event)">
+        <div class="review-box">
+            <div class="review-handle"></div>
+            <div class="review-head">
+                <h3>How do you want to add the photo?</h3>
+                <button class="review-close" onclick="closeSourcePicker()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="review-body">
+                <div id="sourcePickerFieldLabel" style="font-size:0.82rem;color:var(--text-sub);margin-bottom:12px;text-align:center;"></div>
+                <div class="source-picker-grid">
+                    <button type="button" class="source-tile" onclick="chooseSource('camera')">
+                        <i class="fa-solid fa-camera"></i>
+                        <span class="tile-label">Take a Photo</span>
+                        <span class="tile-sub">Open the camera now</span>
+                    </button>
+                    <button type="button" class="source-tile" onclick="chooseSource('gallery')">
+                        <i class="fa-solid fa-images"></i>
+                        <span class="tile-label">From Gallery</span>
+                        <span class="tile-sub">Pick an existing photo</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1106,8 +1164,39 @@
         function pickFieldAndOpenCamera(field) {
             _recTargetField = field || null;   // '' from auto-detect → null
             closeFieldPicker();
+            // Second step: ask whether the photo should come from the camera
+            // or the gallery, then trigger the matching hidden input.
+            setTimeout(openSourcePicker, 80);
+        }
+
+        function openSourcePicker() {
+            // Show the target field so the facilitator can sanity-check they
+            // picked the right column before the OS's picker takes over.
+            const labelEl = document.getElementById('sourcePickerFieldLabel');
+            if (labelEl) {
+                labelEl.textContent = _recTargetField
+                    ? ('Target field: ' + REC_FIELD_LABEL(_recTargetField))
+                    : 'Auto-detect fields from column headers';
+            }
+            document.getElementById('sourcePickerOverlay').classList.add('show');
+        }
+
+        function closeSourcePicker() {
+            document.getElementById('sourcePickerOverlay').classList.remove('show');
+        }
+
+        function closeSourcePickerIfBackdrop(ev) {
+            if (ev.target && ev.target.id === 'sourcePickerOverlay') closeSourcePicker();
+        }
+
+        function chooseSource(source) {
+            closeSourcePicker();
             // Small delay so the modal fade-out doesn't fight the file picker.
-            setTimeout(() => document.getElementById('recordPhotoInput').click(), 60);
+            setTimeout(() => {
+                const id = source === 'camera' ? 'recordPhotoInputCamera' : 'recordPhotoInputGallery';
+                const el = document.getElementById(id);
+                if (el) el.click();
+            }, 80);
         }
 
         // Read a picked file → downsize (JPEG, longest side ≤ 1800 for records
