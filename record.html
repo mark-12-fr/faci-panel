@@ -324,12 +324,50 @@
         .rev-student-head .name { font-weight: 700; font-size: 0.9rem; color: var(--text-main); flex:1; min-width:0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .rev-student-head .conf { font-size: 0.7rem; color: var(--text-sub); }
         .rev-student-head .conf.low-conf { color: #b91c1c; font-weight: 700; }
+        /* Highlight a whole card whose overall confidence is low so the user
+           spots it while scrolling. */
+        .rev-student-card.needs-check {
+            border-left: 4px solid #ef4444;
+            background: #fff5f5;
+        }
         .rev-fields {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px;
         }
         .rev-field {
             background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
             padding: 4px 6px; display: flex; flex-direction: column; gap: 2px; text-align: center;
+            position: relative;
+        }
+        /* Individual score cell flag: red border + pink background + tiny warning
+           dot so a single suspicious digit stands out even inside a
+           high-confidence card. */
+        .rev-field.low-conf-field {
+            border-color: #ef4444; background: #fee2e2;
+        }
+        .rev-field.low-conf-field .flabel { color: #b91c1c; }
+        .rev-field.low-conf-field input { color: #b91c1c; }
+        .rev-field.low-conf-field::before {
+            content: '⚠️'; position: absolute; top: -6px; right: -4px;
+            font-size: 0.62rem; pointer-events: none;
+        }
+        /* Sticky banner at the very top of the review body counting how many
+           low-confidence scores need the facilitator's double-check. */
+        .double-check-banner {
+            display: none; align-items: center; gap: 8px;
+            background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px;
+            padding: 8px 10px; margin-bottom: 10px;
+            font-size: 0.82rem; color: #b45309; font-weight: 700;
+        }
+        .double-check-banner.show { display: flex; }
+        .double-check-banner .dc-count {
+            background: #b45309; color: #fff; padding: 2px 8px;
+            border-radius: 999px; font-weight: 800; font-size: 0.72rem;
+        }
+        .double-check-banner .dc-jump {
+            margin-left: auto; background: #b45309; color: #fff;
+            border: none; padding: 4px 10px; border-radius: 6px;
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.72rem;
+            font-weight: 800; cursor: pointer;
         }
         .rev-field .flabel { font-size: 0.6rem; font-weight: 800; color: var(--text-sub); }
         .rev-field input {
@@ -498,6 +536,15 @@
             <div class="review-body">
                 <div class="review-thumb-wrap"><img id="reviewThumb" class="review-thumb" alt="Preview"></div>
                 <div class="rev-summary" id="revSummary">Detected 0 students, 0 scores.</div>
+                <!-- Double-check banner: only shown when the AI flagged one or
+                     more scores with confidence < 60%. Tapping "Jump" scrolls
+                     the review list to the first suspicious card. -->
+                <div id="doubleCheckBanner" class="double-check-banner">
+                    <span>⚠️ Please double-check</span>
+                    <span class="dc-count" id="doubleCheckCount">0</span>
+                    <span>score(s) below</span>
+                    <button type="button" class="dc-jump" onclick="jumpToFirstLowConf()">Jump to first ↓</button>
+                </div>
                 <div id="reviewNotes" class="review-notes" style="display:none"></div>
                 <div id="reviewList"></div>
             </div>
@@ -1162,6 +1209,11 @@
                 'Detected <strong>' + students.length + '</strong> student' + (students.length === 1 ? '' : 's') +
                 ', <strong>' + totalScores + '</strong> score' + (totalScores === 1 ? '' : 's') + '.';
 
+            // Count of individual score cells that need double-checking, so
+            // we can populate the banner + let the facilitator jump to them.
+            let lowConfFieldCount = 0;
+            const LOW_CONF_THRESHOLD = 0.6;
+
             if (students.length === 0) {
                 listEl.innerHTML = '<div class="review-empty">No students were confidently recognized. Please try a clearer photo.</div>';
                 document.getElementById('reviewApplyBtn').disabled = true;
@@ -1174,14 +1226,23 @@
                     if (shown.length === 0) return '';   // shouldn't happen after sanitize, but safe
                     const conf = Number(st.confidence) || 0;
                     const confPct = Math.round(conf * 100);
-                    const confClass = conf < 0.6 ? 'low-conf' : '';
-                    const fieldsHtml = shown.map(f => `
-                        <div class="rev-field">
+                    const cardLowConf = conf < LOW_CONF_THRESHOLD;
+                    const confClass = cardLowConf ? 'low-conf' : '';
+                    // Flag EVERY score cell on a low-confidence card. Even with
+                    // only overall student confidence available (per the API
+                    // schema), a low overall score is the right proxy: every
+                    // number on that row is now suspect.
+                    const fieldsHtml = shown.map(f => {
+                        const fieldLowConf = cardLowConf;
+                        if (fieldLowConf) lowConfFieldCount++;
+                        return `
+                        <div class="rev-field${fieldLowConf ? ' low-conf-field' : ''}">
                             <span class="flabel">${REC_FIELD_LABEL(f)}</span>
                             <input type="number" step="any" min="0" data-field="${f}" value="${escapeReviewText(scores[f])}">
-                        </div>`).join('');
+                        </div>`;
+                    }).join('');
                     return `
-                        <div class="rev-student-card" data-name="${escapeReviewText(st.name)}">
+                        <div class="rev-student-card${cardLowConf ? ' needs-check' : ''}" data-name="${escapeReviewText(st.name)}">
                             <div class="rev-student-head">
                                 <span class="name">${escapeReviewText(st.name)}</span>
                                 <span class="conf ${confClass}">AI conf ${confPct}%</span>
@@ -1191,7 +1252,27 @@
                 }).filter(Boolean).join('');
             }
 
+            // Populate the double-check banner. Show only when there's at least
+            // one low-confidence score to draw attention to.
+            const banner = document.getElementById('doubleCheckBanner');
+            const dcCount = document.getElementById('doubleCheckCount');
+            if (banner && dcCount) {
+                dcCount.textContent = lowConfFieldCount;
+                banner.classList.toggle('show', lowConfFieldCount > 0);
+            }
+
             overlay.classList.add('show');
+        }
+
+        function jumpToFirstLowConf() {
+            const first = document.querySelector('#reviewList .rev-student-card.needs-check');
+            if (!first) return;
+            first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Briefly flash the card so it's obvious which one to look at.
+            first.style.transition = 'box-shadow 0.3s';
+            const orig = first.style.boxShadow;
+            first.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.5)';
+            setTimeout(() => { first.style.boxShadow = orig; }, 900);
         }
 
         function closeReviewIfBackdrop(ev) {
