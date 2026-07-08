@@ -74,18 +74,20 @@ const MAX_ROSTER = 200;
 function buildAttendancePrompt(roster) {
     return (
         "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. " +
-        "Your ONLY job: for each student on the ROSTER below, look at their attendance column/cell and decide:\n\n" +
-        "  ✅ CELL HAS A MARK (check ✓, slash /, X, dot •, letter P, any pen stroke, any scribble, any visible mark at all) → \"Present\"\n" +
-        "  ❌ CELL IS BLANK (completely empty, no mark, just the box) → \"Absent\"\n\n" +
-        "EXCEPTIONS (only if the cell explicitly has a letter label):\n" +
-        "  Letter 'L' or 'Late' → \"Late\"\n" +
-        "  Letter 'E', 'Ex', or 'Excused' → \"Excused\"\n\n" +
+        "For each student on the ROSTER below, find their attendance cell and read the LETTER written in it:\n\n" +
+        "  LETTER 'P' → \"Present\"\n" +
+        "  LETTER 'A' → \"Absent\"\n" +
+        "  LETTER 'L' → \"Late\"\n" +
+        "  LETTER 'E' → \"Excused\"\n" +
+        "  EMPTY / BLANK cell → \"Absent\"\n\n" +
+        "NOTE: A small dot (.) or faint mark that is NOT clearly one of the letters P, A, L, E counts as BLANK → \"Absent\".\n" +
+        "Only a clear, intentional letter P, A, L, or E should be read as marked.\n\n" +
         "CRITICAL — You MUST return ALL " + roster.length + " roster students:\n" +
         "  • students[] MUST have exactly " + roster.length + " entries in ROSTER ORDER. No omissions, no duplicates.\n" +
-        "  • Read each row left-to-right, match to the roster name, check the attendance cell.\n" +
-        "  • If you CANNOT find a student's row, still include them as Absent with confidence 0.2.\n\n" +
+        "  • Read each row left-to-right, match to the roster name, then read the attendance letter.\n" +
+        "  • If you CANNOT find a student's row, include them as Absent with confidence 0.2.\n\n" +
         "MATCHING RULES:\n" +
-        "  • Match photo names to the closest roster name (ignore missing accents, wrong middle initial).\n" +
+        "  • Match photo names to the closest roster name (tolerate missing accents, wrong middle initial).\n" +
         "  • Never invent names not on the roster. Names must match EXACTLY.\n\n" +
         "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n" +
         '{\n' +
