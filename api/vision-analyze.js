@@ -114,7 +114,44 @@ const RECORD_FIELDS = (function () {
 })();
 const RECORD_FIELD_SET = new Set(RECORD_FIELDS);
 
-function buildRecordPrompt(roster) {
+function buildRecordPrompt(roster, targetField) {
+    // Human-readable label for the target field so the prompt reads clearly.
+    const targetLabel = _fieldLabel(targetField);
+    if (targetField && RECORD_FIELD_SET.has(targetField)) {
+        // Single-field mode: the facilitator has already told us which column
+        // this photo is for. Just read ONE column of numbers matched to
+        // student names -- much easier for the vision model than parsing
+        // arbitrary column headers.
+        return (
+            "You are analyzing a photo of a classroom RECORD / GRADE BOOK from a school in the " +
+            "Philippines. The facilitator has told you that this photo contains scores for ONE " +
+            "specific field: " + targetLabel + " (field key: \"" + targetField + "\").\n\n" +
+            "YOUR JOB: for each student on the ROSTER below, find their row in the photo and read " +
+            "the numeric score in the " + targetLabel + " column. Put that number into scores[\"" +
+            targetField + "\"] for that student. Do NOT read any other column.\n\n" +
+            "SCORE READING RULES:\n" +
+            "  • Read the number in the " + targetLabel + " cell for each roster student.\n" +
+            "  • Blank / empty / unreadable cell → OMIT scores[\"" + targetField + "\"] for that " +
+            "student entirely (do NOT guess 0).\n" +
+            "  • Numbers must be non-negative and at most 200. Decimals allowed but rare.\n" +
+            "  • If unsure of a digit, return your best guess and lower the confidence.\n\n" +
+            "MATCHING RULES:\n" +
+            "  • The ROSTER below is the ground truth. Match each photo row to the closest roster " +
+            "name (tolerate OCR errors: missing accents, wrong middle initial, transposed letters).\n" +
+            "  • Never invent students not on the roster. Names must match the roster string EXACTLY.\n\n" +
+            "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences:\n" +
+            "{\n" +
+            '  "students": [ { "name": "<exact roster name>", "scores": { "' + targetField +
+                '": <number> }, "confidence": <0..1> } ],\n' +
+            '  "unmatched": [ "<name text seen in photo>" ],\n' +
+            '  "notes": "<optional one-line observation>"\n' +
+            "}\n\n" +
+            "ROSTER (match names to these exact strings):\n" +
+            roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+        );
+    }
+
+    // Multi-field / auto-detect mode (original behavior).
     return (
         "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the " +
         "Philippines. Rows are students, columns are score-holding fields. Read the header row to " +
@@ -148,6 +185,17 @@ function buildRecordPrompt(roster) {
         "ROSTER (match names to these exact strings):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
     );
+}
+
+function _fieldLabel(f) {
+    if (!f) return '';
+    if (f.startsWith('module_')) return 'MODULE ' + f.split('_')[1];
+    if (f.startsWith('activity_')) return 'ACTIVITY ' + f.split('_')[1];
+    if (f === 'at') return 'AT (Attendance)';
+    if (f === 'pt_1') return 'PT 1 (Performance Task 1)';
+    if (f === 'pt_2') return 'PT 2 (Performance Task 2)';
+    if (f === 'qe') return 'QE (Quarterly Exam)';
+    return f;
 }
 
 /**
@@ -502,6 +550,11 @@ module.exports = async (req, res) => {
     const imageBase64 = String(body.imageBase64 || '').trim();
     const mimeType = String(body.mimeType || '').trim().toLowerCase();
     const roster = Array.isArray(body.roster) ? body.roster.map((n) => String(n || '').trim()).filter(Boolean) : [];
+    // Optional: single target field for record uploads (e.g. "module_5",
+    // "pt_1"). When provided, the prompt only asks the model to read that
+    // one column of scores -- much easier for the vision model than
+    // parsing arbitrary column headers.
+    const targetField = String(body.targetField || '').trim();
 
     if (type !== 'attendance' && type !== 'record') {
         res.status(400).json({ error: 'type must be "attendance" or "record".' });
@@ -537,7 +590,9 @@ module.exports = async (req, res) => {
         return;
     }
 
-    const prompt = type === 'record' ? buildRecordPrompt(roster) : buildAttendancePrompt(roster);
+    const prompt = type === 'record'
+        ? buildRecordPrompt(roster, targetField && RECORD_FIELD_SET.has(targetField) ? targetField : null)
+        : buildAttendancePrompt(roster);
 
     // Sanitize an upstream error message before sending it back to the client.
     // We include enough detail that a facilitator can screenshot + report it,

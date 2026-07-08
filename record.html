@@ -393,9 +393,30 @@
         <i class="fa-solid fa-camera"></i>
         Upload Record Photo
     </button>
-    <div class="upload-sub-hint fade-in-up delay-2">Take a clear photo of the class record. AI will read the scores.</div>
+    <div class="upload-sub-hint fade-in-up delay-2">Pick a field, then take a photo of that column. AI will read only that column's scores.</div>
     <input type="file" id="recordPhotoInput" accept="image/*" capture="environment" style="display:none"
            onchange="handleRecordPhotoPicked(event)">
+
+    <!-- Field picker: shown when the facilitator taps "Upload Record Photo".
+         They pick which column their photo is for (or Auto-detect from
+         headers), which massively improves accuracy vs. having the AI
+         guess the column mapping. -->
+    <div id="fieldPickerOverlay" class="review-overlay" onclick="closeFieldPickerIfBackdrop(event)">
+        <div class="review-box">
+            <div class="review-handle"></div>
+            <div class="review-head">
+                <h3>What field is this photo for?</h3>
+                <button class="review-close" onclick="closeFieldPicker()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="review-body">
+                <div style="font-size:0.85rem;color:var(--text-sub);margin-bottom:12px;">
+                    Pick the exact column you photographed. The AI will only read that column's
+                    scores — much more accurate than auto-detecting headers.
+                </div>
+                <div id="fieldPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;"></div>
+            </div>
+        </div>
+    </div>
 
     <div class="search-bar fade-in-up delay-2">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
@@ -951,8 +972,59 @@
             .toUpperCase()
             .replace('_', ' ');
 
+        // Target field the facilitator picked in the field-picker modal. Passed
+        // to the /api/vision-analyze call so the AI knows which single column
+        // to read. Null / '' → auto-detect from column headers (fallback).
+        let _recTargetField = null;
+
         function triggerRecordPhoto() {
-            document.getElementById('recordPhotoInput').click();
+            openFieldPicker();
+        }
+
+        function openFieldPicker() {
+            const gridEl = document.getElementById('fieldPickerGrid');
+            const tiles = [];
+            const tile = (field, label) =>
+                `<button type="button" onclick="pickFieldAndOpenCamera('${field}')"
+                    style="padding:10px 6px;border:1px solid #e2e8f0;background:#f8fafc;
+                           border-radius:8px;font-family:'Inter',sans-serif;font-size:0.78rem;
+                           font-weight:800;color:var(--text-main);cursor:pointer;
+                           text-align:center;transition:0.15s;"
+                    onmouseover="this.style.background='#eff6ff';this.style.borderColor='var(--accent-blue)'"
+                    onmouseout="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0'"
+                    >${label}</button>`;
+            // Auto-detect (spans full width)
+            tiles.push(
+                `<button type="button" onclick="pickFieldAndOpenCamera('')"
+                    style="grid-column:1 / -1;padding:12px;border:2px solid var(--accent-blue);
+                           background:#eff6ff;border-radius:8px;color:var(--accent-blue);
+                           font-family:'Inter',sans-serif;font-size:0.85rem;font-weight:800;
+                           cursor:pointer;text-align:center;margin-bottom:6px;">
+                    Auto-detect from column headers
+                </button>`);
+            for (let i = 1; i <= 25; i++) tiles.push(tile('module_' + i, 'M' + i));
+            for (let i = 1; i <= 10; i++) tiles.push(tile('activity_' + i, 'A' + i));
+            tiles.push(tile('at',   'AT'));
+            tiles.push(tile('pt_1', 'PT 1'));
+            tiles.push(tile('pt_2', 'PT 2'));
+            tiles.push(tile('qe',   'QE'));
+            gridEl.innerHTML = tiles.join('');
+            document.getElementById('fieldPickerOverlay').classList.add('show');
+        }
+
+        function closeFieldPicker() {
+            document.getElementById('fieldPickerOverlay').classList.remove('show');
+        }
+
+        function closeFieldPickerIfBackdrop(ev) {
+            if (ev.target && ev.target.id === 'fieldPickerOverlay') closeFieldPicker();
+        }
+
+        function pickFieldAndOpenCamera(field) {
+            _recTargetField = field || null;   // '' from auto-detect → null
+            closeFieldPicker();
+            // Small delay so the modal fade-out doesn't fight the file picker.
+            setTimeout(() => document.getElementById('recordPhotoInput').click(), 60);
         }
 
         // Read a picked file → downsize (JPEG, longest side ≤ 1800 for records
@@ -1023,7 +1095,8 @@
                         type: 'record',
                         imageBase64: base64,
                         mimeType: mimeType,
-                        roster: roster
+                        roster: roster,
+                        targetField: _recTargetField || ''
                     })
                 });
                 let payload;
@@ -1059,6 +1132,16 @@
             thumbEl.src = thumbDataUrl || '';
 
             let noteHtml = '';
+            // Prominently show the field the facilitator picked so a wrong
+            // choice ("I meant PT 2, not PT 1") is obvious BEFORE they Apply.
+            if (_recTargetField) {
+                noteHtml += '<div style="color:var(--accent-blue);font-weight:800;margin-bottom:4px;">' +
+                    '<i class="fa-solid fa-bullseye"></i> Target field: ' +
+                    escapeReviewText(REC_FIELD_LABEL(_recTargetField)) + '</div>';
+            } else {
+                noteHtml += '<div style="color:var(--text-sub);margin-bottom:4px;">' +
+                    '<i class="fa-solid fa-magnifying-glass"></i> Auto-detected fields from column headers.</div>';
+            }
             if (notes) noteHtml += '<div><i class="fa-solid fa-circle-info"></i> ' + escapeReviewText(notes) + '</div>';
             if (unmatched.length) {
                 noteHtml += '<div style="margin-top:4px"><strong>Not matched to roster:</strong> ' +
