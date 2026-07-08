@@ -201,10 +201,13 @@ function buildRecordPrompt(roster, targetField) {
 
     // Multi-field / auto-detect mode (original behavior).
     return (
-        "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the " +
-        "Philippines. Rows are students, columns are score-holding fields. Read the header row to " +
-        "identify each column, then read the score cell for each student × column pair, and match " +
-        "each recognized student to the ROSTER below.\n\n" +
+        "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the Philippines. " +
+        "Rows are students, columns are score-holding fields.\n\n" +
+        "CRITICAL — You MUST return EXACTLY " + roster.length + " students, one per roster entry, in ROSTER ORDER. " +
+        "Every single roster name MUST appear in the students array. No omissions.\n\n" +
+        "STEP 1: Identify the header row. Read each column header and map it to the exact field key below.\n" +
+        "STEP 2: Read each student row from top to bottom. Match the name in the photo to the closest roster name.\n" +
+        "STEP 3: For each matched student, read the score from each column and record it under the correct field key.\n\n" +
         "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n" +
         "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n" +
         "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n" +
@@ -213,24 +216,29 @@ function buildRecordPrompt(roster, targetField) {
         "- 'PT 2' / 'PT2' / 'Performance Task 2' → pt_2\n" +
         "- 'QE' / 'Q.E.' / 'Quarterly Exam' / 'Exam' → qe\n" +
         "- If a header does not clearly map to one of the above field keys, IGNORE that entire column.\n\n" +
+        "NAME MATCHING RULES (highest priority for accuracy):\n" +
+        "- Find each student's name in the leftmost column(s) of the photo. Match it to the EXACT ROSTER NAME below.\n" +
+        "- If the photo name is slightly different (e.g. missing accent, abbreviated middle initial), " +
+        "match it to the closest roster name. Never invent a name not on the roster.\n" +
+        "- Write the EXACT roster string in the \"name\" field — do NOT modify the name.\n" +
+        "- If you truly cannot find a student in the photo, include them anyway with an empty scores object and confidence 0.2.\n\n" +
         "SCORE READING RULES:\n" +
         "- Only include a numeric value if you can read the cell clearly. Empty/blank cells, dashes, " +
         "'-', or clearly-unreadable cells are OMITTED (do not include the field at all for that student).\n" +
         "- Numbers must be non-negative and at most 200. Decimals are allowed but rare; prefer integers.\n" +
-        "- If you're not confident about a value, still return your best guess and lower the confidence.\n\n" +
-        "MATCHING RULES:\n" +
-        "- The ROSTER below is the ground truth. Match each detected student's name to the CLOSEST " +
-        "roster entry, tolerating small OCR mistakes.\n" +
-        "- Only include a student in the `students` array if you can confidently match them to a " +
-        "roster name. Any name you see but can't match goes into `unmatched` verbatim.\n" +
-        "- Never invent students not seen in the photo. Never include duplicates.\n\n" +
+        "- If you're not confident about a value, still return your best guess and lower the confidence.\n" +
+        "- Make sure each score is in the CORRECT column — double-check that module_3's value " +
+        "is actually under the MODULE 3 column and not shifted left or right.\n\n" +
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n" +
         "{\n" +
-        '  "students": [ { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> } ],\n' +
-        '  "unmatched": [ "<name text seen in photo>" ],\n' +
-        '  "notes": "<optional one-line observation>"\n' +
+        '  "students": [\n' +
+        '    { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> },\n' +
+        '    ... (exactly ' + roster.length + ' entries, one per roster name)\n' +
+        '  ],\n' +
+        '  "unmatched": [ "<name text seen in photo but not matched>" ],\n' +
+        '  "notes": "<optional observation>"\n' +
         "}\n\n" +
-        "ROSTER (match names to these exact strings):\n" +
+        "ROSTER (return exactly " + roster.length + " entries — one per name, in this order):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
     );
 }

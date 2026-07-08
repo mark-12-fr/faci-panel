@@ -178,13 +178,9 @@
     </div>
 
     <div class="controls-row fade-in-up delay-1">
-        <div class="date-input" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;">
-            <button onclick="changeDate(-1)" class="nav-btn"><i class="fa-solid fa-chevron-left"></i></button>
-            <div style="text-align: center;">
-                <label><i class="fa-regular fa-calendar"></i> Date</label>
-                <div id="currentDateDisplay">...</div>
-            </div>
-            <button onclick="changeDate(1)" class="nav-btn"><i class="fa-solid fa-chevron-right"></i></button>
+        <div class="date-input" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px;">
+            <i class="fa-regular fa-calendar" style="color: var(--text-sub);"></i>
+            <input type="date" id="datePicker" style="flex:1; border:none; outline:none; font-size:0.9rem; font-weight:700; background:transparent; color:var(--text-main); font-family:inherit;">
         </div>
 
         <div class="subject-select">
@@ -319,35 +315,40 @@
             setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
-        let currentDateObj = new Date();
-
-        function updateDateDisplay() {
-            const dateStr = currentDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            document.getElementById('currentDateDisplay').textContent = dateStr;
+        function toDateInputValue(date) {
+            return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
         }
 
-        async function changeDate(offset) {
-            let tempDate = new Date(currentDateObj);
-            tempDate.setDate(tempDate.getDate() + offset);
+        function toDisplayDate(date) {
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
 
-            let today = new Date();
+        document.addEventListener('DOMContentLoaded', () => {
+            const picker = document.getElementById('datePicker');
+            const today = new Date();
             today.setHours(0,0,0,0);
-            let checkDate = new Date(tempDate);
-            checkDate.setHours(0,0,0,0);
+            picker.value = toDateInputValue(today);
+            picker.max = toDateInputValue(today);
+            picker.addEventListener('change', async () => {
+                if (!picker.value) {
+                    picker.value = toDateInputValue(today);
+                    return;
+                }
+                const picked = new Date(picker.value + 'T00:00:00');
+                if (picked > today) {
+                    showAlert("Action Restricted", "You cannot log attendance for a schedule that has not yet occurred.", "#f59e0b");
+                    picker.value = toDateInputValue(today);
+                    return;
+                }
+                const section = localStorage.getItem('faci_section');
+                await loadDynamicStudents(section);
+            });
+        });
 
-            if (checkDate > today) {
-                showAlert(
-                    "Action Restricted", 
-                    "You cannot log attendance for a schedule that has not yet occurred.", 
-                    "#f59e0b"
-                );
-                return;
-            }
-
-            currentDateObj = tempDate;
-            updateDateDisplay();
-            const section = localStorage.getItem('faci_section');
-            await loadDynamicStudents(section); 
+        function getCurrentDateStr() {
+            const picker = document.getElementById('datePicker');
+            const d = new Date(picker.value + 'T00:00:00');
+            return toDisplayDate(d);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -359,7 +360,6 @@
 
             document.getElementById('subjectDisplay').textContent = subject.substring(0, 7) + '...';
 
-            updateDateDisplay();
             await loadDynamicStudents(section);
 
             listenForTeacherUpdates();
@@ -386,7 +386,7 @@
                         const affectedSection = payload.new?.section || payload.old?.section;
 
                         if (affectedSection === section) {
-                            const dateStr = document.getElementById('currentDateDisplay').textContent;
+                            const dateStr = getCurrentDateStr();
                             const affectedDate = payload.new?.date || payload.old?.date;
 
                             if (affectedDate === dateStr) {
@@ -437,7 +437,7 @@
 
                 document.getElementById('statTotal').textContent = students.length;
 
-                const dateStr = document.getElementById('currentDateDisplay').textContent;
+                const dateStr = getCurrentDateStr();
                 const { data: attendanceData } = await supabaseClient
                     .from('attendance')
                     .select('*')
@@ -447,7 +447,8 @@
 
                 let today = new Date();
                 today.setHours(0,0,0,0);
-                let checkDate = new Date(currentDateObj);
+                let pickedDate = new Date(document.getElementById('datePicker').value + 'T00:00:00');
+                let checkDate = new Date(pickedDate);
                 checkDate.setHours(0,0,0,0);
 
                 const isPastDate = checkDate < today;
@@ -595,7 +596,7 @@
                 return;
             }
 
-            const dateStr = document.getElementById('currentDateDisplay').textContent;
+            const dateStr = getCurrentDateStr();
             const section = localStorage.getItem('faci_section');
             const subject = localStorage.getItem('faci_subject');
             const faciId = localStorage.getItem('faci_id'); 
