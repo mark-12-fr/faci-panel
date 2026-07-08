@@ -376,6 +376,29 @@
             outline: none; font-family: 'Inter','Segoe UI',sans-serif; color: var(--text-main);
         }
         .rev-field input:focus { border-color: var(--accent-blue); background: #eff6ff; }
+        /* Search bar inside the review modal — lets the facilitator jump to a
+           specific student's row instead of scrolling all 55 cards. */
+        .rev-search {
+            display: flex; align-items: center; gap: 8px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 8px 10px; margin-bottom: 10px;
+        }
+        .rev-search i { color: var(--text-sub); font-size: 0.9rem; }
+        .rev-search input {
+            flex: 1; border: none; outline: none; background: transparent;
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.88rem;
+            color: var(--text-main);
+        }
+        .rev-search .clear-btn {
+            background: none; border: none; color: var(--text-sub); cursor: pointer;
+            font-size: 1rem; display: none;
+        }
+        .rev-search .clear-btn.show { display: inline-block; }
+        .rev-search .rev-count {
+            font-size: 0.72rem; color: var(--text-sub); font-weight: 700;
+            white-space: nowrap;
+        }
+        .rev-student-card.rev-hidden { display: none; }
         .review-empty { padding: 16px; text-align: center; color: var(--text-sub); }
         .review-actions {
             display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px;
@@ -546,6 +569,19 @@
                     <button type="button" class="dc-jump" onclick="jumpToFirstLowConf()">Jump to first ↓</button>
                 </div>
                 <div id="reviewNotes" class="review-notes" style="display:none"></div>
+                <!-- Search: filters the review cards by student name as the
+                     facilitator types. Fast per-card display toggle so it
+                     handles a 200-student roster smoothly. -->
+                <div class="rev-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="reviewSearchInput" placeholder="Search student name..."
+                           oninput="filterReviewList(this.value)">
+                    <span class="rev-count" id="reviewMatchCount"></span>
+                    <button type="button" class="clear-btn" id="reviewSearchClear"
+                            onclick="clearReviewSearch()" aria-label="Clear search">
+                        <i class="fa-solid fa-xmark-circle"></i>
+                    </button>
+                </div>
                 <div id="reviewList"></div>
             </div>
             <div class="review-actions">
@@ -1261,11 +1297,19 @@
                 banner.classList.toggle('show', lowConfFieldCount > 0);
             }
 
+            // Reset the search field so a stale query from a previous scan
+            // doesn't hide students on this one.
+            const searchInput = document.getElementById('reviewSearchInput');
+            if (searchInput) {
+                searchInput.value = '';
+                filterReviewList('');   // clears the visible-count and rehydrates
+            }
+
             overlay.classList.add('show');
         }
 
         function jumpToFirstLowConf() {
-            const first = document.querySelector('#reviewList .rev-student-card.needs-check');
+            const first = document.querySelector('#reviewList .rev-student-card.needs-check:not(.rev-hidden)');
             if (!first) return;
             first.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Briefly flash the card so it's obvious which one to look at.
@@ -1273,6 +1317,32 @@
             const orig = first.style.boxShadow;
             first.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.5)';
             setTimeout(() => { first.style.boxShadow = orig; }, 900);
+        }
+
+        // Live search: hides review cards whose student name doesn't contain
+        // the query (case-insensitive). Uses classList toggles rather than
+        // removing DOM so unhide + editable state stay intact.
+        function filterReviewList(rawQuery) {
+            const q = String(rawQuery || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('#reviewList .rev-student-card');
+            let visible = 0;
+            cards.forEach(card => {
+                const name = (card.dataset.name || '').toLowerCase();
+                const match = !q || name.indexOf(q) !== -1;
+                card.classList.toggle('rev-hidden', !match);
+                if (match) visible++;
+            });
+            const countEl = document.getElementById('reviewMatchCount');
+            const clearBtn = document.getElementById('reviewSearchClear');
+            if (countEl) countEl.textContent = q ? (visible + ' match' + (visible === 1 ? '' : 'es')) : '';
+            if (clearBtn) clearBtn.classList.toggle('show', !!q);
+        }
+
+        function clearReviewSearch() {
+            const input = document.getElementById('reviewSearchInput');
+            if (input) input.value = '';
+            filterReviewList('');
+            if (input) input.focus();
         }
 
         function closeReviewIfBackdrop(ev) {
