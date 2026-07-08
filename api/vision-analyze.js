@@ -114,8 +114,45 @@ const RECORD_FIELDS = (function () {
 })();
 const RECORD_FIELD_SET = new Set(RECORD_FIELDS);
 
-function buildRecordPrompt(roster, targetField) {
-    // Human-readable label for the target field so the prompt reads clearly.
+function buildRecordPrompt(roster, targetFields) {
+    // Normalize to an array of valid field keys.
+    const fields = (Array.isArray(targetFields) ? targetFields : (targetFields ? [targetFields] : []))
+        .map(f => String(f || '').trim())
+        .filter(f => RECORD_FIELD_SET.has(f));
+
+    // Multi-field mode: the facilitator told us EXACTLY which columns this
+    // photo covers (e.g. Module 1 + Module 2). Read only those columns.
+    if (fields.length >= 2) {
+        const labelList = fields.map(f => _fieldLabel(f) + ' (key: "' + f + '")').join('\n  • ');
+        const schemaScores = fields.map(f => '"' + f + '": <number>').join(', ');
+        return (
+            "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. " +
+            "The facilitator has told you this photo contains scores for EXACTLY these " + fields.length +
+            " columns (ignore every OTHER column in the photo):\n  • " + labelList + "\n\n" +
+            "YOUR JOB: for each student on the ROSTER below, find their row, then read the handwritten " +
+            "number in EACH of the above columns for that row. Put each into scores using its field key.\n\n" +
+            "═══ RULES (follow strictly) ═══\n" +
+            "  • Read the columns in the SAME left-to-right order they appear in the photo. Do NOT swap " +
+            "columns — a value under Module 1 must go to module_1, not module_2.\n" +
+            "  • Count digits per cell: '8' is ONE digit, '10'/'15' are TWO. Do NOT round '8' to '10'.\n" +
+            "  • Each student's numbers are INDEPENDENT — do NOT copy one student's value to the next.\n" +
+            "  • Blank / empty / unreadable cell → OMIT that one field for that student (do NOT guess 0).\n" +
+            "  • Numbers are 0..200. If a digit is ambiguous, return your best guess and LOWER confidence.\n" +
+            "  • Match names to the ROSTER exactly (tolerate small OCR errors in the name).\n" +
+            "  • Only include a student who has AT LEAST ONE readable score among these columns.\n\n" +
+            "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n" +
+            "{\n" +
+            '  "students": [ { "name": "<exact roster name>", "scores": { ' + schemaScores + ' }, "confidence": <0..1> } ],\n' +
+            '  "unmatched": [ "<name text seen in photo>" ],\n' +
+            '  "notes": "<optional one-line observation>"\n' +
+            "}\n\n" +
+            "ROSTER (match names to these exact strings):\n" +
+            roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+        );
+    }
+
+    // Single-field mode (fields.length === 1) or legacy single string.
+    const targetField = fields.length === 1 ? fields[0] : null;
     const targetLabel = _fieldLabel(targetField);
     if (targetField && RECORD_FIELD_SET.has(targetField)) {
         // Single-field mode: the facilitator has already told us which column
@@ -641,11 +678,18 @@ module.exports = async (req, res) => {
     const imageBase64 = String(body.imageBase64 || '').trim();
     const mimeType = String(body.mimeType || '').trim().toLowerCase();
     const roster = Array.isArray(body.roster) ? body.roster.map((n) => String(n || '').trim()).filter(Boolean) : [];
-    // Optional: single target field for record uploads (e.g. "module_5",
-    // "pt_1"). When provided, the prompt only asks the model to read that
-    // one column of scores -- much easier for the vision model than
-    // parsing arbitrary column headers.
-    const targetField = String(body.targetField || '').trim();
+    // Optional: target field(s) for record uploads. Accepts either
+    // targetFields (array of field keys, e.g. ["module_1","module_2"]) or the
+    // legacy single targetField string. When provided, the prompt only reads
+    // those specific columns -- far more accurate than auto-detecting headers.
+    let targetFields = Array.isArray(body.targetFields)
+        ? body.targetFields.map((f) => String(f || '').trim())
+        : [];
+    const legacyTargetField = String(body.targetField || '').trim();
+    if (targetFields.length === 0 && legacyTargetField) targetFields = [legacyTargetField];
+    // Keep only valid, de-duplicated field keys, in canonical order.
+    const _tfSet = new Set(targetFields.filter((f) => RECORD_FIELD_SET.has(f)));
+    targetFields = RECORD_FIELDS.filter((f) => _tfSet.has(f));
 
     if (type !== 'attendance' && type !== 'record') {
         res.status(400).json({ error: 'type must be "attendance" or "record".' });
@@ -682,7 +726,7 @@ module.exports = async (req, res) => {
     }
 
     const prompt = type === 'record'
-        ? buildRecordPrompt(roster, targetField && RECORD_FIELD_SET.has(targetField) ? targetField : null)
+        ? buildRecordPrompt(roster, targetFields)
         : buildAttendancePrompt(roster);
 
     // Sanitize an upstream error message before sending it back to the client.
@@ -771,21 +815,21 @@ module.exports = async (req, res) => {
     let notes = String((parsed && parsed.notes) || '').trim().slice(0, 240);
 
     // ═══ TWO-PASS CONSENSUS ═══
-    // For single-field record extraction, run the model a SECOND time and
-    // compare per-student. Only high-confidence when both passes agree
-    // (that's the meaningful accuracy signal for handwritten OCR).
-    // Disagreements are surfaced as low confidence so the review UI's
-    // "double-check" flag actually corresponds to real uncertainty.
-    // We skip the second pass on attendance (P/A/L is trivial) and on
-    // auto-detect record mode (too many fields to align cleanly).
-    const doConsensus = type === 'record' && targetField && RECORD_FIELD_SET.has(targetField)
+    // For explicit-field record extraction (one OR several chosen columns),
+    // run the model a SECOND time and compare per-student per-field. Only
+    // high-confidence when both passes agree (that's the meaningful accuracy
+    // signal for handwritten OCR). Disagreements are surfaced as low
+    // confidence so the review UI's "double-check" flag corresponds to real
+    // uncertainty. We skip the second pass on attendance (P/A/L is trivial)
+    // and on auto-detect record mode (too many free-form fields to align).
+    const doConsensus = type === 'record' && targetFields.length >= 1
         && geminiKey && students.length > 0;
     if (doConsensus) {
         try {
             const rawReply2 = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { preferAccurate: true });
             const parsed2 = parseVisionJSON(rawReply2);
             const students2 = sanitizeRecordStudents(parsed2 && parsed2.students, rosterSet);
-            students = mergeRecordConsensus(students, students2, targetField);
+            students = mergeRecordConsensus(students, students2, targetFields);
             const notes2 = String((parsed2 && parsed2.notes) || '').trim();
             if (notes2 && notes.indexOf(notes2) === -1) {
                 notes = (notes ? notes + ' | ' : '') + notes2;
@@ -803,14 +847,21 @@ module.exports = async (req, res) => {
 };
 
 /**
- * Merge two independent extractions of the same single-field record photo.
- * Same score both passes → boost confidence to 0.95 (strong agreement).
- * Different scores  → keep pass-1's score, drop confidence to 0.35 so the
- *                     review UI flags it for the facilitator to verify.
- * Only in one pass  → keep it with the reported confidence, floor at 0.5
- *                     (moderate — one witness).
+ * Merge two independent extractions of the same record photo across one OR
+ * more chosen fields. Per student, per field:
+ *   - both passes present + equal   → keep the value.
+ *   - both present but different     → keep pass-1's value, mark field as
+ *                                      "disagreed".
+ *   - only one pass has the value    → keep it.
+ * Per-student confidence (the review UI flags on this):
+ *   - any field disagreed            → 0.35 (needs check).
+ *   - every shared field agreed      → 0.95 (strong).
+ *   - otherwise (single-witness)     → floor 0.55 (moderate).
+ * targetFields may be an array (multi) or a single string (back-compat).
  */
-function mergeRecordConsensus(a, b, targetField) {
+function mergeRecordConsensus(a, b, targetFields) {
+    const fields = (Array.isArray(targetFields) ? targetFields : [targetFields])
+        .filter(f => RECORD_FIELD_SET.has(f));
     const byName = new Map();
     a.forEach(s => byName.set(s.name, { a: s, b: null }));
     b.forEach(s => {
@@ -821,30 +872,41 @@ function mergeRecordConsensus(a, b, targetField) {
     for (const [name, pair] of byName) {
         const sa = pair.a;
         const sb = pair.b;
-        if (sa && sb) {
-            const va = sa.scores && sa.scores[targetField];
-            const vb = sb.scores && sb.scores[targetField];
+        if (!sa && !sb) continue;
+        if (sa && !sb) { out.push(sa); continue; }
+        if (!sa && sb) { out.push(sb); continue; }
+
+        // Both passes saw this student — reconcile each field.
+        const scoresA = (sa.scores && typeof sa.scores === 'object') ? sa.scores : {};
+        const scoresB = (sb.scores && typeof sb.scores === 'object') ? sb.scores : {};
+        const mergedScores = {};
+        let anyDisagree = false;
+        let anyShared = false;
+        let anySingle = false;
+        // Consider every field the caller cares about, plus any the model
+        // returned (defensive) — but only keep known fields.
+        const allFields = fields.length ? fields
+            : Array.from(new Set([...Object.keys(scoresA), ...Object.keys(scoresB)])).filter(f => RECORD_FIELD_SET.has(f));
+        for (const f of allFields) {
+            const va = scoresA[f], vb = scoresB[f];
             const av = (va !== undefined && va !== null);
             const bv = (vb !== undefined && vb !== null);
             if (av && bv) {
-                if (Number(va) === Number(vb)) {
-                    // Strong agreement.
-                    out.push({ name, scores: { [targetField]: Number(va) }, confidence: 0.95 });
-                } else {
-                    // Disagreement — flag it. Keep pass 1's value as the
-                    // starting point (facilitator will verify anyway).
-                    out.push({ name, scores: { [targetField]: Number(va) }, confidence: 0.35 });
-                }
+                anyShared = true;
+                mergedScores[f] = Number(va);
+                if (Number(va) !== Number(vb)) anyDisagree = true;
             } else if (av) {
-                out.push({ name, scores: { [targetField]: Number(va) }, confidence: Math.max(0.5, Number(sa.confidence) || 0.5) });
+                mergedScores[f] = Number(va); anySingle = true;
             } else if (bv) {
-                out.push({ name, scores: { [targetField]: Number(vb) }, confidence: Math.max(0.5, Number(sb.confidence) || 0.5) });
+                mergedScores[f] = Number(vb); anySingle = true;
             }
-        } else if (sa) {
-            out.push(sa);
-        } else if (sb) {
-            out.push(sb);
         }
+        if (Object.keys(mergedScores).length === 0) continue;
+        let confidence;
+        if (anyDisagree) confidence = 0.35;
+        else if (anyShared) confidence = 0.95;
+        else confidence = Math.max(0.55, Number(sa.confidence) || 0.55);   // single-witness only
+        out.push({ name, scores: mergedScores, confidence });
     }
     return out;
 }

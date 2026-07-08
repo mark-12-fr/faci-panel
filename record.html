@@ -467,6 +467,65 @@
         }
         .source-tile .tile-label { font-weight: 800; color: var(--text-main); font-size: 0.95rem; }
         .source-tile .tile-sub   { font-size: 0.7rem; color: var(--text-sub); text-align: center; }
+
+        /* Field picker: grouped, multi-select tiles. */
+        .fp-section-title {
+            font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px;
+            text-transform: uppercase; color: var(--text-sub);
+            margin: 14px 2px 8px;
+        }
+        .fp-section-title:first-child { margin-top: 4px; }
+        .fp-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 7px;
+        }
+        .fp-tile {
+            position: relative;
+            padding: 11px 6px; border: 1.5px solid #e2e8f0; background: #f8fafc;
+            border-radius: 9px; font-family: 'Inter','Segoe UI',sans-serif;
+            font-size: 0.8rem; font-weight: 800; color: var(--text-main);
+            cursor: pointer; text-align: center; transition: 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fp-tile:active { transform: scale(0.94); }
+        .fp-tile.selected {
+            background: var(--accent-blue); color: #fff; border-color: var(--accent-blue);
+            box-shadow: 0 4px 10px -3px rgba(59,130,246,0.5);
+        }
+        .fp-tile.selected::after {
+            content: '\f00c'; /* fa check */
+            font-family: 'Font Awesome 6 Free'; font-weight: 900;
+            position: absolute; top: -6px; right: -5px;
+            background: #16a34a; color: #fff; font-size: 0.55rem;
+            width: 15px; height: 15px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .fp-auto-btn {
+            width: 100%; padding: 13px; border: 2px dashed var(--accent-blue);
+            background: #eff6ff; border-radius: 10px; color: var(--accent-blue);
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.85rem; font-weight: 800;
+            cursor: pointer; text-align: center; margin-bottom: 4px;
+        }
+        .fp-auto-btn:active { transform: scale(0.98); }
+        .fp-or {
+            text-align: center; font-size: 0.72rem; color: var(--text-sub);
+            font-weight: 700; margin: 12px 0 2px; position: relative;
+        }
+        .fp-continue-bar {
+            display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px;
+            padding: 12px 16px; border-top: 1px solid #f1f5f9;
+        }
+        .fp-continue-bar .fp-clear {
+            padding: 12px 16px; border-radius: 10px; border: none; cursor: pointer;
+            background: #f1f5f9; color: var(--text-sub);
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.9rem; font-weight: 800;
+        }
+        .fp-continue-bar .fp-continue {
+            padding: 12px 16px; border-radius: 10px; border: none; cursor: pointer;
+            background: var(--accent-blue); color: #fff;
+            font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.9rem; font-weight: 800;
+        }
+        .fp-continue-bar .fp-continue:disabled { background: #94a3b8; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -527,15 +586,25 @@
         <div class="review-box">
             <div class="review-handle"></div>
             <div class="review-head">
-                <h3>What field is this photo for?</h3>
+                <h3>Which column(s) is this photo for?</h3>
                 <button class="review-close" onclick="closeFieldPicker()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="review-body">
-                <div style="font-size:0.85rem;color:var(--text-sub);margin-bottom:12px;">
-                    Pick the exact column you photographed. The AI will only read that column's
-                    scores — much more accurate than auto-detecting headers.
+                <div style="font-size:0.82rem;color:var(--text-sub);margin-bottom:10px;">
+                    Tap one or more columns your photo shows (e.g. Module 1 &amp; 2), then Continue.
+                    Selecting the exact columns is far more accurate than auto-detect.
                 </div>
-                <div id="fieldPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;"></div>
+                <button type="button" class="fp-auto-btn" onclick="chooseAutoDetect()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detect from column headers
+                </button>
+                <div class="fp-or">— or pick specific columns —</div>
+                <div id="fieldPickerGrid"></div>
+            </div>
+            <div class="fp-continue-bar">
+                <button type="button" class="fp-clear" onclick="clearFieldSelection()">Clear</button>
+                <button type="button" class="fp-continue" id="fpContinueBtn" disabled onclick="confirmFieldSelection()">
+                    Continue
+                </button>
             </div>
         </div>
     </div>
@@ -1138,41 +1207,79 @@
         // Target field the facilitator picked in the field-picker modal. Passed
         // to the /api/vision-analyze call so the AI knows which single column
         // to read. Null / '' → auto-detect from column headers (fallback).
-        let _recTargetField = null;
+        // Fields the facilitator chose for the NEXT photo. Empty array = auto-
+        // detect from column headers. May contain one or many field keys.
+        let _recTargetFields = [];
+        // Working selection while the field-picker modal is open (a Set of
+        // field keys), committed to _recTargetFields on "Continue".
+        let _recSelectedFields = new Set();
 
         function triggerRecordPhoto() {
             openFieldPicker();
         }
 
+        // Build one group section (title + tiles) for the field picker.
+        function _fpGroup(title, entries) {
+            const tiles = entries.map(([field, label]) =>
+                `<button type="button" class="fp-tile" data-field="${field}"
+                    onclick="toggleFieldTile('${field}', this)">${label}</button>`).join('');
+            return `<div class="fp-section-title">${title}</div><div class="fp-grid">${tiles}</div>`;
+        }
+
         function openFieldPicker() {
+            _recSelectedFields = new Set();
             const gridEl = document.getElementById('fieldPickerGrid');
-            const tiles = [];
-            const tile = (field, label) =>
-                `<button type="button" onclick="pickFieldAndOpenCamera('${field}')"
-                    style="padding:10px 6px;border:1px solid #e2e8f0;background:#f8fafc;
-                           border-radius:8px;font-family:'Inter',sans-serif;font-size:0.78rem;
-                           font-weight:800;color:var(--text-main);cursor:pointer;
-                           text-align:center;transition:0.15s;"
-                    onmouseover="this.style.background='#eff6ff';this.style.borderColor='var(--accent-blue)'"
-                    onmouseout="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0'"
-                    >${label}</button>`;
-            // Auto-detect (spans full width)
-            tiles.push(
-                `<button type="button" onclick="pickFieldAndOpenCamera('')"
-                    style="grid-column:1 / -1;padding:12px;border:2px solid var(--accent-blue);
-                           background:#eff6ff;border-radius:8px;color:var(--accent-blue);
-                           font-family:'Inter',sans-serif;font-size:0.85rem;font-weight:800;
-                           cursor:pointer;text-align:center;margin-bottom:6px;">
-                    Auto-detect from column headers
-                </button>`);
-            for (let i = 1; i <= 25; i++) tiles.push(tile('module_' + i, 'M' + i));
-            for (let i = 1; i <= 10; i++) tiles.push(tile('activity_' + i, 'A' + i));
-            tiles.push(tile('at',   'AT'));
-            tiles.push(tile('pt_1', 'PT 1'));
-            tiles.push(tile('pt_2', 'PT 2'));
-            tiles.push(tile('qe',   'QE'));
-            gridEl.innerHTML = tiles.join('');
+            const modules = [];
+            for (let i = 1; i <= 25; i++) modules.push(['module_' + i, 'M' + i]);
+            const activities = [];
+            for (let i = 1; i <= 10; i++) activities.push(['activity_' + i, 'A' + i]);
+            const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
+            gridEl.innerHTML =
+                _fpGroup('Modules', modules) +
+                _fpGroup('Activities', activities) +
+                _fpGroup('Other', others);
+            _updateFpContinue();
             document.getElementById('fieldPickerOverlay').classList.add('show');
+        }
+
+        function toggleFieldTile(field, btn) {
+            if (_recSelectedFields.has(field)) {
+                _recSelectedFields.delete(field);
+                btn.classList.remove('selected');
+            } else {
+                _recSelectedFields.add(field);
+                btn.classList.add('selected');
+            }
+            _updateFpContinue();
+        }
+
+        function _updateFpContinue() {
+            const btn = document.getElementById('fpContinueBtn');
+            if (!btn) return;
+            const n = _recSelectedFields.size;
+            btn.disabled = n === 0;
+            btn.textContent = n === 0 ? 'Continue' : ('Continue (' + n + ' selected)');
+        }
+
+        function clearFieldSelection() {
+            _recSelectedFields.clear();
+            document.querySelectorAll('#fieldPickerGrid .fp-tile.selected')
+                .forEach(el => el.classList.remove('selected'));
+            _updateFpContinue();
+        }
+
+        function confirmFieldSelection() {
+            if (_recSelectedFields.size === 0) return;
+            // Preserve the canonical record-field order for consistent display.
+            _recTargetFields = REC_FIELDS.filter(f => _recSelectedFields.has(f));
+            closeFieldPicker();
+            setTimeout(openSourcePicker, 80);
+        }
+
+        function chooseAutoDetect() {
+            _recTargetFields = [];   // empty = auto-detect
+            closeFieldPicker();
+            setTimeout(openSourcePicker, 80);
         }
 
         function closeFieldPicker() {
@@ -1183,23 +1290,18 @@
             if (ev.target && ev.target.id === 'fieldPickerOverlay') closeFieldPicker();
         }
 
-        function pickFieldAndOpenCamera(field) {
-            _recTargetField = field || null;   // '' from auto-detect → null
-            closeFieldPicker();
-            // Second step: ask whether the photo should come from the camera
-            // or the gallery, then trigger the matching hidden input.
-            setTimeout(openSourcePicker, 80);
+        // Friendly summary of the chosen fields (or auto-detect).
+        function _recTargetSummary() {
+            if (!_recTargetFields.length) return 'Auto-detect fields from column headers';
+            return 'Target field' + (_recTargetFields.length === 1 ? '' : 's') + ': ' +
+                _recTargetFields.map(REC_FIELD_LABEL).join(', ');
         }
 
         function openSourcePicker() {
-            // Show the target field so the facilitator can sanity-check they
-            // picked the right column before the OS's picker takes over.
+            // Show the chosen field(s) so the facilitator can sanity-check
+            // before the OS's picker takes over.
             const labelEl = document.getElementById('sourcePickerFieldLabel');
-            if (labelEl) {
-                labelEl.textContent = _recTargetField
-                    ? ('Target field: ' + REC_FIELD_LABEL(_recTargetField))
-                    : 'Auto-detect fields from column headers';
-            }
+            if (labelEl) labelEl.textContent = _recTargetSummary();
             document.getElementById('sourcePickerOverlay').classList.add('show');
         }
 
@@ -1361,7 +1463,9 @@
                         imageBase64: base64,
                         mimeType: mimeType,
                         roster: roster,
-                        targetField: _recTargetField || ''
+                        targetFields: _recTargetFields,
+                        // Back-compat: single-field key when exactly one chosen.
+                        targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : ''
                     })
                 });
                 let payload;
@@ -1401,12 +1505,13 @@
             thumbEl.src = thumbDataUrl || '';
 
             let noteHtml = '';
-            // Prominently show the field the facilitator picked so a wrong
+            // Prominently show the field(s) the facilitator picked so a wrong
             // choice ("I meant PT 2, not PT 1") is obvious BEFORE they Apply.
-            if (_recTargetField) {
+            if (_recTargetFields.length) {
                 noteHtml += '<div style="color:var(--accent-blue);font-weight:800;margin-bottom:4px;">' +
-                    '<i class="fa-solid fa-bullseye"></i> Target field: ' +
-                    escapeReviewText(REC_FIELD_LABEL(_recTargetField)) + '</div>';
+                    '<i class="fa-solid fa-bullseye"></i> Target field' +
+                    (_recTargetFields.length === 1 ? '' : 's') + ': ' +
+                    escapeReviewText(_recTargetFields.map(REC_FIELD_LABEL).join(', ')) + '</div>';
             } else {
                 noteHtml += '<div style="color:var(--text-sub);margin-bottom:4px;">' +
                     '<i class="fa-solid fa-magnifying-glass"></i> Auto-detected fields from column headers.</div>';
