@@ -260,10 +260,6 @@
             margin: -6px 0 12px; padding: 0 6px;
         }
         /* Analyzing overlay — professional */
-        @keyframes profSpin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         @keyframes profFade {
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
@@ -276,16 +272,10 @@
         }
         .analyze-overlay.show { display: flex; }
         .analyze-box {
-            background: #fff; border-radius: 16px; padding: 36px 44px;
-            display: flex; flex-direction: column; align-items: center; gap: 16px;
+            background: #fff; border-radius: 16px; padding: 32px 36px;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-            min-width: 300px; max-width: 380px;
-        }
-        .analyze-ring {
-            width: 52px; height: 52px; border-radius: 50%;
-            border: 3px solid #e2e8f0;
-            border-top-color: #3b82f6;
-            animation: profSpin 0.8s linear infinite;
+            min-width: 300px; max-width: 360px;
         }
         .analyze-box p {
             font-size: 1rem; color: #1e293b; font-weight: 700; margin: 0;
@@ -296,13 +286,25 @@
             margin: 0;
         }
         .analyze-track {
-            width: 100%; height: 4px; background: #f1f5f9; border-radius: 2px;
+            width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px;
             overflow: hidden;
         }
         .analyze-track-bar {
-            height: 100%; background: #3b82f6; border-radius: 2px;
+            height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            border-radius: 3px;
             width: 0%;
             transition: width 0.35s ease;
+        }
+        .analyze-pct {
+            font-size: 0.85rem; font-weight: 700; color: #3b82f6; margin: 0;
+        }
+        .analyze-cancel-btn {
+            background: transparent; border: 1px solid #e2e8f0; color: #64748b;
+            padding: 8px 24px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; margin-top: 4px;
+        }
+        .analyze-cancel-btn:hover {
+            background: #f1f5f9; border-color: #94a3b8; color: #1e293b;
         }
         /* Review modal (record) */
         .review-overlay {
@@ -628,10 +630,11 @@
     <!-- Analyzing overlay -->
     <div id="analyzeOverlay" class="analyze-overlay">
         <div class="analyze-box">
-            <div class="analyze-ring"></div>
-            <p id="analyzeTitle">Analyzing photo...</p>
+            <p id="analyzeTitle">Analyzing, please wait...</p>
             <small id="analyzeSub">Reading scores from the grade book</small>
-            <div class="analyze-track"><div class="analyze-track-bar"></div></div>
+            <div class="analyze-track"><div class="analyze-track-bar" id="analyzeTrackBar"></div></div>
+            <span class="analyze-pct" id="analyzePct">0%</span>
+            <button class="analyze-cancel-btn" id="analyzeCancelBtn" onclick="cancelAnalyze()">Cancel</button>
         </div>
     </div>
 
@@ -1268,17 +1271,24 @@
 
         let _analyzeProgressRAF = null;
         let _analyzeStartTime = 0;
+        let _analyzeAbort = null;
+        let _analyzeIsCancelled = false;
         const _ANALYZE_TARGET_PCT = 85;
 
         function _startAnalyzeProgress() {
             _analyzeStartTime = Date.now();
-            const bar = document.querySelector('.analyze-track-bar');
+            _analyzeIsCancelled = false;
+            _analyzeAbort = new AbortController();
+            const bar = document.getElementById('analyzeTrackBar');
+            const pctEl = document.getElementById('analyzePct');
             if (!bar) return;
             bar.style.width = '0%';
+            if (pctEl) pctEl.textContent = '0%';
             function tick() {
                 const elapsed = Date.now() - _analyzeStartTime;
                 const pct = Math.min(_ANALYZE_TARGET_PCT, (elapsed / 30000) * _ANALYZE_TARGET_PCT);
                 bar.style.width = pct + '%';
+                if (pctEl) pctEl.textContent = Math.round(pct) + '%';
                 if (pct < _ANALYZE_TARGET_PCT) {
                     _analyzeProgressRAF = requestAnimationFrame(tick);
                 }
@@ -1291,8 +1301,10 @@
                 cancelAnimationFrame(_analyzeProgressRAF);
                 _analyzeProgressRAF = null;
             }
-            const bar = document.querySelector('.analyze-track-bar');
+            const bar = document.getElementById('analyzeTrackBar');
+            const pctEl = document.getElementById('analyzePct');
             if (bar) bar.style.width = '100%';
+            if (pctEl) pctEl.textContent = '100%';
         }
 
         function _resetAnalyzeProgress() {
@@ -1300,8 +1312,21 @@
                 cancelAnimationFrame(_analyzeProgressRAF);
                 _analyzeProgressRAF = null;
             }
-            const bar = document.querySelector('.analyze-track-bar');
+            _analyzeAbort = null;
+            const bar = document.getElementById('analyzeTrackBar');
+            const pctEl = document.getElementById('analyzePct');
             if (bar) bar.style.width = '0%';
+            if (pctEl) pctEl.textContent = '0%';
+        }
+
+        function cancelAnalyze() {
+            _analyzeIsCancelled = true;
+            if (_analyzeAbort) {
+                _analyzeAbort.abort();
+            }
+            const overlay = document.getElementById('analyzeOverlay');
+            overlay.classList.remove('show');
+            _resetAnalyzeProgress();
         }
 
         async function handleRecordPhotoPicked(event) {
@@ -1326,9 +1351,12 @@
             try {
                 const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
 
+                if (_analyzeIsCancelled) return;
+
                 const resp = await fetch('/api/vision-analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: _analyzeAbort ? _analyzeAbort.signal : null,
                     body: JSON.stringify({
                         type: 'record',
                         imageBase64: base64,
@@ -1348,6 +1376,7 @@
                 await new Promise(r => setTimeout(r, 400));
                 openRecordReviewModal(payload, thumbDataUrl);
             } catch (err) {
+                if (err?.name === 'AbortError') return;
                 console.error('Record photo analyze error:', err);
                 showAlert('Could not analyze photo', String((err && err.message) || err) || 'Please try another photo.', '#ef4444');
             } finally {
