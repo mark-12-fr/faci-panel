@@ -268,10 +268,7 @@
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
         }
-        @keyframes profIndeterminate {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(400%); }
-        }
+
         .analyze-overlay {
             position: fixed; inset: 0; z-index: 2900;
             background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px);
@@ -304,13 +301,8 @@
         }
         .analyze-track-bar {
             height: 100%; background: #3b82f6; border-radius: 2px;
-            width: 35%;
-            animation: profIndeterminate 1.4s ease-in-out infinite;
-            transition: width 0.4s ease;
-        }
-        .analyze-track-bar.done {
-            width: 100%;
-            animation: none;
+            width: 0%;
+            transition: width 0.35s ease;
         }
         /* Review modal (record) */
         .review-overlay {
@@ -1274,15 +1266,42 @@
                 .filter(Boolean);
         }
 
-        let _analyzeBarDone = null;
+        let _analyzeProgressRAF = null;
+        let _analyzeStartTime = 0;
+        const _ANALYZE_TARGET_PCT = 85;
 
-        function _setAnalyzeBarDone() {
+        function _startAnalyzeProgress() {
+            _analyzeStartTime = Date.now();
             const bar = document.querySelector('.analyze-track-bar');
-            if (bar) {
-                bar.classList.remove('done');
-                void bar.offsetWidth;
-                bar.classList.add('done');
+            if (!bar) return;
+            bar.style.width = '0%';
+            function tick() {
+                const elapsed = Date.now() - _analyzeStartTime;
+                const pct = Math.min(_ANALYZE_TARGET_PCT, (elapsed / 30000) * _ANALYZE_TARGET_PCT);
+                bar.style.width = pct + '%';
+                if (pct < _ANALYZE_TARGET_PCT) {
+                    _analyzeProgressRAF = requestAnimationFrame(tick);
+                }
             }
+            _analyzeProgressRAF = requestAnimationFrame(tick);
+        }
+
+        function _finishAnalyzeProgress() {
+            if (_analyzeProgressRAF) {
+                cancelAnimationFrame(_analyzeProgressRAF);
+                _analyzeProgressRAF = null;
+            }
+            const bar = document.querySelector('.analyze-track-bar');
+            if (bar) bar.style.width = '100%';
+        }
+
+        function _resetAnalyzeProgress() {
+            if (_analyzeProgressRAF) {
+                cancelAnimationFrame(_analyzeProgressRAF);
+                _analyzeProgressRAF = null;
+            }
+            const bar = document.querySelector('.analyze-track-bar');
+            if (bar) bar.style.width = '0%';
         }
 
         async function handleRecordPhotoPicked(event) {
@@ -1303,6 +1322,7 @@
 
             const overlay = document.getElementById('analyzeOverlay');
             overlay.classList.add('show');
+            _startAnalyzeProgress();
             try {
                 const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
 
@@ -1324,16 +1344,15 @@
                     const upstream = payload && payload.upstream ? ('\n\nDetail: ' + payload.upstream) : '';
                     throw new Error(baseMsg + upstream);
                 }
-                _setAnalyzeBarDone();
-                await new Promise(r => setTimeout(r, 500));
+                _finishAnalyzeProgress();
+                await new Promise(r => setTimeout(r, 400));
                 openRecordReviewModal(payload, thumbDataUrl);
             } catch (err) {
                 console.error('Record photo analyze error:', err);
                 showAlert('Could not analyze photo', String((err && err.message) || err) || 'Please try another photo.', '#ef4444');
             } finally {
                 overlay.classList.remove('show');
-                const bar = document.querySelector('.analyze-track-bar');
-                if (bar) bar.classList.remove('done');
+                _resetAnalyzeProgress();
             }
         }
 
