@@ -98,16 +98,13 @@
         .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
 
         /* --- STUDENT CARDS --- */
-        .gender-divider { font-size: 0.75rem; font-weight: 800; color: var(--text-sub); margin: 15px 0 10px 5px; }
         .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; transition: all 0.3s ease; }
         .student-card:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
         
         .student-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .student-name h4 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; }
         .student-name p { font-size: 0.75rem; color: var(--text-sub); }
-        .gender-tag { font-size: 0.7rem; color: var(--accent-blue); background: #eff6ff; padding: 2px 8px; border-radius: 5px; font-weight: bold; height: fit-content; }
-        .fem-gen-tag { font-size: 0.7rem; color: var(--accent-pink); background: #fdf4ff; padding: 2px 8px; border-radius: 5px; font-weight: bold; height: fit-content; }
-        
+
         .attendance-options { display: flex; gap: 8px; flex-wrap: wrap; }
         .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: all 0.2s; }
         .opt-btn:active { transform: scale(0.95); }
@@ -457,25 +454,12 @@
                 const isLocked = isAlreadySubmitted || isPastDate;
 
                 let html = '';
-                const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
-                const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
-                
-                let globalIndex = 0; // For cascading delay
+                let globalIndex = 0;
 
-                if(males.length > 0) {
-                    html += `<div class="gender-divider fade-in-up" style="animation-delay: 0.1s;">👶 MALE</div>`;
-                    males.forEach((s) => { 
-                        html += generateStudentCard(s, globalIndex + 1, 'Male', attendanceData, isLocked, globalIndex); 
-                        globalIndex++;
-                    });
-                }
-                if(females.length > 0) {
-                    html += `<div class="gender-divider fade-in-up" style="animation-delay: ${Math.min(0.1 + (globalIndex*0.03), 0.5)}s;">💆‍♀️ FEMALE</div>`;
-                    females.forEach((s) => { 
-                        html += generateStudentCard(s, globalIndex + 1, 'Female', attendanceData, isLocked, globalIndex); 
-                        globalIndex++;
-                    });
-                }
+                students.forEach((s) => { 
+                    html += generateStudentCard(s, globalIndex + 1, attendanceData, isLocked, globalIndex); 
+                    globalIndex++;
+                });
                 
                 container.innerHTML = html;
                 attachButtonListeners();
@@ -504,10 +488,9 @@
         }
 
         // Added inline animation delay for cascading card entry effect
-        function generateStudentCard(student, index, gender, attendanceData, isLocked, globalIndex) {
+        function generateStudentCard(student, index, attendanceData, isLocked, globalIndex) {
             const num = index.toString().padStart(2, '0');
-            const tagClass = gender === 'Male' ? 'gender-tag' : 'fem-gen-tag';
-            const delay = Math.min(0.1 + (globalIndex * 0.04), 0.6); // Stagger up to 0.6 seconds
+            const delay = Math.min(0.1 + (globalIndex * 0.04), 0.6);
 
             const record = attendanceData ? attendanceData.find(a => (student.id_no && a.student_id_no === student.id_no) || a.student_name === student.full_name) : null;
             
@@ -532,7 +515,6 @@
                         <h4 class="s-name"><span style="color: var(--accent-blue); opacity: 0.5;">${num}</span> ${student.full_name}</h4>
                         <p class="s-id">${student.id_no || ''}</p>
                     </div>
-                    <span class="${tagClass}">${gender}</span>
                 </div>
                 <div class="attendance-options">
                     <button class="opt-btn present ${preP}" ${disabledBtnAttr}>Present</button>

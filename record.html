@@ -123,8 +123,7 @@
         .td-sticky-1 { position: sticky; left: 0; background: white; z-index: 5; width: 32px; }
         .td-sticky-2 { position: sticky; left: 32px; background: white; z-index: 5; text-align: left; padding-left: 8px; width: 108px; max-width: 108px; white-space: normal; line-height: 1.2; }
 
-        .gender-row td { background: #e2e8f0; font-weight: 800; font-size: 0.7rem; color: var(--accent-blue); text-align: left; padding: 10px 20px;}
-        .gender-row .td-sticky-1, .gender-row .td-sticky-2 { background: #e2e8f0; }
+
 
         .score-input {
             width: 64px; text-align: center; border: 1px solid transparent; background: transparent;
@@ -833,18 +832,8 @@
                     return;
                 }
 
-                const males = students.filter(s => s.gender === 'Male' || s.gender === 'M');
-                const females = students.filter(s => s.gender === 'Female' || s.gender === 'F');
                 let rowCount = 1;
-
-                if (males.length > 0) {
-                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2"><i class="fa-solid fa-mars"></i> MALE</td><td colspan="39"></td></tr>`;
-                    males.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
-                }
-                if (females.length > 0) {
-                    tbody.innerHTML += `<tr class="gender-row"><td class="td-sticky-1"></td><td class="td-sticky-2" style="color: #ec4899;"><i class="fa-solid fa-venus"></i> FEMALE</td><td colspan="39"></td></tr>`;
-                    females.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
-                }
+                students.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
 
                 const submitBtn = document.getElementById('submitBtn');
                 submitBtn.style.background = 'var(--accent-blue)';
