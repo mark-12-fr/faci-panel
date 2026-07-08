@@ -123,39 +123,77 @@ function buildRecordPrompt(roster, targetField) {
         // student names -- much easier for the vision model than parsing
         // arbitrary column headers.
         return (
-            "You are analyzing a photo of a classroom RECORD / GRADE BOOK from a school in the " +
-            "Philippines. The facilitator has told you that this photo contains scores for ONE " +
-            "specific field: " + targetLabel + " (field key: \"" + targetField + "\").\n\n" +
-            "YOUR JOB: for each student on the ROSTER below, find their row in the photo and read " +
-            "the HANDWRITTEN NUMBER in the " + targetLabel + " column cell for that row. Put that " +
-            "number into scores[\"" + targetField + "\"] for that student. Do NOT read any other column.\n\n" +
-            "CRITICAL — DO NOT HALLUCINATE OR HOMOGENIZE (very common vision-LLM failure):\n" +
-            "  ★ Each student has a DIFFERENT score. Do NOT return the same number for every row.\n" +
-            "  ★ Look at each cell INDIVIDUALLY, row by row, top to bottom. Move your attention " +
-            "down one row at a time.\n" +
-            "  ★ The column HEADER may itself be a number (e.g. '1', '2', '10'). That is the column " +
-            "LABEL, NOT a score. Read the number WRITTEN INSIDE each student's row cell.\n" +
-            "  ★ If a cell looks like '8' or '9' or '15', DO NOT round it to '10' just because '10' " +
-            "is the common value. Read the actual digit(s) written.\n" +
-            "  ★ A '10' and an '8' look DIFFERENT (10 has two digits, 8 has one). A '15' and '10' " +
-            "look DIFFERENT (5 vs 0 as the second digit). Read carefully.\n\n" +
-            "SCORE READING RULES:\n" +
-            "  • Blank / empty / unreadable cell → OMIT scores[\"" + targetField + "\"] for that " +
-            "student entirely (do NOT guess 0).\n" +
-            "  • Numbers must be non-negative and at most 200. Decimals allowed but rare.\n" +
-            "  • If a cell has clear handwriting, use confidence 0.9+. If digits are hard to tell " +
-            "apart, lower confidence to 0.4-0.6 so the facilitator can double-check.\n\n" +
-            "MATCHING RULES:\n" +
-            "  • The ROSTER below is the ground truth. Match each photo row to the closest roster " +
-            "name (tolerate OCR errors: missing accents, wrong middle initial, transposed letters).\n" +
-            "  • Never invent students not on the roster. Names must match the roster string EXACTLY.\n\n" +
-            "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences:\n" +
+            "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. " +
+            "The facilitator has told you this photo contains scores for ONE specific field: " +
+            targetLabel + " (field key: \"" + targetField + "\"). You must read every student's " +
+            "score in that ONE column with the care of a person double-checking their own work.\n\n" +
+
+            "═══ STEP-BY-STEP PROCEDURE (do NOT skip any step) ═══\n\n" +
+
+            "STEP 1 — LOCATE the " + targetLabel + " column. If the photo shows a table with a " +
+            "header row, identify the column labeled " + targetLabel + " (or its short form like " +
+            targetField.replace('_', ' ').toUpperCase() + "). Every score you extract must come " +
+            "from THIS column and no other.\n\n" +
+
+            "STEP 2 — For each student on the ROSTER below, find their row in the photo (the row " +
+            "whose Student Name matches the roster name). Then find the CELL that is on that row " +
+            "AND in the " + targetLabel + " column. That intersection is the cell you must read.\n\n" +
+
+            "STEP 3 — Before writing any number, count the DIGITS in the cell:\n" +
+            "  • 0 digits → the cell is BLANK. Do NOT write a score for this student.\n" +
+            "  • 1 digit  → single-digit number (0 through 9).\n" +
+            "  • 2 digits → two-digit number (10 through 99).\n" +
+            "  • 3 digits → three-digit number (100+; rare).\n" +
+            "\n" +
+            "  ★ '8' has ONE digit. '10' has TWO. '15' has TWO. These look DIFFERENT.\n" +
+            "  ★ Do NOT round '8' to '10' or '15' to '10' just because '10' is common.\n\n" +
+
+            "STEP 4 — For each digit you see, verify its SHAPE:\n" +
+            "  • 0: closed oval or circle, no straight lines through the middle.\n" +
+            "  • 1: a single vertical stroke (may have a tiny top serif or bottom flag).\n" +
+            "  • 2: curved top and a flat or diagonal bottom (like a 'z').\n" +
+            "  • 3: two right-facing bumps stacked (or open on the LEFT).\n" +
+            "  • 4: crossed lines forming a closed top, plus a vertical line down (open '4' also common).\n" +
+            "  • 5: flat horizontal top, then a downward stroke, then a bottom curve.\n" +
+            "  • 6: a downward curve that closes at the bottom into a loop.\n" +
+            "  • 7: a flat top with a diagonal stroke going down-left.\n" +
+            "  • 8: two closed loops stacked (top loop and bottom loop).\n" +
+            "  • 9: closed loop at the top and a straight or curved stroke down.\n\n" +
+
+            "STEP 5 — Sanity-check common confusions:\n" +
+            "  • '10' vs '8'  → 10 is TWO digits, 8 is ONE digit. If you see two clearly separate " +
+            "shapes in the cell, it's TWO digits.\n" +
+            "  • '15' vs '10' → the second digit is '5' (flat top + curve) NOT '0' (closed loop). " +
+            "Look at the second digit shape.\n" +
+            "  • '9'  vs '10' → 9 is ONE digit, 10 is TWO.\n" +
+            "  • '7'  vs '1'  → 7 has a flat top-bar and a diagonal; 1 is a single vertical.\n" +
+            "  • '0'  vs '6'  → 0 is a plain closed oval; 6 has a loop at the bottom only.\n\n" +
+
+            "STEP 6 — CONFIDENCE. Assign confidence honestly:\n" +
+            "  • 0.9+  → the digits are unambiguous and clearly written.\n" +
+            "  • 0.7   → readable but with minor ambiguity you had to reason about.\n" +
+            "  • 0.4-0.6 → you're not sure between two possibilities (e.g. '8' vs '3'). Flag it.\n" +
+            "  • 0.2   → almost illegible / smudged / could be anything.\n\n" +
+
+            "═══ DO-NOT LIST ═══\n" +
+            "  ✗ Do NOT default a whole column to the same value. Each student's cell is INDEPENDENT.\n" +
+            "  ✗ Do NOT copy the COLUMN HEADER as a score (headers may be numbers like '1', '10').\n" +
+            "  ✗ Do NOT guess when you can't see clearly — return LOW confidence instead.\n" +
+            "  ✗ Do NOT invent students not on the roster.\n" +
+            "  ✗ Do NOT skip blank cells — just omit scores[\"" + targetField + "\"] for that student.\n\n" +
+
+            "═══ OUTPUT ═══\n" +
+            "Reply with STRICT JSON ONLY (no prose, no markdown, no code fences):\n" +
             "{\n" +
             '  "students": [ { "name": "<exact roster name>", "scores": { "' + targetField +
                 '": <number> }, "confidence": <0..1> } ],\n' +
             '  "unmatched": [ "<name text seen in photo>" ],\n' +
             '  "notes": "<optional one-line observation, e.g. photo blur>"\n' +
             "}\n\n" +
+
+            "Match student names in the photo to the ROSTER (ground truth). Tolerate small OCR " +
+            "errors in names, but names in `students[].name` MUST match the roster string EXACTLY.\n\n" +
+
             "ROSTER (match names to these exact strings):\n" +
             roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
         );
@@ -715,13 +753,89 @@ module.exports = async (req, res) => {
     }
 
     const rosterSet = new Set(roster);
-    const students = type === 'record'
+    let students = type === 'record'
         ? sanitizeRecordStudents(parsed && parsed.students, rosterSet)
         : sanitizeStudents(parsed && parsed.students, rosterSet);
-    const unmatched = Array.isArray(parsed && parsed.unmatched)
+    let unmatched = Array.isArray(parsed && parsed.unmatched)
         ? parsed.unmatched.map((n) => String(n || '').trim()).filter(Boolean).slice(0, 30)
         : [];
-    const notes = String((parsed && parsed.notes) || '').trim().slice(0, 240);
+    let notes = String((parsed && parsed.notes) || '').trim().slice(0, 240);
+
+    // ═══ TWO-PASS CONSENSUS ═══
+    // For single-field record extraction, run the model a SECOND time and
+    // compare per-student. Only high-confidence when both passes agree
+    // (that's the meaningful accuracy signal for handwritten OCR).
+    // Disagreements are surfaced as low confidence so the review UI's
+    // "double-check" flag actually corresponds to real uncertainty.
+    // We skip the second pass on attendance (P/A/L is trivial) and on
+    // auto-detect record mode (too many fields to align cleanly).
+    const doConsensus = type === 'record' && targetField && RECORD_FIELD_SET.has(targetField)
+        && geminiKey && students.length > 0;
+    if (doConsensus) {
+        try {
+            const rawReply2 = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { preferAccurate: true });
+            const parsed2 = parseVisionJSON(rawReply2);
+            const students2 = sanitizeRecordStudents(parsed2 && parsed2.students, rosterSet);
+            students = mergeRecordConsensus(students, students2, targetField);
+            const notes2 = String((parsed2 && parsed2.notes) || '').trim();
+            if (notes2 && notes.indexOf(notes2) === -1) {
+                notes = (notes ? notes + ' | ' : '') + notes2;
+                if (notes.length > 240) notes = notes.slice(0, 240);
+            }
+        } catch (e) {
+            // Consensus is best-effort. If the second pass fails (rate limit,
+            // network, parse error), fall back to the first pass silently -
+            // the review UI still shows the first pass's confidences.
+            console.error('Consensus second-pass error (falling back to single pass):', (e && e.message) || e);
+        }
+    }
 
     res.status(200).json({ students, unmatched, notes });
 };
+
+/**
+ * Merge two independent extractions of the same single-field record photo.
+ * Same score both passes → boost confidence to 0.95 (strong agreement).
+ * Different scores  → keep pass-1's score, drop confidence to 0.35 so the
+ *                     review UI flags it for the facilitator to verify.
+ * Only in one pass  → keep it with the reported confidence, floor at 0.5
+ *                     (moderate — one witness).
+ */
+function mergeRecordConsensus(a, b, targetField) {
+    const byName = new Map();
+    a.forEach(s => byName.set(s.name, { a: s, b: null }));
+    b.forEach(s => {
+        if (byName.has(s.name)) byName.get(s.name).b = s;
+        else byName.set(s.name, { a: null, b: s });
+    });
+    const out = [];
+    for (const [name, pair] of byName) {
+        const sa = pair.a;
+        const sb = pair.b;
+        if (sa && sb) {
+            const va = sa.scores && sa.scores[targetField];
+            const vb = sb.scores && sb.scores[targetField];
+            const av = (va !== undefined && va !== null);
+            const bv = (vb !== undefined && vb !== null);
+            if (av && bv) {
+                if (Number(va) === Number(vb)) {
+                    // Strong agreement.
+                    out.push({ name, scores: { [targetField]: Number(va) }, confidence: 0.95 });
+                } else {
+                    // Disagreement — flag it. Keep pass 1's value as the
+                    // starting point (facilitator will verify anyway).
+                    out.push({ name, scores: { [targetField]: Number(va) }, confidence: 0.35 });
+                }
+            } else if (av) {
+                out.push({ name, scores: { [targetField]: Number(va) }, confidence: Math.max(0.5, Number(sa.confidence) || 0.5) });
+            } else if (bv) {
+                out.push({ name, scores: { [targetField]: Number(vb) }, confidence: Math.max(0.5, Number(sb.confidence) || 0.5) });
+            }
+        } else if (sa) {
+            out.push(sa);
+        } else if (sb) {
+            out.push(sb);
+        }
+    }
+    return out;
+}
