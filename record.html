@@ -259,21 +259,89 @@
             font-size: 0.72rem; color: var(--text-sub); text-align: center;
             margin: -6px 0 12px; padding: 0 6px;
         }
-        /* Analyzing overlay */
+        /* Analyzing overlay — fun edition */
+        @keyframes funBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            25% { transform: translateY(-12px) scale(1.05) rotate(-5deg); }
+            50% { transform: translateY(0) scale(1) rotate(0deg); }
+            75% { transform: translateY(-8px) scale(1.03) rotate(5deg); }
+        }
+        @keyframes funDance {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg) translateY(-5px); }
+            50% { transform: rotate(0deg) translateY(0); }
+            75% { transform: rotate(10deg) translateY(-5px); }
+            100% { transform: rotate(0deg); }
+        }
+        @keyframes progressPulse {
+            0% { width: 5%; }
+            50% { width: 85%; }
+            100% { width: 5%; }
+        }
+        @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0); }
+            50% { opacity: 1; transform: scale(1); }
+        }
         .analyze-overlay {
             position: fixed; inset: 0; z-index: 2900;
-            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(3px);
+            background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px);
             display: none; align-items: center; justify-content: center;
         }
         .analyze-overlay.show { display: flex; }
         .analyze-box {
-            background: #fff; border-radius: 16px; padding: 24px 30px;
-            display: flex; flex-direction: column; align-items: center; gap: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2); min-width: 240px;
+            background: linear-gradient(145deg, #ffffff, #f0f4ff);
+            border-radius: 24px; padding: 32px 36px;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2); min-width: 280px; max-width: 360px;
+            border: 2px solid rgba(59,130,246,0.15);
+            position: relative; overflow: hidden;
         }
-        .analyze-box i { font-size: 1.6rem; color: var(--accent-blue); }
-        .analyze-box p { font-size: 0.9rem; color: var(--text-main); font-weight: 700; }
-        .analyze-box small { font-size: 0.75rem; color: var(--text-sub); text-align: center; }
+        .analyze-box::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: conic-gradient(from 0deg, transparent, rgba(59,130,246,0.05), transparent, rgba(59,130,246,0.05), transparent);
+            animation: spin 6s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .analyze-emoji {
+            font-size: 3.2rem; line-height: 1;
+            animation: funBounce 1.4s ease-in-out infinite;
+            position: relative; z-index: 1;
+            filter: drop-shadow(0 4px 8px rgba(59,130,246,0.2));
+        }
+        .analyze-emoji-dance {
+            display: inline-block;
+            animation: funDance 0.8s ease-in-out infinite;
+        }
+        .analyze-box p {
+            font-size: 1rem; color: var(--text-main); font-weight: 800;
+            position: relative; z-index: 1; margin: 0;
+        }
+        .analyze-box small {
+            font-size: 0.78rem; color: var(--text-sub); text-align: center;
+            position: relative; z-index: 1; line-height: 1.4;
+        }
+        .analyze-progress {
+            width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px;
+            overflow: hidden; position: relative; z-index: 1; margin-top: 4px;
+        }
+        .analyze-progress-bar {
+            height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+            background-size: 200% 100%;
+            border-radius: 3px; animation: progressPulse 2.4s ease-in-out infinite;
+        }
+        .analyze-sparkles {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+            pointer-events: none; z-index: 0;
+        }
+        .analyze-sparkles span {
+            position: absolute; font-size: 0.8rem; animation: sparkle 1.5s ease-in-out infinite;
+        }
+        .analyze-sparkles span:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+        .analyze-sparkles span:nth-child(2) { top: 15%; right: 15%; animation-delay: 0.3s; }
+        .analyze-sparkles span:nth-child(3) { bottom: 20%; left: 20%; animation-delay: 0.6s; }
+        .analyze-sparkles span:nth-child(4) { bottom: 15%; right: 10%; animation-delay: 0.9s; }
+        .analyze-sparkles span:nth-child(5) { top: 40%; left: 5%; animation-delay: 0.4s; }
+        .analyze-sparkles span:nth-child(6) { top: 45%; right: 5%; animation-delay: 0.7s; }
         /* Review modal (record) */
         .review-overlay {
             position: fixed; inset: 0; z-index: 3000;
@@ -595,12 +663,16 @@
         <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
     </div>
 
-    <!-- Analyzing spinner shown while the record photo is uploaded/parsed. -->
+    <!-- Analyzing overlay — fun edition with bouncing emoji -->
     <div id="analyzeOverlay" class="analyze-overlay">
         <div class="analyze-box">
-            <i class="fa-solid fa-spinner fa-spin"></i>
-            <p>Analyzing record photo...</p>
-            <small>Reading each student's scores. This usually takes 10-25 seconds.</small>
+            <div class="analyze-sparkles">
+                <span>✨</span><span>⭐</span><span>🌟</span><span>✨</span><span>💫</span><span>⭐</span>
+            </div>
+            <div class="analyze-emoji" id="analyzeEmoji">🔍</div>
+            <p id="analyzeTitle">Reading the grade book...</p>
+            <small id="analyzeSub">Taking a peek at every student's scores ✨</small>
+            <div class="analyze-progress"><div class="analyze-progress-bar"></div></div>
         </div>
     </div>
 
@@ -1235,6 +1307,44 @@
                 .filter(Boolean);
         }
 
+        const _analyzeMessages = [
+            { emoji: '🔍', title: 'Hunting for scores...', sub: 'Squinting at tiny handwritten numbers 👀' },
+            { emoji: '🤓', title: 'Reading the grade book...', sub: 'Trying to tell 8 from 3, pray for me 🙏' },
+            { emoji: '🧐', title: 'Decoding digits...', sub: '"Is that a 5 or a 6?" — the AI, probably' },
+            { emoji: '📖', title: 'Flipping through pages...', sub: 'These students have so many scores! 📝' },
+            { emoji: '✨', title: 'Doing the math...', sub: 'Adding, subtracting, doing magic 🪄' },
+            { emoji: '🤖', title: 'AI brain is working...', sub: '*loading sounds* beep boop beep 🤖' },
+            { emoji: '🎯', title: 'Matching names to scores...', sub: 'Alisen? Got it. Amihan? Found you!' },
+            { emoji: '⚡', title: 'Almost there!', sub: 'Just double-checking everything...' },
+        ];
+
+        let _analyzeMessageInterval = null;
+
+        function _startAnalyzeMessages() {
+            const emojiEl = document.getElementById('analyzeEmoji');
+            const titleEl = document.getElementById('analyzeTitle');
+            const subEl = document.getElementById('analyzeSub');
+            let i = 0;
+            function showMsg(idx) {
+                const m = _analyzeMessages[idx % _analyzeMessages.length];
+                if (emojiEl) emojiEl.textContent = m.emoji;
+                if (titleEl) titleEl.textContent = m.title;
+                if (subEl) subEl.textContent = m.sub;
+            }
+            showMsg(0);
+            _analyzeMessageInterval = setInterval(() => {
+                i++;
+                showMsg(i);
+            }, 2500);
+        }
+
+        function _stopAnalyzeMessages() {
+            if (_analyzeMessageInterval) {
+                clearInterval(_analyzeMessageInterval);
+                _analyzeMessageInterval = null;
+            }
+        }
+
         async function handleRecordPhotoPicked(event) {
             const input = event.target;
             const file = (input.files || [])[0];
@@ -1253,6 +1363,7 @@
 
             const overlay = document.getElementById('analyzeOverlay');
             overlay.classList.add('show');
+            _startAnalyzeMessages();
             try {
                 const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
 
@@ -1280,6 +1391,7 @@
                 showAlert('Could not analyze photo', String((err && err.message) || err) || 'Please try another photo.', '#ef4444');
             } finally {
                 overlay.classList.remove('show');
+                _stopAnalyzeMessages();
             }
         }
 
