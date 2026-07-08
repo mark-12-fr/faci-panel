@@ -1042,7 +1042,12 @@
                 im.onerror = () => reject(new Error('Could not decode the image. Try another photo.'));
                 im.src = dataUrl;
             });
-            const side = 1800;
+            // Records need higher resolution than attendance: the scores are
+            // small handwritten digits (8 vs 10 vs 15) and a compressed image
+            // makes them almost impossible to distinguish. Push to 2400px on
+            // the long side + JPEG q=0.92; 4.5MB Vercel body limit still fits
+            // even for large photos.
+            const side = 2400;
             let w = img.naturalWidth || img.width;
             let h = img.naturalHeight || img.height;
             if (!w || !h) throw new Error('Empty image.');
@@ -1053,9 +1058,11 @@
             const canvas = document.createElement('canvas');
             canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
             ctx.drawImage(img, 0, 0, w, h);
-            const outDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const outDataUrl = canvas.toDataURL('image/jpeg', 0.92);
             const base64 = outDataUrl.split(',')[1] || '';
             return { base64, mimeType: 'image/jpeg', thumbDataUrl: outDataUrl };
         }

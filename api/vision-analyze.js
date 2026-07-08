@@ -127,14 +127,24 @@ function buildRecordPrompt(roster, targetField) {
             "Philippines. The facilitator has told you that this photo contains scores for ONE " +
             "specific field: " + targetLabel + " (field key: \"" + targetField + "\").\n\n" +
             "YOUR JOB: for each student on the ROSTER below, find their row in the photo and read " +
-            "the numeric score in the " + targetLabel + " column. Put that number into scores[\"" +
-            targetField + "\"] for that student. Do NOT read any other column.\n\n" +
+            "the HANDWRITTEN NUMBER in the " + targetLabel + " column cell for that row. Put that " +
+            "number into scores[\"" + targetField + "\"] for that student. Do NOT read any other column.\n\n" +
+            "CRITICAL — DO NOT HALLUCINATE OR HOMOGENIZE (very common vision-LLM failure):\n" +
+            "  ★ Each student has a DIFFERENT score. Do NOT return the same number for every row.\n" +
+            "  ★ Look at each cell INDIVIDUALLY, row by row, top to bottom. Move your attention " +
+            "down one row at a time.\n" +
+            "  ★ The column HEADER may itself be a number (e.g. '1', '2', '10'). That is the column " +
+            "LABEL, NOT a score. Read the number WRITTEN INSIDE each student's row cell.\n" +
+            "  ★ If a cell looks like '8' or '9' or '15', DO NOT round it to '10' just because '10' " +
+            "is the common value. Read the actual digit(s) written.\n" +
+            "  ★ A '10' and an '8' look DIFFERENT (10 has two digits, 8 has one). A '15' and '10' " +
+            "look DIFFERENT (5 vs 0 as the second digit). Read carefully.\n\n" +
             "SCORE READING RULES:\n" +
-            "  • Read the number in the " + targetLabel + " cell for each roster student.\n" +
             "  • Blank / empty / unreadable cell → OMIT scores[\"" + targetField + "\"] for that " +
             "student entirely (do NOT guess 0).\n" +
             "  • Numbers must be non-negative and at most 200. Decimals allowed but rare.\n" +
-            "  • If unsure of a digit, return your best guess and lower the confidence.\n\n" +
+            "  • If a cell has clear handwriting, use confidence 0.9+. If digits are hard to tell " +
+            "apart, lower confidence to 0.4-0.6 so the facilitator can double-check.\n\n" +
             "MATCHING RULES:\n" +
             "  • The ROSTER below is the ground truth. Match each photo row to the closest roster " +
             "name (tolerate OCR errors: missing accents, wrong middle initial, transposed letters).\n" +
@@ -144,7 +154,7 @@ function buildRecordPrompt(roster, targetField) {
             '  "students": [ { "name": "<exact roster name>", "scores": { "' + targetField +
                 '": <number> }, "confidence": <0..1> } ],\n' +
             '  "unmatched": [ "<name text seen in photo>" ],\n' +
-            '  "notes": "<optional one-line observation>"\n' +
+            '  "notes": "<optional one-line observation, e.g. photo blur>"\n' +
             "}\n\n" +
             "ROSTER (match names to these exact strings):\n" +
             roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
@@ -259,9 +269,23 @@ async function groqVision(apiKey, prompt, imageBase64, mimeType) {
  * Optional Gemini fallback — used only if GEMINI_API_KEY is set AND Groq is
  * missing or rate-limited. Same output contract as groqVision.
  */
-async function geminiVision(apiKey, prompt, imageBase64, mimeType) {
+async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
     const pinned = process.env.GEMINI_VISION_MODEL;
-    const models = pinned ? [pinned] : GEMINI_MODELS;
+    // For record photos we prefer a stronger model first because small
+    // handwritten digits (8 vs 10 vs 15) reward every extra bit of visual
+    // reasoning. Attendance's simple P/A/L letters don't need it, so keep
+    // flash-lite for that (faster + cheaper).
+    const preferAccurate = !!(opts && opts.preferAccurate);
+    const RECORD_MODEL_ORDER = [
+        'gemini-2.5-pro',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-exp',
+        'gemini-1.5-flash'
+    ];
+    const models = pinned ? [pinned] : (preferAccurate ? RECORD_MODEL_ORDER : GEMINI_MODELS);
     let lastErr = null;
     // Try each model up to twice: once WITH responseMimeType=application/json,
     // then WITHOUT it if the model rejects the field (Gemini sometimes returns
@@ -613,7 +637,7 @@ module.exports = async (req, res) => {
     let rawReply = null;
     if (geminiKey) {
         try {
-            rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType);
+            rawReply = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { preferAccurate: type === 'record' });
         } catch (e) {
             const detail = (e && (e.raw || e.message)) || String(e);
             const msg = String(detail || '').toLowerCase();
