@@ -268,9 +268,9 @@
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
         }
-        @keyframes profSlide {
-            0% { width: 0%; }
-            100% { width: 100%; }
+        @keyframes profIndeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
         }
         .analyze-overlay {
             position: fixed; inset: 0; z-index: 2900;
@@ -304,7 +304,13 @@
         }
         .analyze-track-bar {
             height: 100%; background: #3b82f6; border-radius: 2px;
-            animation: profSlide 2.4s ease-in-out infinite;
+            width: 35%;
+            animation: profIndeterminate 1.4s ease-in-out infinite;
+            transition: width 0.4s ease;
+        }
+        .analyze-track-bar.done {
+            width: 100%;
+            animation: none;
         }
         /* Review modal (record) */
         .review-overlay {
@@ -1268,36 +1274,14 @@
                 .filter(Boolean);
         }
 
-        const _analyzeMessages = [
-            { title: 'Analyzing photo...', sub: 'Reading scores from the grade book' },
-            { title: 'Extracting data...', sub: 'Identifying student names and scores' },
-            { title: 'Matching entries...', sub: 'Aligning names with the roster' },
-            { title: 'Validating results...', sub: 'Cross-checking for accuracy' },
-            { title: 'Finalizing...', sub: 'Preparing results for review' },
-        ];
+        let _analyzeBarDone = null;
 
-        let _analyzeMessageInterval = null;
-
-        function _startAnalyzeMessages() {
-            const titleEl = document.getElementById('analyzeTitle');
-            const subEl = document.getElementById('analyzeSub');
-            let i = 0;
-            function showMsg(idx) {
-                const m = _analyzeMessages[idx % _analyzeMessages.length];
-                if (titleEl) titleEl.textContent = m.title;
-                if (subEl) subEl.textContent = m.sub;
-            }
-            showMsg(0);
-            _analyzeMessageInterval = setInterval(() => {
-                i++;
-                showMsg(i);
-            }, 3000);
-        }
-
-        function _stopAnalyzeMessages() {
-            if (_analyzeMessageInterval) {
-                clearInterval(_analyzeMessageInterval);
-                _analyzeMessageInterval = null;
+        function _setAnalyzeBarDone() {
+            const bar = document.querySelector('.analyze-track-bar');
+            if (bar) {
+                bar.classList.remove('done');
+                void bar.offsetWidth;
+                bar.classList.add('done');
             }
         }
 
@@ -1319,7 +1303,6 @@
 
             const overlay = document.getElementById('analyzeOverlay');
             overlay.classList.add('show');
-            _startAnalyzeMessages();
             try {
                 const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
 
@@ -1341,13 +1324,16 @@
                     const upstream = payload && payload.upstream ? ('\n\nDetail: ' + payload.upstream) : '';
                     throw new Error(baseMsg + upstream);
                 }
+                _setAnalyzeBarDone();
+                await new Promise(r => setTimeout(r, 500));
                 openRecordReviewModal(payload, thumbDataUrl);
             } catch (err) {
                 console.error('Record photo analyze error:', err);
                 showAlert('Could not analyze photo', String((err && err.message) || err) || 'Please try another photo.', '#ef4444');
             } finally {
                 overlay.classList.remove('show');
-                _stopAnalyzeMessages();
+                const bar = document.querySelector('.analyze-track-bar');
+                if (bar) bar.classList.remove('done');
             }
         }
 
