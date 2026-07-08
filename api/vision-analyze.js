@@ -180,7 +180,8 @@ function buildRecordPrompt(roster, targetField) {
             "  ✗ Do NOT copy the COLUMN HEADER as a score (headers may be numbers like '1', '10').\n" +
             "  ✗ Do NOT guess when you can't see clearly — return LOW confidence instead.\n" +
             "  ✗ Do NOT invent students not on the roster.\n" +
-            "  ✗ Do NOT skip blank cells — just omit scores[\"" + targetField + "\"] for that student.\n\n" +
+            "  ✗ Do NOT skip blank cells — just omit scores[\"" + targetField + "\"] for that student.\n" +
+            "  ✗ Do NOT shift scores up/down — a score belongs to the student on THAT row, not the row above or below.\n\n" +
 
             "═══ OUTPUT ═══\n" +
             "Reply with STRICT JSON ONLY (no prose, no markdown, no code fences):\n" +
@@ -203,11 +204,12 @@ function buildRecordPrompt(roster, targetField) {
     return (
         "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the Philippines. " +
         "Rows are students, columns are score-holding fields.\n\n" +
-        "CRITICAL — You MUST return EXACTLY " + roster.length + " students, one per roster entry, in ROSTER ORDER. " +
-        "Every single roster name MUST appear in the students array. No omissions.\n\n" +
+        "IMPORTANT — Only include a student in the students array if you can read AT LEAST ONE score " +
+        "for them. Students with ALL blank cells should NOT appear in the output.\n\n" +
         "STEP 1: Identify the header row. Read each column header and map it to the exact field key below.\n" +
         "STEP 2: Read each student row from top to bottom. Match the name in the photo to the closest roster name.\n" +
-        "STEP 3: For each matched student, read the score from each column and record it under the correct field key.\n\n" +
+        "STEP 3: For each matched student, read the score from each column and record it under the correct field key.\n" +
+        "STEP 4: If EVERY cell in that student's row is blank/empty, OMIT that student entirely.\n\n" +
         "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n" +
         "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n" +
         "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n" +
@@ -216,29 +218,28 @@ function buildRecordPrompt(roster, targetField) {
         "- 'PT 2' / 'PT2' / 'Performance Task 2' → pt_2\n" +
         "- 'QE' / 'Q.E.' / 'Quarterly Exam' / 'Exam' → qe\n" +
         "- If a header does not clearly map to one of the above field keys, IGNORE that entire column.\n\n" +
-        "NAME MATCHING RULES (highest priority for accuracy):\n" +
+        "NAME MATCHING RULES:\n" +
         "- Find each student's name in the leftmost column(s) of the photo. Match it to the EXACT ROSTER NAME below.\n" +
-        "- If the photo name is slightly different (e.g. missing accent, abbreviated middle initial), " +
-        "match it to the closest roster name. Never invent a name not on the roster.\n" +
         "- Write the EXACT roster string in the \"name\" field — do NOT modify the name.\n" +
-        "- If you truly cannot find a student in the photo, include them anyway with an empty scores object and confidence 0.2.\n\n" +
+        "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n\n" +
         "SCORE READING RULES:\n" +
-        "- Only include a numeric value if you can read the cell clearly. Empty/blank cells, dashes, " +
-        "'-', or clearly-unreadable cells are OMITTED (do not include the field at all for that student).\n" +
+        "- Only include a numeric value if you can CLEARLY read the digits. Empty/blank cells, dashes, " +
+        "'-', or unreadable cells are OMITTED (do not include the field at all).\n" +
         "- Numbers must be non-negative and at most 200. Decimals are allowed but rare; prefer integers.\n" +
         "- If you're not confident about a value, still return your best guess and lower the confidence.\n" +
-        "- Make sure each score is in the CORRECT column — double-check that module_3's value " +
-        "is actually under the MODULE 3 column and not shifted left or right.\n\n" +
+        "- Make sure each score is in the CORRECT column — double-check alignment left-to-right.\n" +
+        "- A COMMON MISTAKE is assigning a score from one student to the next student. Double-check " +
+        "that each score is on the CORRECT row and in the CORRECT column.\n\n" +
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n" +
         "{\n" +
         '  "students": [\n' +
         '    { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> },\n' +
-        '    ... (exactly ' + roster.length + ' entries, one per roster name)\n' +
+        '    ...\n' +
         '  ],\n' +
         '  "unmatched": [ "<name text seen in photo but not matched>" ],\n' +
         '  "notes": "<optional observation>"\n' +
         "}\n\n" +
-        "ROSTER (return exactly " + roster.length + " entries — one per name, in this order):\n" +
+        "ROSTER (use these exact names for matching):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
     );
 }
