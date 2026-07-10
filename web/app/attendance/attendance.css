@@ -1,0 +1,119 @@
+/* Ported from attendance.html <style>, scoped under .attendance-page.
+   Shared .custom-alert-* live in globals.css. */
+
+.attendance-page {
+            --primary-bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-pink: #d946ef;
+            --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --border-radius: 12px;
+            --hover-bg: #f1f5f9;
+        }
+
+        .attendance-page {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-main);
+            padding: 15px;
+            padding-bottom: 90px;
+            overflow-x: hidden;
+        }
+
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bobbing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .fade-in-up {
+            opacity: 0; 
+            animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        /* --- HEADER & CONTROLS --- */
+        .attendance-header { margin-bottom: 20px; }
+        .status-lock { background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: 600; }
+        .attendance-header h1 { font-size: 1.5rem; font-weight: 800; }
+        .attendance-header p { font-size: 0.85rem; color: var(--text-sub); }
+
+        .controls-row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; margin-bottom: 15px; }
+        .date-input, .subject-select { background: var(--panel-bg); border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; box-shadow: var(--premium-shadow); transition: transform 0.2s ease; }
+        .date-input:hover, .subject-select:hover { transform: translateY(-2px); }
+        .date-input label { display: block; font-size: 0.65rem; color: var(--text-sub); font-weight: bold; margin-bottom: 2px;}
+        .date-input div { font-weight: 700; font-size: 0.9rem; }
+
+        .nav-btn {
+            background: var(--input-bg); border: 1px solid #e2e8f0; color: var(--text-main);
+            border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .nav-btn:hover { background: var(--hover-bg); border-color: var(--accent-blue); color: var(--accent-blue); }
+        .nav-btn:active { transform: scale(0.9); }
+
+        /* --- MINI STATS WITH BOBBING ANIMATION --- */
+        .mini-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+        .mini-card { background: var(--panel-bg); padding: 12px 5px; text-align: center; border-radius: 10px; box-shadow: var(--premium-shadow); border-bottom: 3px solid #cbd5e1; transition: 0.3s; }
+        .mini-card:hover { transform: translateY(-3px); box-shadow: var(--hover-shadow); }
+        
+        .mini-card h3 { 
+            font-size: 1.2rem; 
+            display: inline-block; 
+            animation: bobbing 2s ease-in-out infinite; 
+        }
+        .mini-card p { font-size: 0.65rem; color: var(--text-sub); font-weight: bold; }
+        
+        .total h3 { color: var(--text-main); animation-delay: 0s; }
+        .present { border-color: #22c55e; } .present h3 { color: #15803d; animation-delay: 0.2s;}
+        .absent { border-color: #ef4444; } .absent h3 { color: #b91c1c; animation-delay: 0.4s;}
+        .late { border-color: #f59e0b; } .late h3 { color: #b45309; animation-delay: 0.6s;}
+
+        .search-container { background: var(--panel-bg); padding: 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--premium-shadow); margin-bottom: 20px; border: 1px solid #e2e8f0; transition: transform 0.2s ease; }
+        .search-container:focus-within { transform: translateY(-2px); border-color: var(--accent-blue); }
+        .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
+
+        /* --- STUDENT CARDS --- */
+        .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; transition: all 0.3s ease; }
+        .student-card:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+        
+        .student-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .student-name h4 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; }
+        .student-name p { font-size: 0.75rem; color: var(--text-sub); }
+
+        .attendance-options { display: flex; gap: 8px; flex-wrap: wrap; }
+        .opt-btn { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; color: var(--text-sub); cursor: pointer; transition: all 0.2s; }
+        .opt-btn:active { transform: scale(0.95); }
+        
+        .opt-btn.present.active { background: #22c55e; color: white; border-color: #22c55e; transform: scale(1.05); }
+        .opt-btn.absent.active { background: #ef4444; color: white; border-color: #ef4444; transform: scale(1.05); }
+        .opt-btn.late.active { background: #f59e0b; color: white; border-color: #f59e0b; transform: scale(1.05); }
+
+
+        .submit-btn { width: 100%; padding: 16px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 15px; margin-bottom: 25px; cursor: pointer; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); transition: all 0.2s; }
+        .submit-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4); }
+        .submit-btn:active { transform: scale(0.98); }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
+        .nav-item i { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin: 0 auto 2px; font-size: 1.2rem; border-radius: 50%; transition: background 0.25s ease, transform 0.2s ease, color 0.2s ease; }
+        .nav-item.active { color: var(--accent-blue); font-weight: bold; }
+        .nav-item.active i { background: rgba(59, 130, 246, 0.15); }
+        .nav-item:hover { color: var(--accent-blue); }
+        .nav-item:hover i { transform: translateY(-2px); }
+        .nav-item:active i { background: rgba(59, 130, 246, 0.28); transform: scale(0.9); }
+
+.attendance-page { min-height: 100vh; }
