@@ -1,0 +1,28 @@
+# ── AcadTrack Facilitator API (FastAPI) ─────────────────────────────────────
+# Pinned for reproducible installs. Python 3.11+.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Database — async SQLAlchemy over the Supabase Postgres instance
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+greenlet==3.1.1
+
+# Config / validation
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# Auth — bcrypt password verification (compatible with the old Flask hashes)
+# and JWT session tokens
+bcrypt==4.2.1
+PyJWT==2.10.1
+
+# Outbound HTTP for the Groq / Gemini vision + AI providers
+httpx==0.28.1
+
+# Web Push (VAPID) notifications
+pywebpush==2.0.1
+
+# File uploads (vision image) / form parsing
+python-multipart==0.0.20
