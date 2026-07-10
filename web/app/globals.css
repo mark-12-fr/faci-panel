@@ -1,0 +1,87 @@
+/* Global reset + shared building blocks. Page-specific styles live in each
+   route's own CSS file (ported verbatim from the original pages). */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ── Shared custom alert popup (used across every page) ───────────────────── */
+.custom-alert-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200000;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.3s ease;
+}
+.custom-alert-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.custom-alert-box {
+  background: #ffffff;
+  padding: 25px 20px;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 90%;
+  max-width: 340px;
+  text-align: center;
+  transform: translateY(-20px);
+  transition: 0.3s ease;
+  border: 1px solid #e5e7eb;
+}
+.custom-alert-overlay.show .custom-alert-box {
+  transform: translateY(0);
+}
+.custom-alert-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+.custom-alert-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+.custom-alert-msg {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 25px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.custom-alert-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+  width: 100%;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 0.9rem;
+  font-family: "Inter", sans-serif;
+}
+.custom-alert-btn:hover {
+  background: #2563eb;
+}

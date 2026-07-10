@@ -1,0 +1,19 @@
+{
+  "name": "AcadTrack — Facilitator Portal",
+  "short_name": "AcadTrack Faci",
+  "description": "Facilitator portal for AcadTrack — submit attendance and class records for your assigned section.",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "categories": ["education", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+  ]
+}
