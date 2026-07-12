@@ -16,6 +16,38 @@ body {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* ── Responsive: frame the phone-first app as a centered column ────────────
+   The facilitator app is designed mobile-first (facilitators scan record
+   photos on their phones), so on phones every route stays full-width and
+   byte-for-byte identical to the original design. On tablets / desktops the
+   four app routes would otherwise stretch edge-to-edge; instead we center them
+   in a phone-width column over a soft backdrop so the layout reads as an
+   intentional app frame at any width. The login route already centers its own
+   card, and full-screen modal overlays keep covering the whole viewport, so
+   both are deliberately left untouched. */
+@media (min-width: 600px) {
+  body {
+    background: #e2e8f0;
+  }
+  .dashboard-page,
+  .attendance-page,
+  .record-page,
+  .profile-page {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 0 40px rgba(15, 23, 42, 0.08);
+  }
+  /* The fixed bottom nav lives inside each page container but is positioned
+     against the viewport — re-center it over the same 480px column. */
+  .bottom-nav {
+    left: 50% !important;
+    width: 100% !important;
+    max-width: 480px;
+    transform: translateX(-50%);
+  }
+}
+
 /* ── Shared custom alert popup (used across every page) ───────────────────── */
 .custom-alert-overlay {
   position: fixed;
