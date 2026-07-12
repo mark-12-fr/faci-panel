@@ -29,7 +29,7 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isLoggedIn() || !getItem("faci_section")) {
+    if (!isLoggedIn()) {
       window.location.href = "/login";
       return;
     }

@@ -71,7 +71,7 @@ export default function DashboardPage() {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, type: "" });
 
   useEffect(() => {
-    if (!isLoggedIn() || !getItem("faci_section")) {
+    if (!isLoggedIn()) {
       window.location.href = "/login";
       return;
     }
