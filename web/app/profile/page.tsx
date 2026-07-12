@@ -120,7 +120,15 @@ export default function ProfilePage() {
           setUploading(false);
         }
       };
+      img.onerror = () => {
+        setUploading(false);
+        window.alert("That image couldn't be loaded. Please try a different file.");
+      };
       img.src = ev.target?.result as string;
+    };
+    reader.onerror = () => {
+      setUploading(false);
+      window.alert("Couldn't read that image file. Please try again.");
     };
     reader.readAsDataURL(file);
   }

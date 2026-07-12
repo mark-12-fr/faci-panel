@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import { API_BASE } from "@/lib/config";
-import { getItem, getToken, isLoggedIn } from "@/lib/session";
+import { clearSession, getItem, getToken, isLoggedIn } from "@/lib/session";
 import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
 import { useAlert } from "@/components/CustomAlert";
@@ -447,7 +447,15 @@ export default function RecordPage() {
         payload = {};
       }
       if (!res.ok) {
-        const baseMsg = payload?.error || "Analyze failed (" + res.status + ")";
+        // Mirror the shared api() 401 handling: an expired session mid-scan
+        // should bounce to /login, not leave the user with a dead session.
+        if (res.status === 401) {
+          clearSession();
+          if (typeof window !== "undefined") window.location.replace("/login");
+          return;
+        }
+        // FastAPI auth errors return {detail}; the vision router returns {error}.
+        const baseMsg = payload?.detail || payload?.error || "Analyze failed (" + res.status + ")";
         const upstream = payload?.upstream ? "\n\nDetail: " + payload.upstream : "";
         throw new Error(baseMsg + upstream);
       }
