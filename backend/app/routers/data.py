@@ -110,7 +110,15 @@ async def upsert_class_records(
 
         stmt = pg_insert(ClassRecord).values(**values)
         update_cols = {k: stmt.excluded[k] for k in values if k != "id"}
-        stmt = stmt.on_conflict_do_update(index_elements=["id"], set_=update_cols)
+        # Forcing section_id above only fixes the *written* value — it does NOT
+        # stop a body carrying another section's record id from hijacking that
+        # row via the id conflict. Scope the update to rows already in THIS
+        # facilitator's section, so an out-of-section id is a no-op instead.
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["id"],
+            set_=update_cols,
+            where=(ClassRecord.section_id == section_id),
+        )
         await db.execute(stmt)
         written += 1
 
