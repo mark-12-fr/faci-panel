@@ -114,7 +114,7 @@ export default function RecordPage() {
 
   // ── Load ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isLoggedIn() || !getItem("faci_section")) {
+    if (!isLoggedIn()) {
       window.location.href = "/login";
       return;
     }

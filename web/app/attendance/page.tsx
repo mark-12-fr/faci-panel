@@ -50,7 +50,7 @@ export default function AttendancePage() {
 
   // Initial load: section + students (once).
   useEffect(() => {
-    if (!isLoggedIn() || !getItem("faci_section")) {
+    if (!isLoggedIn()) {
       window.location.href = "/login";
       return;
     }
