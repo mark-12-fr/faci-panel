@@ -404,6 +404,36 @@ export default function RecordPage() {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
+    // Mild auto-contrast for dim / washed-out classroom photos: only kicks in
+    // when the luminance histogram is compressed (dark room, faint pencil),
+    // so well-lit photos pass through byte-identical.
+    try {
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+      const hist = new Uint32Array(256);
+      let sampled = 0;
+      for (let i = 0; i < d.length; i += 16) {
+        hist[((d[i] * 3 + d[i + 1] * 6 + d[i + 2]) / 10) | 0]++;
+        sampled++;
+      }
+      const cut = Math.max(1, Math.floor(sampled * 0.02));
+      let lo = 0, hi = 255, acc = 0;
+      for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= cut) { lo = v; break; } }
+      acc = 0;
+      for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= cut) { hi = v; break; } }
+      if (hi - lo > 20 && hi - lo < 200) {
+        const lut = new Uint8ClampedArray(256);
+        for (let v = 0; v < 256; v++) lut[v] = ((v - lo) * 255) / (hi - lo);
+        for (let i = 0; i < d.length; i += 4) {
+          d[i] = lut[d[i]];
+          d[i + 1] = lut[d[i + 1]];
+          d[i + 2] = lut[d[i + 2]];
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+    } catch {
+      // canvas read blocked or OOM — send the photo as-is
+    }
     // Step quality down only if a busy photo would blow the backend's 6 MB
     // limit (base64 length ≈ bytes × 1.37; stay well under with 5.5M chars).
     let outDataUrl = "";

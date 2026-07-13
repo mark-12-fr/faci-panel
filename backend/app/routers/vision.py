@@ -6,10 +6,16 @@ request/response contract and Gemini-primary / Groq-fallback strategy, with an
 accuracy-hardened read path on top:
 
   • greedy decoding (temperature 0) + HIGH media resolution + thinking models
-  • record scans: 2 independent reads, per-cell majority-of-3 tie-break when
-    the reads disagree; cells with no majority are confidence-flagged (0.35)
-    so the review modal forces the facilitator to verify them
-  • attendance scans: verification re-read; disagreements are flagged
+  • strict responseSchema on Gemini (student names constrained to the exact
+    roster strings), dropped gracefully per model on 400
+  • record scans: 2 DECORRELATED reads (the verification pass re-reads the
+    sheet bottom-up on a rotated model order so both passes can't repeat the
+    same first-impression error), then a targeted per-cell majority-of-3
+    tie-break that names the disputed rows; cells with no majority are
+    confidence-flagged (0.35) so the review modal forces the facilitator to
+    verify them
+  • attendance scans: decorrelated verification re-read; disagreements flagged
+  • row-order cross-check in every prompt (class sheets are roster-ordered)
 
 Primary provider : Google Gemini    (GEMINI_API_KEY)
 Optional fallback: Groq (Llama 4)    (GROQ_API_KEY)
@@ -105,6 +111,91 @@ def _roster_lines(roster: List[str]) -> str:
     return "\n".join(f"{i + 1}. {n}" for i, n in enumerate(roster))
 
 
+ROW_ORDER_NOTE = (
+    "\nROW-ORDER CROSS-CHECK: class sheets almost always list students in the SAME "
+    "ORDER as the ROSTER (alphabetical). If the sheet has a '#' / number column, row N "
+    "should correspond to roster name N. Use this ordering to double-check every name "
+    "match — but if the written name clearly conflicts with the ordering, the written "
+    "name wins.\n"
+)
+
+
+def verification_prompt(prompt: str) -> str:
+    """Decorrelated second read: scanning the sheet in a different order breaks
+    correlated first-impression errors (row shifts, repeated misreads)."""
+    return (
+        "INDEPENDENT VERIFICATION PASS — re-read the sheet starting from the BOTTOM row "
+        "and working UPWARD, so you do not repeat a first-impression error. Apply every "
+        "rule below as if reading the photo for the first time.\n\n" + prompt
+    )
+
+
+def focus_prompt(prompt: str, disputed: List[str]) -> str:
+    """Targeted tie-break read: tell the model exactly which rows earlier passes
+    disagreed on so it spends its attention there."""
+    names = "\n".join(f"  • {n}" for n in disputed[:40])
+    return (
+        "TIE-BREAK PASS — two earlier reads of this photo DISAGREED on the following "
+        "students' cells. Re-examine THESE rows with extra care (count the digits, check "
+        "each digit's shape) before answering. Still output every student you can read, "
+        "not just these:\n" + names + "\n\n" + prompt
+    )
+
+
+# ── Gemini structured-output schemas ─────────────────────────────────────────
+# Constraining `name` to the exact roster strings eliminates name drift (case,
+# spacing, accents) at the decoder level; sanitizers below stay as the backstop.
+
+def build_record_schema(roster: List[str], target_fields: List[str]) -> dict:
+    fields = [f for f in (target_fields or RECORD_FIELDS) if f in RECORD_FIELD_SET]
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "students": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "name": {"type": "STRING", "enum": list(roster)},
+                        "scores": {
+                            "type": "OBJECT",
+                            "properties": {f: {"type": "NUMBER"} for f in fields},
+                        },
+                        "confidence": {"type": "NUMBER"},
+                    },
+                    "required": ["name", "scores"],
+                },
+            },
+            "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "notes": {"type": "STRING"},
+        },
+        "required": ["students"],
+    }
+
+
+def build_attendance_schema(roster: List[str]) -> dict:
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "students": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "name": {"type": "STRING", "enum": list(roster)},
+                        "status": {"type": "STRING", "enum": ["Present", "Absent", "Late", "Excused"]},
+                        "confidence": {"type": "NUMBER"},
+                    },
+                    "required": ["name", "status"],
+                },
+            },
+            "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "notes": {"type": "STRING"},
+        },
+        "required": ["students"],
+    }
+
+
 def build_attendance_prompt(roster: List[str]) -> str:
     return (
         "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. "
@@ -122,7 +213,8 @@ def build_attendance_prompt(roster: List[str]) -> str:
         "  • If you CANNOT find a student's row, include them as Absent with confidence 0.2.\n\n"
         "MATCHING RULES:\n"
         "  • Match photo names to the closest roster name (tolerate missing accents, wrong middle initial).\n"
-        "  • Never invent names not on the roster. Names must match EXACTLY.\n\n"
+        "  • Never invent names not on the roster. Names must match EXACTLY.\n"
+        + ROW_ORDER_NOTE + "\n"
         "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
         "{\n"
         '  "students": [\n'
@@ -161,7 +253,8 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "  • Blank / empty / unreadable cell → OMIT that one field for that student (do NOT guess 0).\n"
             "  • Numbers are 0..200. If a digit is ambiguous, return your best guess and LOWER confidence.\n"
             "  • Match names to the ROSTER exactly (tolerate small OCR errors in the name).\n"
-            "  • Only include a student who has AT LEAST ONE readable score among these columns.\n\n"
+            "  • Only include a student who has AT LEAST ONE readable score among these columns.\n"
+            + ROW_ORDER_NOTE + "\n"
             "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
             "{\n"
             '  "students": [ { "name": "<exact roster name>", "scores": { ' + schema_scores + ' }, "confidence": <0..1> } ],\n'
@@ -187,7 +280,8 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "from THIS column and no other.\n\n"
             "STEP 2 — For each student on the ROSTER below, find their row in the photo (the row "
             "whose Student Name matches the roster name). Then find the CELL that is on that row "
-            "AND in the " + target_label + " column. That intersection is the cell you must read.\n\n"
+            "AND in the " + target_label + " column. That intersection is the cell you must read.\n"
+            + ROW_ORDER_NOTE + "\n"
             "STEP 3 — Before writing any number, count the DIGITS in the cell:\n"
             "  • 0 digits → the cell is BLANK. Do NOT write a score for this student.\n"
             "  • 1 digit  → single-digit number (0 through 9).\n"
@@ -261,7 +355,8 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
         "NAME MATCHING RULES:\n"
         "- Find each student's name in the leftmost column(s) of the photo. Match it to the EXACT ROSTER NAME below.\n"
         '- Write the EXACT roster string in the "name" field — do NOT modify the name.\n'
-        "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n\n"
+        "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n"
+        + ROW_ORDER_NOTE + "\n"
         "SCORE READING RULES:\n"
         "- Only include a numeric value if you can CLEARLY read the digits. Empty/blank cells, dashes, "
         "'-', or unreadable cells are OMITTED (do not include the field at all).\n"
@@ -331,9 +426,26 @@ async def groq_vision(api_key: str, prompt: str, image_b64: str, mime_type: str)
     raise _Upstream(last_err or "Groq returned no reply")
 
 
-async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: str, prefer_accurate: bool = False) -> str:
+async def gemini_vision(
+    api_key: str,
+    prompt: str,
+    image_b64: str,
+    mime_type: str,
+    prefer_accurate: bool = False,
+    response_schema: Optional[dict] = None,
+    rotate: int = 0,
+) -> str:
     pinned = settings.GEMINI_VISION_MODEL
-    models = [pinned] if pinned else (RECORD_MODEL_ORDER if prefer_accurate else GEMINI_MODELS)
+    if pinned:
+        models = [pinned]
+    else:
+        models = RECORD_MODEL_ORDER if prefer_accurate else GEMINI_MODELS
+        if rotate:
+            # Decorrelate consensus passes: starting the fallback chain on a
+            # different model keeps pass errors independent (two greedy reads of
+            # the SAME model mostly agree with each other, right or wrong).
+            r = rotate % len(models)
+            models = models[r:] + models[:r]
     last_err = None
     models_tried = 0
     models_rate_limited = 0
@@ -342,13 +454,14 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
             models_tried += 1
             model_rate_limited = False
             # Per-model parameter negotiation. Start with everything that helps
-            # accuracy — strict-JSON output, HIGH media resolution (more image
-            # tokens = far better small-handwritten-digit legibility on dense
-            # tables), and thinking on 2.5 models (reasoning before answering
-            # measurably reduces row/column mix-ups). If a model 400s on a
-            # specific parameter, drop just that flag and retry the same model.
-            flags = {"json": True, "hires": True, "think": "2.5" in m}
-            for _attempt in range(4):
+            # accuracy — strict-JSON output, an exact response schema (names
+            # constrained to the roster strings), HIGH media resolution (more
+            # image tokens = far better small-handwritten-digit legibility on
+            # dense tables), and thinking on 2.5 models (reasoning before
+            # answering measurably reduces row/column mix-ups). If a model 400s
+            # on a specific parameter, drop just that flag and retry the model.
+            flags = {"json": True, "schema": bool(response_schema), "hires": True, "think": "2.5" in m}
+            for _attempt in range(5):
                 try:
                     gen: Dict[str, Any] = {
                         # temperature 0: greedy decoding. OCR-style transcription
@@ -359,6 +472,8 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
                     }
                     if flags["json"]:
                         gen["responseMimeType"] = "application/json"
+                        if flags["schema"]:
+                            gen["responseSchema"] = response_schema
                     if flags["hires"]:
                         gen["mediaResolution"] = "MEDIA_RESOLUTION_HIGH"
                     if flags["think"]:
@@ -393,6 +508,9 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
                         model_rate_limited = True
                         break
                     if r.status_code == 400:
+                        if flags["schema"] and re.search(r"response_?schema|enum|too (?:large|long)", last_err, re.I):
+                            flags["schema"] = False
+                            continue
                         if flags["think"] and re.search(r"thinking", last_err, re.I):
                             flags["think"] = False
                             continue
@@ -401,6 +519,12 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
                             continue
                         if flags["json"] and re.search(r"response_?mime_?type", last_err, re.I):
                             flags["json"] = False
+                            continue
+                        if flags["schema"]:
+                            # Unrecognized 400 while a schema is attached — the
+                            # schema is the most likely culprit; retry without it
+                            # before giving up on this model.
+                            flags["schema"] = False
                             continue
                     break
                 except Exception as e:  # noqa: BLE001
@@ -610,17 +734,19 @@ def sanitize_record_students(lst, roster_set) -> List[dict]:
     return out
 
 
-def record_passes_disagree(a: List[dict], b: List[dict]) -> bool:
-    """True when the two passes read a different number for any shared cell."""
+def record_disputed_names(a: List[dict], b: List[dict]) -> List[str]:
+    """Roster names whose shared cells the two passes read differently."""
     bmap = {s["name"]: (s.get("scores") or {}) for s in b}
+    disputed: List[str] = []
     for s in a:
         sb = bmap.get(s["name"])
         if not sb:
             continue
         for f, v in (s.get("scores") or {}).items():
             if f in sb and float(sb[f]) != float(v):
-                return True
-    return False
+                disputed.append(s["name"])
+                break
+    return disputed
 
 
 def merge_record_consensus(passes: List[List[dict]], target_fields) -> List[dict]:
@@ -741,7 +867,12 @@ async def vision_analyze(
     if not gemini_key and not groq_key:
         return JSONResponse({"error": not_configured}, status_code=503)
 
-    prompt = build_record_prompt(roster, target_fields) if type_ == "record" else build_attendance_prompt(roster)
+    if type_ == "record":
+        prompt = build_record_prompt(roster, target_fields)
+        schema = build_record_schema(roster, target_fields)
+    else:
+        prompt = build_attendance_prompt(roster)
+        schema = build_attendance_schema(roster)
 
     # Step 1: Gemini (primary)
     raw_reply = None
@@ -749,7 +880,10 @@ async def vision_analyze(
         try:
             # Accuracy-first model ordering for BOTH scan types — attendance
             # letters deserve the same care as record scores.
-            raw_reply = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+            raw_reply = await gemini_vision(
+                gemini_key, prompt, image_b64, mime_type,
+                prefer_accurate=True, response_schema=schema,
+            )
         except _RateLimit as e:
             if not groq_key:
                 return JSONResponse(
@@ -808,13 +942,25 @@ async def vision_analyze(
     # confidence-flagged so the review modal forces a human check.
     if type_ == "record" and len(target_fields) >= 1 and gemini_key and students:
         try:
-            raw_reply2 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+            # Pass 2 is DECORRELATED from pass 1: it re-reads the sheet
+            # bottom-up on a rotated model order, so the two passes cannot
+            # simply repeat the same first-impression mistake.
+            raw_reply2 = await gemini_vision(
+                gemini_key, verification_prompt(prompt), image_b64, mime_type,
+                prefer_accurate=True, response_schema=schema, rotate=1,
+            )
             parsed2 = parse_vision_json(raw_reply2)
             students2 = sanitize_record_students(parsed2.get("students"), roster_set)
             passes = [students, students2]
-            if students2 and record_passes_disagree(students, students2):
+            disputed = record_disputed_names(students, students2) if students2 else []
+            if disputed:
                 try:
-                    raw_reply3 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+                    # Pass 3 tie-break is TARGETED: it names the disputed rows
+                    # so the strongest model spends its attention exactly there.
+                    raw_reply3 = await gemini_vision(
+                        gemini_key, focus_prompt(prompt, disputed), image_b64, mime_type,
+                        prefer_accurate=True, response_schema=schema,
+                    )
                     parsed3 = parse_vision_json(raw_reply3)
                     students3 = sanitize_record_students(parsed3.get("students"), roster_set)
                     if students3:
@@ -833,7 +979,10 @@ async def vision_analyze(
     # confidence, disagreements drop to 0.35 so the letter gets double-checked.
     if type_ == "attendance" and gemini_key and students:
         try:
-            raw_reply2 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+            raw_reply2 = await gemini_vision(
+                gemini_key, verification_prompt(prompt), image_b64, mime_type,
+                prefer_accurate=True, response_schema=schema, rotate=1,
+            )
             parsed2 = parse_vision_json(raw_reply2)
             students2 = sanitize_students(parsed2.get("students"), roster_set)
             if students2:
