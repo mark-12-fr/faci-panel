@@ -1,10 +1,15 @@
 """
 vision.py — Photo → structured data (attendance letters / record scores).
 ========================================================================
-Faithful Python port of the Vercel `api/vision-analyze.js` serverless function.
-Same request/response contract, same prompts, same Gemini-primary / Groq-fallback
-strategy, same JSON-salvage and two-pass consensus behaviour — so the record
-and attendance photo-scan features work identically.
+Python port of the Vercel `api/vision-analyze.js` serverless function — same
+request/response contract and Gemini-primary / Groq-fallback strategy, with an
+accuracy-hardened read path on top:
+
+  • greedy decoding (temperature 0) + HIGH media resolution + thinking models
+  • record scans: 2 independent reads, per-cell majority-of-3 tie-break when
+    the reads disagree; cells with no majority are confidence-flagged (0.35)
+    so the review modal forces the facilitator to verify them
+  • attendance scans: verification re-read; disagreements are flagged
 
 Primary provider : Google Gemini    (GEMINI_API_KEY)
 Optional fallback: Groq (Llama 4)    (GROQ_API_KEY)
@@ -149,6 +154,9 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "  • Read the columns in the SAME left-to-right order they appear in the photo. Do NOT swap "
             "columns — a value under Module 1 must go to module_1, not module_2.\n"
             "  • Count digits per cell: '8' is ONE digit, '10'/'15' are TWO. Do NOT round '8' to '10'.\n"
+            "  • Common confusions — check the SHAPES: the second digit of '15' is a 5 (flat top + curve), "
+            "not a 0 (closed loop); '7' has a flat top bar, '1' is a single vertical stroke; "
+            "'0' is a plain oval, '6' has its loop at the bottom only.\n"
             "  • Each student's numbers are INDEPENDENT — do NOT copy one student's value to the next.\n"
             "  • Blank / empty / unreadable cell → OMIT that one field for that student (do NOT guess 0).\n"
             "  • Numbers are 0..200. If a digit is ambiguous, return your best guess and LOWER confidence.\n"
@@ -298,7 +306,7 @@ async def groq_vision(api_key: str, prompt: str, image_b64: str, mime_type: str)
                                 {"type": "image_url", "image_url": {"url": data_url}},
                             ],
                         }],
-                        "temperature": 0.1,
+                        "temperature": 0,
                         "max_tokens": 16384,
                         "response_format": {"type": "json_object"},
                     },
@@ -333,11 +341,28 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
         for m in models:
             models_tried += 1
             model_rate_limited = False
-            for use_json_mime in (True, False):
+            # Per-model parameter negotiation. Start with everything that helps
+            # accuracy — strict-JSON output, HIGH media resolution (more image
+            # tokens = far better small-handwritten-digit legibility on dense
+            # tables), and thinking on 2.5 models (reasoning before answering
+            # measurably reduces row/column mix-ups). If a model 400s on a
+            # specific parameter, drop just that flag and retry the same model.
+            flags = {"json": True, "hires": True, "think": "2.5" in m}
+            for _attempt in range(4):
                 try:
-                    gen: Dict[str, Any] = {"temperature": 0.1, "maxOutputTokens": 32768}
-                    if use_json_mime:
+                    gen: Dict[str, Any] = {
+                        # temperature 0: greedy decoding. OCR-style transcription
+                        # has one right answer — sampling only adds noise.
+                        "temperature": 0,
+                        # 2.0/1.5 models cap output at 8192 and 400 on more.
+                        "maxOutputTokens": 32768 if "2.5" in m else 8192,
+                    }
+                    if flags["json"]:
                         gen["responseMimeType"] = "application/json"
+                    if flags["hires"]:
+                        gen["mediaResolution"] = "MEDIA_RESOLUTION_HIGH"
+                    if flags["think"]:
+                        gen["thinkingConfig"] = {"thinkingBudget": -1}  # dynamic
                     r = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}",
                         headers={"Content-Type": "application/json"},
@@ -357,7 +382,8 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
                         data = {}
                     if r.status_code == 200:
                         parts = (((data.get("candidates") or [{}])[0] or {}).get("content") or {}).get("parts") or []
-                        text = "".join((p or {}).get("text", "") for p in parts).strip()
+                        # Skip thought-summary parts (present when thinking is on).
+                        text = "".join((p or {}).get("text", "") for p in parts if not (p or {}).get("thought")).strip()
                         if text:
                             return text
                         last_err = f"[{m}] empty reply"
@@ -366,8 +392,16 @@ async def gemini_vision(api_key: str, prompt: str, image_b64: str, mime_type: st
                     if r.status_code == 429 or re.search(r"RESOURCE_EXHAUSTED", last_err, re.I):
                         model_rate_limited = True
                         break
-                    if use_json_mime and r.status_code == 400 and re.search(r"responseMimeType|response_mime_type", last_err, re.I):
-                        continue
+                    if r.status_code == 400:
+                        if flags["think"] and re.search(r"thinking", last_err, re.I):
+                            flags["think"] = False
+                            continue
+                        if flags["hires"] and re.search(r"media_?resolution", last_err, re.I):
+                            flags["hires"] = False
+                            continue
+                        if flags["json"] and re.search(r"response_?mime_?type", last_err, re.I):
+                            flags["json"] = False
+                            continue
                     break
                 except Exception as e:  # noqa: BLE001
                     last_err = f"[{m}] {e}"
@@ -576,56 +610,79 @@ def sanitize_record_students(lst, roster_set) -> List[dict]:
     return out
 
 
-def merge_record_consensus(a: List[dict], b: List[dict], target_fields) -> List[dict]:
+def record_passes_disagree(a: List[dict], b: List[dict]) -> bool:
+    """True when the two passes read a different number for any shared cell."""
+    bmap = {s["name"]: (s.get("scores") or {}) for s in b}
+    for s in a:
+        sb = bmap.get(s["name"])
+        if not sb:
+            continue
+        for f, v in (s.get("scores") or {}).items():
+            if f in sb and float(sb[f]) != float(v):
+                return True
+    return False
+
+
+def merge_record_consensus(passes: List[List[dict]], target_fields) -> List[dict]:
+    """Per-cell majority vote across 2–3 independent read passes.
+
+    For every (student, field) cell: if the passes that read it all agree →
+    high confidence; if 2 of 3 agree → take the majority; if there is no
+    majority → keep the first pass's value but drop confidence to 0.35 so the
+    review modal flags the cell in red and the facilitator must eyeball it.
+    """
     raw = target_fields if isinstance(target_fields, list) else [target_fields]
     fields = [f for f in raw if f in RECORD_FIELD_SET]
-    by_name: Dict[str, Dict[str, Any]] = {}
-    for s in a:
-        by_name[s["name"]] = {"a": s, "b": None}
-    for s in b:
-        if s["name"] in by_name:
-            by_name[s["name"]]["b"] = s
-        else:
-            by_name[s["name"]] = {"a": None, "b": s}
+    passes = [p for p in passes if p]
+    if not passes:
+        return []
+    if len(passes) == 1:
+        return passes[0]
+    by_pass = [{s["name"]: s for s in p} for p in passes]
+    names: List[str] = []
+    for bp in by_pass:
+        for n in bp:
+            if n not in names:
+                names.append(n)
     out = []
-    for name, pair in by_name.items():
-        sa, sb = pair["a"], pair["b"]
-        if not sa and not sb:
-            continue
-        if sa and not sb:
-            out.append(sa)
-            continue
-        if not sa and sb:
-            out.append(sb)
-            continue
-        scores_a = sa.get("scores") or {}
-        scores_b = sb.get("scores") or {}
-        merged: Dict[str, float] = {}
-        any_disagree = any_shared = False
+    for name in names:
+        present = [bp[name] for bp in by_pass if name in bp]
         all_fields = fields if fields else [
-            f for f in dict.fromkeys(list(scores_a) + list(scores_b)) if f in RECORD_FIELD_SET
+            f for f in dict.fromkeys(f for e in present for f in (e.get("scores") or {}))
+            if f in RECORD_FIELD_SET
         ]
+        merged: Dict[str, float] = {}
+        any_conflict = any_majority = any_agree = False
         for f in all_fields:
-            va, vb = scores_a.get(f), scores_b.get(f)
-            av = va is not None
-            bv = vb is not None
-            if av and bv:
-                any_shared = True
-                merged[f] = float(va)
-                if float(va) != float(vb):
-                    any_disagree = True
-            elif av:
-                merged[f] = float(va)
-            elif bv:
-                merged[f] = float(vb)
+            vals = [float((e.get("scores") or {})[f]) for e in present if f in (e.get("scores") or {})]
+            if not vals:
+                continue
+            if len(vals) == 1:
+                merged[f] = vals[0]
+                continue
+            counts: Dict[float, int] = {}
+            for v in vals:
+                counts[v] = counts.get(v, 0) + 1
+            best_v, best_c = max(counts.items(), key=lambda kv: kv[1])
+            if best_c == len(vals):
+                merged[f] = best_v
+                any_agree = True
+            elif best_c >= 2:
+                merged[f] = best_v
+                any_majority = True
+            else:
+                merged[f] = vals[0]
+                any_conflict = True
         if not merged:
             continue
-        if any_disagree:
+        if any_conflict:
             confidence = 0.35
-        elif any_shared:
+        elif any_majority:
+            confidence = 0.9
+        elif any_agree:
             confidence = 0.95
         else:
-            confidence = max(0.55, float(sa.get("confidence") or 0.55))
+            confidence = max(0.55, float(present[0].get("confidence") or 0.55))
         out.append({"name": name, "scores": merged, "confidence": confidence})
     return out
 
@@ -690,7 +747,9 @@ async def vision_analyze(
     raw_reply = None
     if gemini_key:
         try:
-            raw_reply = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=(type_ == "record"))
+            # Accuracy-first model ordering for BOTH scan types — attendance
+            # letters deserve the same care as record scores.
+            raw_reply = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
         except _RateLimit as e:
             if not groq_key:
                 return JSONResponse(
@@ -743,18 +802,54 @@ async def vision_analyze(
         unmatched = [str(n or "").strip() for n in parsed["unmatched"] if str(n or "").strip()][:30]
     notes = str(parsed.get("notes") or "").strip()[:240]
 
-    # Two-pass consensus (record + explicit fields + gemini available)
+    # Multi-pass consensus (record + explicit fields + gemini available):
+    # every scan is read at least twice; if the two reads disagree on any cell
+    # a third read breaks the tie, and cells with no 2-of-3 majority are
+    # confidence-flagged so the review modal forces a human check.
     if type_ == "record" and len(target_fields) >= 1 and gemini_key and students:
         try:
             raw_reply2 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
             parsed2 = parse_vision_json(raw_reply2)
             students2 = sanitize_record_students(parsed2.get("students"), roster_set)
-            students = merge_record_consensus(students, students2, target_fields)
+            passes = [students, students2]
+            if students2 and record_passes_disagree(students, students2):
+                try:
+                    raw_reply3 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+                    parsed3 = parse_vision_json(raw_reply3)
+                    students3 = sanitize_record_students(parsed3.get("students"), roster_set)
+                    if students3:
+                        passes.append(students3)
+                except Exception:  # noqa: BLE001
+                    pass  # tie-break is best-effort; 2-pass merge still applies
+            students = merge_record_consensus(passes, target_fields)
             notes2 = str(parsed2.get("notes") or "").strip()
             if notes2 and notes2 not in notes:
                 notes = (notes + " | " if notes else "") + notes2
                 notes = notes[:240]
         except Exception:  # noqa: BLE001
             pass  # best-effort; fall back to single pass
+
+    # Attendance verification pass: re-read once; agreements lock in at high
+    # confidence, disagreements drop to 0.35 so the letter gets double-checked.
+    if type_ == "attendance" and gemini_key and students:
+        try:
+            raw_reply2 = await gemini_vision(gemini_key, prompt, image_b64, mime_type, prefer_accurate=True)
+            parsed2 = parse_vision_json(raw_reply2)
+            students2 = sanitize_students(parsed2.get("students"), roster_set)
+            if students2:
+                second = {s["name"]: s for s in students2}
+                merged_att = []
+                for s in students:
+                    other = second.pop(s["name"], None)
+                    if other is None:
+                        merged_att.append(s)
+                    elif other["status"] == s["status"]:
+                        merged_att.append({**s, "confidence": max(s["confidence"], other["confidence"], 0.9)})
+                    else:
+                        merged_att.append({**s, "confidence": 0.35})
+                merged_att.extend(second.values())
+                students = merged_att
+        except Exception:  # noqa: BLE001
+            pass  # best-effort; single pass is still returned
 
     return JSONResponse({"students": students, "unmatched": unmatched, "notes": notes})
