@@ -1,12 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Attendance</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="images/logo.jpg">
-    <link rel="apple-touch-icon" href="images/logo.jpg">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
     <meta name="theme-color" content="#3b82f6">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -34,7 +34,7 @@
             overflow-x: hidden;
         }
 
-        /* --- âœ¨ SMOOTH ANIMATIONS âœ¨ --- */
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(20px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -229,7 +229,7 @@
     </div>
 
     <script>
-        // ðŸ”’ SECURITY GUARD 
+        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -238,7 +238,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ðŸ”¥ ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) ðŸ”¥
+        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
         let currentSectionQuarter = '1';
 
@@ -388,13 +388,13 @@
                                 showUpdateToast("Live Update: Teacher modified the attendance.");
                             }
 
-                            // Cross-device notification â€” skip self-echo.
+                            // Cross-device notification — skip self-echo.
                             if (window.MJR_notify) {
                                 const rec = payload.new || payload.old || {};
                                 const who = rec.student_name || 'a student';
                                 const what = (payload.eventType === 'DELETE') ? 'cleared' : (rec.status || 'updated');
                                 window.MJR_notify({
-                                    title: 'Teacher updated attendance â€” ' + section,
+                                    title: 'Teacher updated attendance — ' + section,
                                     body: `${who}: ${what} (${rec.date || ''})`,
                                     tag: 'mjr-attendance-' + section
                                 });
@@ -419,7 +419,7 @@
                 const sectionId = sectionRow.id;
                 const semester = sectionRow.semester || '1st Sem';
                 currentSectionQuarter = sectionRow.quarter ? String(sectionRow.quarter) : '1';
-                document.getElementById('headerDetails').textContent = `${semester} â€¢ ${sectionTitle} â€¢ Q${currentSectionQuarter}`;
+                document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • Q${currentSectionQuarter}`;
 
                 const { data: students } = await supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name');
                 
@@ -619,7 +619,7 @@
             if (window.MJR_markLocalSave) window.MJR_markLocalSave();
 
             try {
-                // Clear previous records for this date/section â€” but ONLY this
+                // Clear previous records for this date/section — but ONLY this
                 // facilitator's own teacher. Section titles repeat across
                 // teachers, so an unscoped delete would wipe another tenant's
                 // attendance. Resolve teacher_id (DB fallback) before deleting.
@@ -668,8 +668,8 @@
         });
 
     </script>
-    <script src="js/mjr-notify.js" defer></script>
-<script src="js/mjr-guard.js" defer></script>
-<script src="js/faci-session.js" defer></script>
+    <script src="mjr-notify.js" defer></script>
+<script src="mjr-guard.js" defer></script>
+<script src="faci-session.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Dashboard</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="images/logo.jpg">
-    <link rel="apple-touch-icon" href="images/logo.jpg">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
     <meta name="theme-color" content="#3b82f6">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="js/grading.js"></script>
+    <script src="grading.js"></script>
 
     <style>
         /* --- Root Variables & Reset --- */
@@ -46,7 +46,7 @@
             overflow-x: hidden; 
         }
 
-        /* --- âœ¨ SMOOTH ANIMATIONS âœ¨ --- */
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(25px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -63,7 +63,7 @@
             100% { transform: rotate( 0.0deg) }
         }
 
-        /* âœ¨ NEW: Bobbing Animation for Numbers (Up and Down) âœ¨ */
+        /* ✨ NEW: Bobbing Animation for Numbers (Up and Down) ✨ */
         @keyframes bobbing {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-4px); } /* Moves up by 4px */
@@ -203,7 +203,7 @@
         .stat-card.purple { border-left: 4px solid #a855f7; box-shadow: 0 10px 15px -3px var(--color-4-shadow); }
         .stat-card.purple:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px var(--color-4-shadow); }
 
-        /* âœ¨ Applying Bobbing Animation to Numbers âœ¨ */
+        /* ✨ Applying Bobbing Animation to Numbers ✨ */
         .stat-card h2 { 
             font-size: 2.2rem; 
             font-weight: 800; 
@@ -456,7 +456,7 @@
     <div class="dashboard-header fade-in-up">
         <div class="header-content">
             <p class="date" id="currentDate">Loading Date...</p>
-            <h1 id="faciGreeting">Good day,<br>Facilitator! <span class="hand-emoji">ðŸ‘‹</span></h1>
+            <h1 id="faciGreeting">Good day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
             <div class="tag-row">
                 <span class="tag tag-primary" id="faciSectionTag">Section</span>
                 <span class="tag tag-secondary" id="faciSubjectTag"><i class="fa-solid fa-spinner fa-spin"></i></span>
@@ -574,7 +574,7 @@
     </nav>
 
     <script>
-        // ðŸ”’ SECURITY GUARD 
+        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -585,7 +585,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        // ðŸ”¥ ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) ðŸ”¥
+        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
 
         async function sendPresenceHeartbeat(online = true) {
@@ -685,7 +685,7 @@
                     const partOfDay = hr < 12 ? 'Good morning'
                                     : hr < 18 ? 'Good afternoon'
                                     :           'Good evening';
-                    document.getElementById('faciGreeting').innerHTML = `${partOfDay},<br>${firstName}! <span class="hand-emoji">ðŸ‘‹</span>`;
+                    document.getElementById('faciGreeting').innerHTML = `${partOfDay},<br>${firstName}! <span class="hand-emoji">👋</span>`;
                     document.getElementById('faciSectionTag').textContent = profile.section;
                     document.getElementById('faciSubjectTag').textContent = profile.subject || 'Subject';
                     document.getElementById('faciSectionStat').textContent = profile.section;
@@ -715,15 +715,15 @@
                     document.getElementById('dashActivitiesSub').textContent = 'Waiting';
                     // The assigned section no longer exists (e.g. the teacher removed
                     // it). Tell the facilitator clearly instead of showing a silent,
-                    // confusing empty dashboard â€” the teacher can reassign them to a
+                    // confusing empty dashboard — the teacher can reassign them to a
                     // new section from the Facilitators page.
                     const gEl = document.getElementById('faciGreeting');
-                    if (gEl) gEl.innerHTML = 'No active section <span class="hand-emoji">ðŸ“­</span>';
+                    if (gEl) gEl.innerHTML = 'No active section <span class="hand-emoji">📭</span>';
                     ['faciSectionTag', 'faciSubjectTag', 'faciSectionStat'].forEach(idv => {
-                        const el = document.getElementById(idv); if (el) el.textContent = 'â€”';
+                        const el = document.getElementById(idv); if (el) el.textContent = '—';
                     });
                     if (typeof showAlert === 'function') {
-                        showAlert('Section unavailable', 'Your assigned section is no longer available â€” it may have been removed by your teacher. Please contact them to be assigned to a new section.', '#f59e0b');
+                        showAlert('Section unavailable', 'Your assigned section is no longer available — it may have been removed by your teacher. Please contact them to be assigned to a new section.', '#f59e0b');
                     }
                     // Also reset the Class Performance panel to its zero state
                     // so it doesn't stay stuck on "Loading ranking..." forever.
@@ -795,7 +795,7 @@
                 document.getElementById('dashActivities').textContent = activitiesDone;
                 document.getElementById('dashActivitiesSub').textContent = pendingActivities > 0 ? `${pendingActivities} pending` : (activitiesDone > 0 ? 'All done' : 'Waiting');
 
-                // Class Performance ranking â€” uses the shared grading.js engine
+                // Class Performance ranking — uses the shared grading.js engine
                 // (same weights + passing grade as the teacher panel), so the
                 // faci sees the exact same rankings + grades her teacher does.
                 renderPerformance();
@@ -837,7 +837,7 @@
 
         function studentRecord(studentId) {
             // Merge ALL of a student's records across quarters (latest non-empty
-            // value wins per field) â€” same as gradeFor() and the Class Record
+            // value wins per field) — same as gradeFor() and the Class Record
             // grid's carry-over. Using a single record (.find) wrongly flagged
             // items as "missing" when they were entered in a different quarter.
             const recs = cachedRecords
@@ -853,8 +853,8 @@
         }
 
         function gradeFor(student) {
-            // Merge ALL of a student's records (across quarters) â€” latest non-empty
-            // value wins per field â€” exactly like the teacher panel does. This is
+            // Merge ALL of a student's records (across quarters) — latest non-empty
+            // value wins per field — exactly like the teacher panel does. This is
             // what makes the ranking here match the teacher panel's ranking.
             const recs = cachedRecords.filter(r => r.student_id === student.id)
                 .sort((a, b) => Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0));
@@ -1065,7 +1065,7 @@
                 });
                 const ptChip = (label, v) => {
                     const empty = (v === null || v === undefined || v === '');
-                    return `<span class="chip ${empty ? 'miss' : 'has'}"><span class="lbl">${label}</span>${empty ? 'â€”' : v}</span>`;
+                    return `<span class="chip ${empty ? 'miss' : 'has'}"><span class="lbl">${label}</span>${empty ? '—' : v}</span>`;
                 };
                 html = rows.map(r => `
                         <div class="drawer-row">
@@ -1090,7 +1090,7 @@
                             <div class="avatar">#${i + 1}</div>
                             <div class="info">
                                 <div class="name">${escapeHtml(r.student.full_name)}</div>
-                                <div class="sub">WW ${r.ww} Â· PT ${r.pt} Â· QE ${r.qe}</div>
+                                <div class="sub">WW ${r.ww} · PT ${r.pt} · QE ${r.qe}</div>
                             </div>
                             <span class="badge badge-score">${r.grade}</span>
                         </div>`).join('');
@@ -1106,7 +1106,7 @@
                 const has = (rec, k) => { const v = rec[k]; return v !== null && v !== undefined && v !== ''; };
 
                 // An item counts as "expected" only if at least one student has a
-                // score for it â€” so unused modules/activities aren't flagged.
+                // score for it — so unused modules/activities aren't flagged.
                 const activeFields = fields.filter(f => cachedStudents.some(s => has(recOf(s), f.key)));
 
                 const rows = cachedStudents.map(s => {
@@ -1119,7 +1119,7 @@
                 if (!activeFields.length) {
                     html = '<div class="drawer-empty">No scores entered yet.</div>';
                 } else if (!rows.length) {
-                    html = '<div class="drawer-empty">All students are complete â€” no missing scores. ðŸŽ‰</div>';
+                    html = '<div class="drawer-empty">All students are complete — no missing scores. 🎉</div>';
                 } else {
                     html = rows.map(r => {
                         const labs = r.missing.map(f => f.label);
@@ -1153,7 +1153,7 @@
         window.openDrawer = openDrawer;
         window.closeDrawer = closeDrawer;
 
-        // ðŸ”¥ 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) ðŸ”¥
+        // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
         async function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
                 stopPresenceHeartbeat();
@@ -1170,8 +1170,8 @@
         }
     </script>
 
-<script src="js/mjr-notify.js" defer></script>
-<script src="js/mjr-guard.js" defer></script>
-<script src="js/faci-session.js" defer></script>
+<script src="mjr-notify.js" defer></script>
+<script src="mjr-guard.js" defer></script>
+<script src="faci-session.js" defer></script>
 </body>
 </html>

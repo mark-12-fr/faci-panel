@@ -1,12 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Profile</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="images/logo.jpg">
-    <link rel="apple-touch-icon" href="images/logo.jpg">
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
     <meta name="theme-color" content="#3b82f6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -35,7 +35,7 @@
             overflow-x: hidden; /* Prevents horizontal scroll during animations */
         }
 
-        /* --- âœ¨ SMOOTH ANIMATIONS âœ¨ --- */
+        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(20px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -254,7 +254,7 @@
     </nav>
 
     <script>
-        // ðŸ”’ SECURITY GUARD 
+        // 🔒 SECURITY GUARD 
         if (!localStorage.getItem('faci_id') || !localStorage.getItem('faci_section')) {
             window.location.href = 'login.html';
         }
@@ -263,7 +263,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ðŸ”¥ ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) ðŸ”¥
+        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
 
         async function sendPresenceHeartbeat(online = true) {
@@ -333,7 +333,7 @@
             document.getElementById('cardSection').textContent = section;
             document.getElementById('cardSubject').textContent = subject;
 
-            // ðŸŒŸ FETCH CURRENT FACILITATOR DATA ðŸŒŸ
+            // 🌟 FETCH CURRENT FACILITATOR DATA 🌟
             let myTeacherId = localStorage.getItem('faci_teacher_id');
             try {
                 const { data: faciData } = await supabaseClient
@@ -366,11 +366,11 @@
                 document.getElementById('faciName').textContent = fullName;
             }
 
-            // ðŸŒŸ FETCH CO-FACILITATORS IN THE SAME SECTION (same teacher only) ðŸŒŸ
+            // 🌟 FETCH CO-FACILITATORS IN THE SAME SECTION (same teacher only) 🌟
             try {
                 // Require a confirmed teacher scope (resolve via DB if needed).
                 // Titles repeat across teachers, so never list co-facilitators by
-                // title alone â€” a missing scope must return nothing, not everyone.
+                // title alone — a missing scope must return nothing, not everyone.
                 const coTid = myTeacherId || (window.MJR_getFaciTeacherId ? await window.MJR_getFaciTeacherId(supabaseClient) : null);
                 let coFaciQuery = supabaseClient
                     .from('facilitators')
@@ -411,7 +411,7 @@
 
         });
 
-        // ðŸŒŸ UPLOAD PROFILE PICTURE FUNCTION ðŸŒŸ
+        // 🌟 UPLOAD PROFILE PICTURE FUNCTION 🌟
         function uploadAvatar(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -463,7 +463,7 @@
             reader.readAsDataURL(file);
         }
 
-        // ðŸŒŸ SAFE LOGOUT FUNCTION ðŸŒŸ
+        // 🌟 SAFE LOGOUT FUNCTION 🌟
         async function faciLogout() {
             if(confirm("Are you sure you want to sign out?")) {
                 stopPresenceHeartbeat();
@@ -477,8 +477,8 @@
             }
         }
     </script>
-    <script src="js/mjr-notify.js" defer></script>
-<script src="js/mjr-guard.js" defer></script>
-<script src="js/faci-session.js" defer></script>
+    <script src="mjr-notify.js" defer></script>
+<script src="mjr-guard.js" defer></script>
+<script src="faci-session.js" defer></script>
 </body>
 </html>
