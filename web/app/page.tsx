@@ -165,16 +165,21 @@ export default function DashboardPage() {
             const allResp = await apiGet("/api/faci/attendance");
             const agg: Record<string, { present: number; late: number; total: number }> = {};
             (allResp.attendance || []).forEach((a: any) => {
-              const k = a.student_id_no
-                ? "id:" + String(a.student_id_no).trim()
-                : a.student_name
-                ? "nm:" + String(a.student_name).trim().toLowerCase()
-                : null;
-              if (!k) return;
-              if (!agg[k]) agg[k] = { present: 0, late: 0, total: 0 };
-              agg[k].total++;
-              if (a.status === "Present") agg[k].present++;
-              else if (a.status === "Late") agg[k].late++;
+              const idk = a.student_id_no ? "id:" + String(a.student_id_no).trim() : null;
+              const nmk = a.student_name ? "nm:" + String(a.student_name).trim().toLowerCase() : null;
+              if (!idk && !nmk) return;
+              // One bucket per student, registered under BOTH keys: rows saved
+              // with an id_no and rows saved with only a name (or an id_no that
+              // was later edited) must land in the same counts — otherwise the
+              // absences silently vanish and attScore() defaults the student to
+              // a perfect attendance component in the grade.
+              const bucket =
+                (idk && agg[idk]) || (nmk && agg[nmk]) || { present: 0, late: 0, total: 0 };
+              if (idk) agg[idk] = bucket;
+              if (nmk) agg[nmk] = bucket;
+              bucket.total++;
+              if (a.status === "Present") bucket.present++;
+              else if (a.status === "Late") bucket.late++;
             });
             studs.forEach((st: any) => {
               const idk = st.id_no ? "id:" + String(st.id_no).trim() : null;
@@ -294,9 +299,13 @@ export default function DashboardPage() {
     if (type === "attendance") {
       const byKey: Record<string, any> = {};
       attendanceToday.forEach((r) => {
-        const key =
-          (r.student_id_no || "").trim() || "name:" + (r.student_name || "").trim().toLowerCase();
-        byKey[key] = r;
+        // Register under BOTH keys so a row still matches its student when
+        // the id_no drifted (edited later / saved name-only) — same reason as
+        // the attendance-rate aggregation above.
+        const idk = (r.student_id_no || "").trim();
+        const nmk = (r.student_name || "").trim().toLowerCase();
+        if (idk) byKey[idk] = r;
+        if (nmk) byKey["name:" + nmk] = r;
       });
       const groups: Record<string, { student: any; remarks: string }[]> = {
         Present: [],

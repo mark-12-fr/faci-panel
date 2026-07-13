@@ -104,11 +104,16 @@ export default function AttendancePage() {
       const isAlreadySubmitted = rows.length > 0;
       const isLocked = isAlreadySubmitted || isPastDate;
 
-      // Prefill marks from existing rows (match by id_no or name).
+      // Prefill marks from existing rows (match by id_no or name). Normalize
+      // both sides — id_no/name may carry stray whitespace or case drift from
+      // edits, and an exact-string miss would show a marked student as blank.
+      const norm = (v: any) => String(v || "").trim().toLowerCase();
       const nextMarks: Record<string, Status> = {};
       studs.forEach((s) => {
         const record = rows.find(
-          (a) => (s.id_no && a.student_id_no === s.id_no) || a.student_name === s.full_name
+          (a) =>
+            (norm(s.id_no) && norm(a.student_id_no) === norm(s.id_no)) ||
+            (norm(s.full_name) && norm(a.student_name) === norm(s.full_name))
         );
         if (record && (record.status === "Present" || record.status === "Absent" || record.status === "Late")) {
           nextMarks[s.id] = record.status;
