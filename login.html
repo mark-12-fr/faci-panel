@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facilitator Login | Management System</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="logo.jpg">
-    <link rel="apple-touch-icon" href="logo.jpg">
+    <link rel="icon" type="image/jpeg" href="images/logo.jpg">
+    <link rel="apple-touch-icon" href="images/logo.jpg">
     <meta name="theme-color" content="#3b82f6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -295,7 +295,7 @@
     <div id="splashScreen" class="splash-screen">
         <div class="splash-content">
             <div class="splash-logo-container">
-                <img src="logo.jpg" alt="Logo">
+                <img src="images/logo.jpg" alt="Logo">
             </div>
             <h1 class="splash-title">AcadTrack</h1>
             <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
@@ -351,7 +351,7 @@
             ? 'http://127.0.0.1:5000'
             : 'https://teacher-panel-d1kw.onrender.com';
 
-        // 🌟 CUSTOM ALERT FUNCTIONS 🌟
+        // ðŸŒŸ CUSTOM ALERT FUNCTIONS ðŸŒŸ
         function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
             document.getElementById('customAlertTitle').textContent = title;
             document.getElementById('customAlertMessage').textContent = message;
@@ -367,7 +367,7 @@
             document.getElementById('customAlertOverlay').classList.remove('show');
         }
 
-        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
+        // ðŸŒŸ INSTANT AUTO-LOGIN CHECK ðŸŒŸ
         window.addEventListener('DOMContentLoaded', () => {
             const activeFaciId = localStorage.getItem('faci_id');
             if (activeFaciId) {
@@ -388,7 +388,7 @@
             }
         });
 
-        // 🌟 SPLASH SCREEN LOGIC 🌟
+        // ðŸŒŸ SPLASH SCREEN LOGIC ðŸŒŸ
         window.addEventListener('load', function() {
             if (!localStorage.getItem('faci_id')) {
                 const splashScreen = document.getElementById('splashScreen');
@@ -412,7 +412,7 @@
             this.classList.toggle('fa-eye-slash');
         });
 
-        // 🔥 DIRECT SUPABASE LOGIN LOGIC 🔥
+        // ðŸ”¥ DIRECT SUPABASE LOGIN LOGIC ðŸ”¥
         document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
             e.preventDefault(); 
 

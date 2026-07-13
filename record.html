@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Class Record</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/jpeg" href="logo.jpg">
-    <link rel="apple-touch-icon" href="logo.jpg">
+    <link rel="icon" type="image/jpeg" href="images/logo.jpg">
+    <link rel="apple-touch-icon" href="images/logo.jpg">
     <meta name="theme-color" content="#3b82f6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -29,7 +29,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background-color: var(--primary-bg); color: var(--text-main); padding: 15px; padding-bottom: 90px; overflow-x: hidden; }
 
-        /* --- ✨ SMOOTH ANIMATIONS ✨ --- */
+        /* --- âœ¨ SMOOTH ANIMATIONS âœ¨ --- */
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(20px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -184,7 +184,7 @@
         }
         .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
 
-        /* --- ✨ DRAWER STYLES --- */
+        /* --- âœ¨ DRAWER STYLES --- */
         .clickable-name { 
             cursor: pointer; color: var(--accent-blue); display: flex; align-items: center; gap: 6px; 
             transition: 0.2s; padding: 4px 0;
@@ -259,7 +259,7 @@
             font-size: 0.72rem; color: var(--text-sub); text-align: center;
             margin: -6px 0 12px; padding: 0 6px;
         }
-        /* Analyzing overlay — professional */
+        /* Analyzing overlay â€” professional */
         @keyframes profFade {
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
@@ -378,7 +378,7 @@
         .rev-field.low-conf-field .flabel { color: #b91c1c; }
         .rev-field.low-conf-field input { color: #b91c1c; }
         .rev-field.low-conf-field::before {
-            content: '⚠️'; position: absolute; top: -6px; right: -4px;
+            content: 'âš ï¸'; position: absolute; top: -6px; right: -4px;
             font-size: 0.62rem; pointer-events: none;
         }
         /* Sticky banner at the very top of the review body counting how many
@@ -407,7 +407,7 @@
             outline: none; font-family: 'Inter','Segoe UI',sans-serif; color: var(--text-main);
         }
         .rev-field input:focus { border-color: var(--accent-blue); background: #eff6ff; }
-        /* Search bar inside the review modal — lets the facilitator jump to a
+        /* Search bar inside the review modal â€” lets the facilitator jump to a
            specific student's row instead of scrolling all 55 cards. */
         .rev-search {
             display: flex; align-items: center; gap: 8px;
@@ -535,7 +535,7 @@
         <div class="header-flex">
             <div>
                 <h1>Class Record</h1>
-                <p style="font-size: 0.8rem; color: var(--text-sub);">All scores — <span id="headerSection">...</span></p>
+                <p style="font-size: 0.8rem; color: var(--text-sub);">All scores â€” <span id="headerSection">...</span></p>
             </div>
         </div>
     </div>
@@ -722,10 +722,10 @@
                      more scores with confidence < 60%. Tapping "Jump" scrolls
                      the review list to the first suspicious card. -->
                 <div id="doubleCheckBanner" class="double-check-banner">
-                    <span>⚠️ Please double-check</span>
+                    <span>âš ï¸ Please double-check</span>
                     <span class="dc-count" id="doubleCheckCount">0</span>
                     <span>score(s) below</span>
-                    <button type="button" class="dc-jump" onclick="jumpToFirstLowConf()">Jump to first ↓</button>
+                    <button type="button" class="dc-jump" onclick="jumpToFirstLowConf()">Jump to first â†“</button>
                 </div>
                 <div id="reviewNotes" class="review-notes" style="display:none"></div>
                 <!-- Search: filters the review cards by student name as the
@@ -774,7 +774,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qenZ1d2tlcGFhc25zdnV1amd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk5MTgsImV4cCI6MjA5MzE3NTkxOH0.tFh2d3ZIZYMWk-7HHckCbkwbTJ7uQ9onGeTaaUlkeH0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
+        // ðŸ”¥ ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) ðŸ”¥
         let presenceHeartbeatTimer = null;
 
         async function sendPresenceHeartbeat(online = true) {
@@ -879,10 +879,10 @@
                             loadClassRecordData(sectionTitle);
                             showUpdateToast("Live Update: A score was modified by the Teacher.");
 
-                            // Cross-device notification — skip self-echo.
+                            // Cross-device notification â€” skip self-echo.
                             if (window.MJR_notify && !(window.MJR_isLikelyOwnChange && window.MJR_isLikelyOwnChange())) {
                                 window.MJR_notify({
-                                    title: 'Teacher updated scores — ' + (sectionTitle || 'your section'),
+                                    title: 'Teacher updated scores â€” ' + (sectionTitle || 'your section'),
                                     body: 'A score in the class record was changed.',
                                     tag: 'mjr-classrec-' + currentSectionId
                                 });
@@ -966,7 +966,7 @@
             // quarter has no value for a field, we display the previous
             // quarter's value so it doesn't look wiped. These cells are
             // shown disabled to keep the read-only feel of submitted
-            // scores — the teacher can still edit them via the teacher
+            // scores â€” the teacher can still edit them via the teacher
             // panel, which is the source of truth.
             const fallbackRecs = studentRecs
                 .filter(r => r !== currentRec)
@@ -1123,7 +1123,7 @@
 
                 row.querySelectorAll('.score-input').forEach(input => {
                     // Skip values that are only being displayed from a
-                    // previous quarter — they live in another row and we
+                    // previous quarter â€” they live in another row and we
                     // don't want to copy them into the current quarter.
                     if (input.dataset.carried === '1') return;
 
@@ -1180,12 +1180,12 @@
             }
         });
 
-        /* ═══════════════════════════════════════════════════════════════
-           PHOTO-TO-RECORD (Upload → AI Vision → Review → Apply)
-           ═══════════════════════════════════════════════════════════════
-           Same shape as attendance.html: pick photo → downsize to JPEG →
-           POST /api/vision-analyze with type="record" → review modal shows
-           every extracted score (editable) → Apply fills only the ENABLED
+        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           PHOTO-TO-RECORD (Upload â†’ AI Vision â†’ Review â†’ Apply)
+           â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           Same shape as attendance.html: pick photo â†’ downsize to JPEG â†’
+           POST /api/vision-analyze with type="record" â†’ review modal shows
+           every extracted score (editable) â†’ Apply fills only the ENABLED
            inputs in the table (disabled ones = already-submitted scores,
            only the teacher can edit those, so we never overwrite them).
            The facilitator still presses Submit New Scores to save.
@@ -1323,8 +1323,8 @@
             }, 80);
         }
 
-        // Read a picked file → downsize (JPEG, longest side ≤ 1800 for records
-        // so column headers stay readable) → return { base64, mimeType, thumbDataUrl }.
+        // Read a picked file â†’ downsize (JPEG, longest side â‰¤ 1800 for records
+        // so column headers stay readable) â†’ return { base64, mimeType, thumbDataUrl }.
         async function _recFileToBase64Jpeg(file) {
             const dataUrl = await new Promise((resolve, reject) => {
                 const r = new FileReader();
@@ -1677,8 +1677,8 @@
             showAlert('Applied to table', msg, '#22c55e');
         }
     </script>
-    <script src="mjr-notify.js" defer></script>
-<script src="mjr-guard.js" defer></script>
-<script src="faci-session.js" defer></script>
+    <script src="js/mjr-notify.js" defer></script>
+<script src="js/mjr-guard.js" defer></script>
+<script src="js/faci-session.js" defer></script>
 </body>
 </html>
