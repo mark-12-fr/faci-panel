@@ -16,6 +16,12 @@ accuracy-hardened read path on top:
     verify them
   • attendance scans: decorrelated verification re-read; disagreements flagged
   • row-order cross-check in every prompt (class sheets are roster-ordered)
+  • image-before-text part order (Gemini single-image best practice)
+  • per-cell confidence: one doubtful cell flags the student (min over cells)
+  • row cross-check: two students claiming the same sheet row within one pass
+    flags both (physically impossible → the pass slipped rows there)
+  • multi-column scans verify COLUMN-MAJOR — a row-shift made reading
+    row-by-row is almost never repeated reading column-by-column
 
 Primary provider : Google Gemini    (GEMINI_API_KEY)
 Optional fallback: Groq (Llama 4)    (GROQ_API_KEY)
@@ -120,9 +126,20 @@ ROW_ORDER_NOTE = (
 )
 
 
-def verification_prompt(prompt: str) -> str:
+def verification_prompt(prompt: str, column_major: bool = False) -> str:
     """Decorrelated second read: scanning the sheet in a different order breaks
-    correlated first-impression errors (row shifts, repeated misreads)."""
+    correlated first-impression errors (row shifts, repeated misreads). For
+    multi-column scans the strongest decorrelation is COLUMN-MAJOR reading —
+    a row-shift error made while reading row-by-row is almost never repeated
+    when reading the same table column-by-column."""
+    if column_major:
+        return (
+            "INDEPENDENT VERIFICATION PASS — this time read the table COLUMN BY COLUMN: "
+            "finish one requested column from top to bottom (tracking which row each value "
+            "sits on), then move to the next column, and only then assemble the per-student "
+            "results. Apply every rule below as if reading the photo for the first time.\n\n"
+            + prompt
+        )
     return (
         "INDEPENDENT VERIFICATION PASS — re-read the sheet starting from the BOTTOM row "
         "and working UPWARD, so you do not repeat a first-impression error. Apply every "
@@ -156,20 +173,34 @@ def build_record_schema(roster: List[str], target_fields: List[str]) -> dict:
                 "items": {
                     "type": "OBJECT",
                     "properties": {
+                        # `row` = the sheet row this student was read from (the
+                        # '#' column when printed, else ordinal position). Two
+                        # students claiming the same row is physically
+                        # impossible — used server-side to flag row-alignment
+                        # slips for review.
+                        "row": {"type": "NUMBER"},
                         "name": {"type": "STRING", "enum": list(roster)},
                         "scores": {
+                            "type": "OBJECT",
+                            "properties": {f: {"type": "NUMBER"} for f in fields},
+                        },
+                        # Per-cell 0..1 confidence keyed like `scores` — lets the
+                        # model doubt ONE cell without tanking the whole student.
+                        "cell_confidence": {
                             "type": "OBJECT",
                             "properties": {f: {"type": "NUMBER"} for f in fields},
                         },
                         "confidence": {"type": "NUMBER"},
                     },
                     "required": ["name", "scores"],
+                    "propertyOrdering": ["row", "name", "scores", "cell_confidence", "confidence"],
                 },
             },
             "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
             "notes": {"type": "STRING"},
         },
         "required": ["students"],
+        "propertyOrdering": ["students", "unmatched", "notes"],
     }
 
 
@@ -187,12 +218,14 @@ def build_attendance_schema(roster: List[str]) -> dict:
                         "confidence": {"type": "NUMBER"},
                     },
                     "required": ["name", "status"],
+                    "propertyOrdering": ["name", "status", "confidence"],
                 },
             },
             "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
             "notes": {"type": "STRING"},
         },
         "required": ["students"],
+        "propertyOrdering": ["students", "unmatched", "notes"],
     }
 
 
@@ -257,10 +290,14 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             + ROW_ORDER_NOTE + "\n"
             "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
             "{\n"
-            '  "students": [ { "name": "<exact roster name>", "scores": { ' + schema_scores + ' }, "confidence": <0..1> } ],\n'
+            '  "students": [ { "row": <sheet row number for this student>, "name": "<exact roster name>", '
+            '"scores": { ' + schema_scores + ' }, "cell_confidence": { "<field>": <0..1 for that cell> }, '
+            '"confidence": <0..1 overall> } ],\n'
             '  "unmatched": [ "<name text seen in photo>" ],\n'
             '  "notes": "<optional one-line observation>"\n'
-            "}\n\n"
+            "}\n"
+            '"row" is the row you read the student from (the # column if printed, else counting data rows '
+            "from 1). Two students can NEVER share a row.\n\n"
             "ROSTER (match names to these exact strings):\n"
             + _roster_lines(roster)
         )
@@ -324,11 +361,14 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "═══ OUTPUT ═══\n"
             "Reply with STRICT JSON ONLY (no prose, no markdown, no code fences):\n"
             "{\n"
-            '  "students": [ { "name": "<exact roster name>", "scores": { "' + target_field
-            + '": <number> }, "confidence": <0..1> } ],\n'
+            '  "students": [ { "row": <sheet row number>, "name": "<exact roster name>", "scores": { "'
+            + target_field + '": <number> }, "cell_confidence": { "' + target_field
+            + '": <0..1> }, "confidence": <0..1> } ],\n'
             '  "unmatched": [ "<name text seen in photo>" ],\n'
             '  "notes": "<optional one-line observation, e.g. photo blur>"\n'
-            "}\n\n"
+            "}\n"
+            '"row" is the row you read the student from (the # column if printed, else counting data rows '
+            "from 1). Two students can NEVER share a row.\n\n"
             "Match student names in the photo to the ROSTER (ground truth). Tolerate small OCR "
             "errors in names, but names in `students[].name` MUST match the roster string EXACTLY.\n\n"
             "ROSTER (match names to these exact strings):\n"
@@ -368,7 +408,8 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n"
         "{\n"
         '  "students": [\n'
-        '    { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> },\n'
+        '    { "row": <sheet row number>, "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, '
+        '"cell_confidence": { "<field_key>": <0..1>, ... }, "confidence": <0..1> },\n'
         "    ...\n"
         "  ],\n"
         '  "unmatched": [ "<name text seen in photo but not matched>" ],\n'
@@ -483,9 +524,13 @@ async def gemini_vision(
                         headers={"Content-Type": "application/json"},
                         json={
                             "contents": [{
+                                # Image BEFORE the text: Gemini's documented
+                                # best practice for single-image prompts —
+                                # measurably better grounding of the
+                                # instructions in the picture.
                                 "parts": [
-                                    {"text": prompt},
                                     {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+                                    {"text": prompt},
                                 ]
                             }],
                             "generationConfig": gen,
@@ -730,7 +775,24 @@ def sanitize_record_students(lst, roster_set) -> List[dict]:
         if not scores:
             continue
         seen.add(name)
-        out.append({"name": name, "scores": scores, "confidence": _clamp_conf(item.get("confidence"))})
+        # Student confidence = the WORST cell: overall confidence min'd with
+        # every per-cell confidence for a field we kept. One doubtful cell must
+        # flag the student for review even when the rest are clear.
+        conf = _clamp_conf(item.get("confidence"))
+        raw_cc = item.get("cell_confidence") if isinstance(item.get("cell_confidence"), dict) else {}
+        for field, cval in raw_cc.items():
+            if field in scores:
+                conf = min(conf, _clamp_conf(cval))
+        entry: Dict[str, Any] = {"name": name, "scores": scores, "confidence": conf}
+        # `row` = which sheet row the model read this student from. Kept for the
+        # duplicate-row cross-check downstream; stripped before the response.
+        try:
+            row = int(float(item.get("row")))
+            if 1 <= row <= 500:
+                entry["row"] = row
+        except (TypeError, ValueError):
+            pass
+        out.append(entry)
     return out
 
 
@@ -747,6 +809,30 @@ def record_disputed_names(a: List[dict], b: List[dict]) -> List[str]:
                 disputed.append(s["name"])
                 break
     return disputed
+
+
+def flag_duplicate_rows(merged: List[dict], passes: List[List[dict]]) -> None:
+    """Two students can never occupy the same sheet row. If any single pass
+    read two roster names off one row number, that pass slipped rows somewhere
+    around that point — cap every implicated student's confidence so the
+    review modal flags them for a human check. (Rows are compared only WITHIN
+    a pass; different passes may legitimately count rows differently.)"""
+    suspect: set = set()
+    for p in passes:
+        rows_seen: Dict[int, str] = {}
+        for s in p:
+            r = s.get("row")
+            if r is None:
+                continue
+            other = rows_seen.get(r)
+            if other is not None and other != s["name"]:
+                suspect.add(other)
+                suspect.add(s["name"])
+            else:
+                rows_seen[r] = s["name"]
+    for s in merged:
+        if s["name"] in suspect:
+            s["confidence"] = min(s["confidence"], 0.45)
 
 
 def merge_record_consensus(passes: List[List[dict]], target_fields) -> List[dict]:
@@ -945,8 +1031,11 @@ async def vision_analyze(
             # Pass 2 is DECORRELATED from pass 1: it re-reads the sheet
             # bottom-up on a rotated model order, so the two passes cannot
             # simply repeat the same first-impression mistake.
+            # Multi-column scans verify COLUMN-MAJOR (strongest row-shift
+            # decorrelation); single-column scans verify bottom-up.
             raw_reply2 = await gemini_vision(
-                gemini_key, verification_prompt(prompt), image_b64, mime_type,
+                gemini_key, verification_prompt(prompt, column_major=len(target_fields) >= 2),
+                image_b64, mime_type,
                 prefer_accurate=True, response_schema=schema, rotate=1,
             )
             parsed2 = parse_vision_json(raw_reply2)
@@ -968,6 +1057,7 @@ async def vision_analyze(
                 except Exception:  # noqa: BLE001
                     pass  # tie-break is best-effort; 2-pass merge still applies
             students = merge_record_consensus(passes, target_fields)
+            flag_duplicate_rows(students, passes)
             notes2 = str(parsed2.get("notes") or "").strip()
             if notes2 and notes2 not in notes:
                 notes = (notes + " | " if notes else "") + notes2
@@ -1000,5 +1090,14 @@ async def vision_analyze(
                 students = merged_att
         except Exception:  # noqa: BLE001
             pass  # best-effort; single pass is still returned
+
+    if type_ == "record":
+        # Row cross-check also covers the single-pass path (Groq fallback / no
+        # explicit fields) — after a consensus merge the entries carry no `row`
+        # key, so this is a no-op there. Then strip internal keys: the response
+        # contract stays exactly {name, scores, confidence}.
+        flag_duplicate_rows(students, [students])
+        for s in students:
+            s.pop("row", None)
 
     return JSONResponse({"students": students, "unmatched": unmatched, "notes": notes})
