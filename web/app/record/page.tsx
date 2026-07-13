@@ -384,7 +384,9 @@ export default function RecordPage() {
       im.onerror = () => reject(new Error("Could not decode the image. Try another photo."));
       im.src = dataUrl;
     });
-    const side = 2400;
+    // Keep as much resolution as the backend accepts — small handwritten
+    // digits survive 2800px far better than 2400px under the AI's tiling.
+    const side = 2800;
     let w = img.naturalWidth || img.width;
     let h = img.naturalHeight || img.height;
     if (!w || !h) throw new Error("Empty image.");
@@ -402,7 +404,13 @@ export default function RecordPage() {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
-    const outDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    // Step quality down only if a busy photo would blow the backend's 6 MB
+    // limit (base64 length ≈ bytes × 1.37; stay well under with 5.5M chars).
+    let outDataUrl = "";
+    for (const q of [0.92, 0.85, 0.78]) {
+      outDataUrl = canvas.toDataURL("image/jpeg", q);
+      if (outDataUrl.length <= 5.5 * 1024 * 1024) break;
+    }
     return { base64: outDataUrl.split(",")[1] || "", mimeType: "image/jpeg", thumb: outDataUrl };
   }
 
