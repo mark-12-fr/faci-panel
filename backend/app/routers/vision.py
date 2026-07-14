@@ -240,63 +240,6 @@ def build_record_schema(roster: List[str], target_fields: List[str]) -> dict:
     }
 
 
-def build_attendance_schema(roster: List[str]) -> dict:
-    return {
-        "type": "OBJECT",
-        "properties": {
-            "students": {
-                "type": "ARRAY",
-                "items": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "name": {"type": "STRING", "enum": list(roster)},
-                        "status": {"type": "STRING", "enum": ["Present", "Absent", "Late", "Excused"]},
-                        "confidence": {"type": "NUMBER"},
-                    },
-                    "required": ["name", "status"],
-                    "propertyOrdering": ["name", "status", "confidence"],
-                },
-            },
-            "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
-            "notes": {"type": "STRING"},
-        },
-        "required": ["students"],
-        "propertyOrdering": ["students", "unmatched", "notes"],
-    }
-
-
-def build_attendance_prompt(roster: List[str]) -> str:
-    return (
-        "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. "
-        "For each student on the ROSTER below, find their attendance cell and read the LETTER written in it:\n\n"
-        "  LETTER 'P' → \"Present\"\n"
-        "  LETTER 'A' → \"Absent\"\n"
-        "  LETTER 'L' → \"Late\"\n"
-        "  LETTER 'E' → \"Excused\"\n"
-        "  EMPTY / BLANK cell → \"Absent\"\n\n"
-        "NOTE: A small dot (.) or faint mark that is NOT clearly one of the letters P, A, L, E counts as BLANK → \"Absent\".\n"
-        "Only a clear, intentional letter P, A, L, or E should be read as marked.\n\n"
-        f"CRITICAL — You MUST return ALL {len(roster)} roster students:\n"
-        f"  • students[] MUST have exactly {len(roster)} entries in ROSTER ORDER. No omissions, no duplicates.\n"
-        "  • Read each row left-to-right, match to the roster name, then read the attendance letter.\n"
-        "  • If you CANNOT find a student's row, include them as Absent with confidence 0.2.\n\n"
-        "MATCHING RULES:\n"
-        "  • Match photo names to the closest roster name (tolerate missing accents, wrong middle initial).\n"
-        "  • Never invent names not on the roster. Names must match EXACTLY.\n"
-        + ROW_ORDER_NOTE + "\n"
-        "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
-        "{\n"
-        '  "students": [\n'
-        '    { "name": "<exact roster name>", "status": "Present", "confidence": 1.0 },\n'
-        '    { "name": "<exact roster name>", "status": "Absent", "confidence": 0.9 }\n'
-        "  ],\n"
-        '  "unmatched": [],\n'
-        '  "notes": ""\n'
-        "}\n\n"
-        f"ROSTER ({len(roster)} names — return exactly this many):\n"
-        + _roster_lines(roster)
-    )
-
 
 def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[List[str]] = None) -> str:
     raw = target_fields if isinstance(target_fields, list) else ([target_fields] if target_fields else [])
@@ -804,22 +747,6 @@ def _clamp_conf(v) -> float:
     return 1.0 if conf > 1 else conf
 
 
-def sanitize_students(lst, roster_set) -> List[dict]:
-    if not isinstance(lst, list):
-        return []
-    seen = set()
-    valid = {"Present", "Absent", "Late", "Excused"}
-    out = []
-    for item in lst:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        status = str(item.get("status") or "").strip()
-        if not name or name not in roster_set or status not in valid or name in seen:
-            continue
-        seen.add(name)
-        out.append({"name": name, "status": status, "confidence": _clamp_conf(item.get("confidence"))})
-    return out
 
 
 def sanitize_record_students(lst, roster_set) -> List[dict]:
@@ -1082,8 +1009,8 @@ async def vision_analyze(
         prompt = build_record_prompt(roster, target_fields, roster_ids if roster_ids else None)
         schema = build_record_schema(roster, target_fields)
     else:
-        prompt = build_attendance_prompt(roster)
-        schema = build_attendance_schema(roster)
+        prompt = build_record_prompt(roster, target_fields, roster_ids if roster_ids else None)
+        schema = build_record_schema(roster, target_fields)
 
     # Step 1: Gemini (primary)
     raw_reply = None
@@ -1138,10 +1065,7 @@ async def vision_analyze(
         )
 
     roster_set = set(roster)
-    if type_ == "record":
-        students = sanitize_record_students(parsed.get("students"), roster_set)
-    else:
-        students = sanitize_students(parsed.get("students"), roster_set)
+    students = sanitize_record_students(parsed.get("students"), roster_set)
     unmatched = []
     if isinstance(parsed.get("unmatched"), list):
         unmatched = [str(n or "").strip() for n in parsed["unmatched"] if str(n or "").strip()][:30]
@@ -1189,32 +1113,6 @@ async def vision_analyze(
                 notes = notes[:240]
         except Exception:  # noqa: BLE001
             pass  # best-effort; fall back to single pass
-
-    # Attendance verification pass: re-read once; agreements lock in at high
-    # confidence, disagreements drop to 0.35 so the letter gets double-checked.
-    if type_ == "attendance" and gemini_key and students:
-        try:
-            raw_reply2 = await gemini_vision(
-                gemini_key, verification_prompt(prompt), image_b64, mime_type,
-                prefer_accurate=True, response_schema=schema, rotate=1,
-            )
-            parsed2 = parse_vision_json(raw_reply2)
-            students2 = sanitize_students(parsed2.get("students"), roster_set)
-            if students2:
-                second = {s["name"]: s for s in students2}
-                merged_att = []
-                for s in students:
-                    other = second.pop(s["name"], None)
-                    if other is None:
-                        merged_att.append(s)
-                    elif other["status"] == s["status"]:
-                        merged_att.append({**s, "confidence": max(s["confidence"], other["confidence"], 0.9)})
-                    else:
-                        merged_att.append({**s, "confidence": 0.35})
-                merged_att.extend(second.values())
-                students = merged_att
-        except Exception:  # noqa: BLE001
-            pass  # best-effort; single pass is still returned
 
     if type_ == "record":
         # Row cross-check also covers the single-pass path (Groq fallback / no
