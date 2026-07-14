@@ -531,6 +531,39 @@
             font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.9rem; font-weight: 800;
         }
         .fp-continue-bar .fp-continue:disabled { background: #94a3b8; cursor: not-allowed; }
+        /* Crop modal overlay */
+        .crop-overlay {
+            position: fixed; inset: 0; z-index: 2800;
+            background: rgba(0,0,0,0.85);
+            display: none; flex-direction: column;
+        }
+        .crop-overlay.show { display: flex; }
+        .crop-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; color: #fff;
+        }
+        .crop-header h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+        .crop-actions { display: flex; gap: 10px; }
+        .crop-actions button {
+            background: rgba(255,255,255,0.15); border: none; color: #fff;
+            padding: 8px 18px; border-radius: 8px; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; font-family: 'Inter','Segoe UI',sans-serif;
+        }
+        .crop-actions .crop-confirm { background: var(--accent-blue); }
+        .crop-actions .crop-confirm:disabled { background: #64748b; cursor: not-allowed; }
+        .crop-canvas-wrap {
+            flex: 1; overflow: hidden; position: relative; touch-action: none;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 8px 8px; border-radius: 8px;
+        }
+        .crop-canvas-wrap canvas {
+            display: block; max-width: 100%; max-height: 100%;
+            border-radius: 6px;
+        }
+        .crop-hint {
+            text-align: center; color: rgba(255,255,255,0.6);
+            font-size: 0.78rem; padding: 6px 0 10px;
+        }
     </style>
 </head>
 <body>
@@ -709,6 +742,21 @@
     <div id="updateToast" class="toast-notification">
         <i class="fa-solid fa-arrows-rotate"></i>
         <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
+    </div>
+
+    <!-- Crop modal: lets the user select the scores region before AI analysis -->
+    <div id="cropOverlay" class="crop-overlay">
+        <div class="crop-header">
+            <h3><i class="fa-solid fa-crop"></i> Crop to scores area</h3>
+            <div class="crop-actions">
+                <button type="button" onclick="cancelCrop()">Cancel</button>
+                <button type="button" class="crop-confirm" id="cropConfirmBtn" onclick="confirmCrop()" disabled>Analyze</button>
+            </div>
+        </div>
+        <div class="crop-canvas-wrap" id="cropCanvasWrap">
+            <canvas id="cropCanvas"></canvas>
+        </div>
+        <div class="crop-hint">Drag to select the scores area. Pinch-to-zoom not supported — just crop tightly around the scores.</div>
     </div>
 
     <!-- Analyzing overlay -->
@@ -1220,7 +1268,145 @@
             .toUpperCase()
             .replace('_', ' ');
 
-        // Target field the facilitator picked in the field-picker modal. Passed
+        // ── Crop state ────────────────────────────────────────────────────────
+        let _cropState = null; // { img, srcBase64, srcMime, origW, origH, displayW, displayH, offsetX, offsetY, sel }
+        let _cropCanvasCtx = null;
+        let _cropDrawing = false;
+        let _cropStartX = 0, _cropStartY = 0;
+
+        function _cropGetPos(e) {
+            const canvas = document.getElementById('cropCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const t = e.touches ? e.touches[0] : e;
+            return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+        }
+
+        function _cropRedraw() {
+            const ctx = _cropCanvasCtx, st = _cropState;
+            if (!ctx || !st) return;
+            const cvs = ctx.canvas;
+            cvs.width = st.displayW; cvs.height = st.displayH;
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            ctx.drawImage(st.img, 0, 0, st.displayW, st.displayH);
+            if (!st.sel) return;
+            const s = st.sel;
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillRect(0, 0, cvs.width, s.y);
+            ctx.fillRect(0, s.y + s.h, cvs.width, cvs.height - s.y - s.h);
+            ctx.fillRect(0, s.y, s.x, s.h);
+            ctx.fillRect(s.x + s.w, s.y, cvs.width - s.x - s.w, s.h);
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(s.x, s.y, s.w, s.h);
+            // corner handles
+            const hsz = 8;
+            ctx.fillStyle = '#3b82f6';
+            [[s.x, s.y], [s.x + s.w, s.y], [s.x, s.y + s.h], [s.x + s.w, s.y + s.h]].forEach(([cx, cy]) => {
+                ctx.fillRect(cx - hsz/2, cy - hsz/2, hsz, hsz);
+            });
+            document.getElementById('cropConfirmBtn').disabled = false;
+        }
+
+        function _cropStartDrag(e) {
+            e.preventDefault();
+            _cropDrawing = true;
+            const p = _cropGetPos(e);
+            _cropStartX = p.x; _cropStartY = p.y;
+            _cropState.sel = { x: p.x, y: p.y, w: 0, h: 0 };
+        }
+
+        function _cropMoveDrag(e) {
+            e.preventDefault();
+            if (!_cropDrawing) return;
+            const p = _cropGetPos(e);
+            const st = _cropState;
+            let x = Math.min(_cropStartX, p.x), y = Math.min(_cropStartY, p.y);
+            let w = Math.abs(p.x - _cropStartX), h = Math.abs(p.y - _cropStartY);
+            // minimum 20px
+            if (w < 20 || h < 20) return;
+            st.sel = { x, y, w, h };
+            _cropRedraw();
+        }
+
+        function _cropEndDrag(e) {
+            e.preventDefault();
+            _cropDrawing = false;
+            const st = _cropState;
+            if (st && st.sel && (st.sel.w < 20 || st.sel.h < 20)) {
+                st.sel = null;
+                _cropRedraw();
+                document.getElementById('cropConfirmBtn').disabled = true;
+            }
+        }
+
+        function showCropModal(img, srcBase64, srcMime) {
+            const overlay = document.getElementById('cropOverlay');
+            const canvas = document.getElementById('cropCanvas');
+            const wrap = document.getElementById('cropCanvasWrap');
+            const wrapRect = wrap.getBoundingClientRect();
+            const maxW = wrapRect.width - 4, maxH = wrapRect.height - 4;
+            const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+            const scale = Math.min(maxW / iw, maxH / ih, 1);
+            const dw = Math.round(iw * scale), dh = Math.round(ih * scale);
+            _cropState = {
+                img, srcBase64, srcMime, origW: iw, origH: ih,
+                displayW: dw, displayH: dh, sel: null
+            };
+            _cropCanvasCtx = canvas.getContext('2d');
+            document.getElementById('cropConfirmBtn').disabled = true;
+            _cropRedraw();
+            overlay.classList.add('show');
+            // Add event listeners
+            const onStart = (e) => _cropStartDrag(e);
+            const onMove = (e) => _cropMoveDrag(e);
+            const onEnd = (e) => _cropEndDrag(e);
+            canvas.addEventListener('mousedown', onStart);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onEnd);
+            canvas.addEventListener('touchstart', onStart, { passive: false });
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('touchend', onEnd);
+            // Store for cleanup
+            _cropState._cleanup = () => {
+                canvas.removeEventListener('mousedown', onStart);
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onEnd);
+                canvas.removeEventListener('touchstart', onStart);
+                window.removeEventListener('touchmove', onMove);
+                window.removeEventListener('touchend', onEnd);
+            };
+        }
+
+        function cancelCrop() {
+            const overlay = document.getElementById('cropOverlay');
+            overlay.classList.remove('show');
+            if (_cropState && _cropState._cleanup) _cropState._cleanup();
+            _cropState = null;
+            _cropCanvasCtx = null;
+        }
+
+        function confirmCrop() {
+            const st = _cropState;
+            if (!st || !st.sel) return;
+            const s = st.sel;
+            // Map display coords to original image coords
+            const scaleX = st.origW / st.displayW;
+            const scaleY = st.origH / st.displayH;
+            const cropX = Math.round(s.x * scaleX);
+            const cropY = Math.round(s.y * scaleY);
+            const cropW = Math.round(s.w * scaleX);
+            const cropH = Math.round(s.h * scaleY);
+            // Create a temporary canvas to crop
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = cropW; tmpCanvas.height = cropH;
+            const tmpCtx = tmpCanvas.getContext('2d');
+            tmpCtx.drawImage(st.img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            const outDataUrl = tmpCanvas.toDataURL('image/jpeg', 0.92);
+            const base64 = outDataUrl.split(',')[1] || '';
+            cancelCrop();
+            // Proceed with AI analysis using the cropped image
+            _analyzeRecordPhoto(base64, 'image/jpeg', outDataUrl);
+        }
         // to the /api/vision-analyze call so the AI knows which single column
         // to read. Null / '' → auto-detect from column headers (fallback).
         // Fields the facilitator chose for the NEXT photo. Empty array = auto-
@@ -1527,12 +1713,37 @@
                 return;
             }
 
+            try {
+                const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
+                if (!base64) throw new Error('Could not read the photo.');
+
+                // Show crop modal so the user can select the scores area
+                const img = new Image();
+                img.onload = () => {
+                    showCropModal(img, base64, mimeType);
+                };
+                img.onerror = () => {
+                    showAlert('Could not decode the photo', 'Try another photo.', '#ef4444');
+                };
+                img.src = 'data:image/jpeg;base64,' + base64;
+            } catch (err) {
+                console.error('Photo read error:', err);
+                showAlert('Could not read photo', String(err?.message || err), '#ef4444');
+            }
+        }
+
+        async function _analyzeRecordPhoto(base64, mimeType, thumbDataUrl) {
+            const roster = _recCurrentRosterNames();
+            const rosterIds = _recCurrentRosterIds();
+            if (roster.length === 0) {
+                showAlert('No students yet', 'Wait for the class list to load first, then try again.', '#f59e0b');
+                return;
+            }
+
             const overlay = document.getElementById('analyzeOverlay');
             overlay.classList.add('show');
             _startAnalyzeProgress();
             try {
-                const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
-
                 if (_analyzeIsCancelled) return;
 
                 const resp = await fetch('/api/vision-analyze', {

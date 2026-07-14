@@ -27,6 +27,8 @@ Primary provider : Google Gemini    (GEMINI_API_KEY)
 Optional fallback: Groq (Llama 4)    (GROQ_API_KEY)
 Model overrides  : GEMINI_VISION_MODEL, GROQ_VISION_MODEL
 """
+import base64
+import io
 import json
 import re
 from typing import Any, Dict, List, Optional
@@ -34,6 +36,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from PIL import Image, ImageFilter, ImageOps
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import settings
@@ -70,6 +73,31 @@ CHUNK_SIZE = 35
 
 RECORD_FIELDS: List[str] = list(CLASS_RECORD_SCORE_FIELDS)
 RECORD_FIELD_SET = set(RECORD_FIELDS)
+
+
+# ── Image pre-processing ─────────────────────────────────────────────────────
+
+def _preprocess_image(image_b64: str) -> str:
+    """Enhance image for better handwritten-digit legibility.
+
+    Steps: grayscale → auto contrast → sharpen. Returns the original base64
+    unchanged if anything fails (best-effort).
+    """
+    try:
+        raw = base64.b64decode(image_b64)
+        img = Image.open(io.BytesIO(raw))
+        if img.mode != "L":
+            img = img.convert("L")
+        img = ImageOps.autocontrast(img, cutoff=3)
+        img = img.filter(ImageFilter.SHARPEN)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=92)
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return image_b64
+
+
+_REC_PREPROCESS_FIELDS = {"image_base64", "roster_image_base64"}
 
 
 class _RateLimit(Exception):
@@ -973,9 +1001,17 @@ async def vision_analyze(
     if len(roster) > MAX_ROSTER:
         return JSONResponse({"error": f"Roster too large (max {MAX_ROSTER})."}, status_code=400)
 
-    # ── Two-photo flow: extract student order from roster photo ──────────────
+    # ── Image pre-processing: enhance legibility ──────────────────────────
+    # Both the scores image and (when provided) the roster image are
+    # converted to grayscale, auto-contrasted, and sharpened so the AI sees
+    # cleaner digits.
+    image_b64 = _preprocess_image(image_b64)
     roster_image_b64 = (body.roster_image_base64 or "").strip()
+    if roster_image_b64:
+        roster_image_b64 = _preprocess_image(roster_image_b64)
     roster_mime = (body.roster_mime_type or "").strip().lower()
+
+    # ── Two-photo flow: extract student order from roster photo ──────────────
     if roster_image_b64 and _MIME_RE.match(roster_mime) and gemini_key:
         try:
             raw_roster_reply = await gemini_vision(

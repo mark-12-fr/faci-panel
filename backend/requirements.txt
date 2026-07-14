@@ -26,3 +26,6 @@ pywebpush==2.0.1
 
 # File uploads (vision image) / form parsing
 python-multipart==0.0.20
+
+# Image pre-processing (vision photo enhancement)
+Pillow==11.1.0
