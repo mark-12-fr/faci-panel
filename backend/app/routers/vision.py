@@ -96,6 +96,8 @@ class VisionRequest(BaseModel):
     roster_ids: List[str] = Field(default_factory=list, alias="rosterIds")
     target_fields: List[str] = Field(default_factory=list, alias="targetFields")
     target_field: str = Field(default="", alias="targetField")
+    roster_image_base64: str = Field(default="", alias="rosterImageBase64")
+    roster_mime_type: str = Field(default="", alias="rosterMimeType")
 
 
 # ── Prompt builders ─────────────────────────────────────────────────────────
@@ -119,6 +121,26 @@ def _roster_lines(roster: List[str], roster_ids: Optional[List[str]] = None) -> 
     if roster_ids and len(roster_ids) == len(roster):
         return "\n".join(f"{i + 1}. [{rid}] {n}" for i, (n, rid) in enumerate(zip(roster, roster_ids)))
     return "\n".join(f"{i + 1}. {n}" for i, n in enumerate(roster))
+
+
+ROSTER_EXTRACT_PROMPT = (
+    "You are analyzing a photo of the LEFT side of a classroom grade sheet that shows "
+    "only the ROW NUMBER, STUDENT NAME, and ID NUMBER columns. "
+    "Your ONLY job is to read every student name and ID number in order from TOP to BOTTOM.\n\n"
+    "RULES:\n"
+    "  • Read EACH row from top to bottom. Output them in the SAME ORDER they appear.\n"
+    "  • For each row, output the row number, the student name, and the ID number (if visible).\n"
+    "  • If the ID number column is blank or missing, output an empty string for that student's id_no.\n"
+    "  • Include EVERY visible student row. Do NOT skip any.\n"
+    "  • Names must match what is written on the sheet exactly (spacing, commas, Jr./Sr., etc.).\n\n"
+    "OUTPUT — STRICT JSON ONLY, no prose:\n"
+    "{\n"
+    '  "students": [\n'
+    '    { "row": 1, "name": "<name as written>", "id_no": "<ID or empty string>" },\n'
+    "    ...\n"
+    "  ]\n"
+    "}\n"
+)
 
 
 def _id_anchor_section(roster_ids: Optional[List[str]]) -> str:
@@ -950,6 +972,31 @@ async def vision_analyze(
         return JSONResponse({"error": "Missing roster."}, status_code=400)
     if len(roster) > MAX_ROSTER:
         return JSONResponse({"error": f"Roster too large (max {MAX_ROSTER})."}, status_code=400)
+
+    # ── Two-photo flow: extract student order from roster photo ──────────────
+    roster_image_b64 = (body.roster_image_base64 or "").strip()
+    roster_mime = (body.roster_mime_type or "").strip().lower()
+    if roster_image_b64 and _MIME_RE.match(roster_mime) and gemini_key:
+        try:
+            raw_roster_reply = await gemini_vision(
+                gemini_key, ROSTER_EXTRACT_PROMPT, roster_image_b64, roster_mime,
+                prefer_accurate=True,
+            )
+            parsed_roster = parse_vision_json(raw_roster_reply)
+            extracted = parsed_roster.get("students") or []
+            if isinstance(extracted, list) and len(extracted) > 0:
+                extracted_names = []
+                extracted_ids = []
+                for s in extracted:
+                    nm = str(s.get("name") or "").strip()
+                    if nm:
+                        extracted_names.append(nm)
+                        extracted_ids.append(str(s.get("id_no") or "").strip())
+                if len(extracted_names) == len(roster):
+                    roster = extracted_names
+                    roster_ids = extracted_ids if any(extracted_ids) else []
+        except Exception:
+            pass  # fall back to original roster if extraction fails
 
     gemini_key = settings.GEMINI_API_KEY
     groq_key = settings.GROQ_API_KEY

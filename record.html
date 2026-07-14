@@ -241,6 +241,8 @@
         .apply-drawer-btn:active { transform: scale(0.98); }
 
         /* PHOTO UPLOAD (record-by-photo) */
+        .photo-btn-group { display: flex; gap: 10px; margin-bottom: 8px; }
+        .photo-btn-group .upload-record-btn { margin-bottom: 0; }
         .upload-record-btn {
             width: 100%;
             display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -251,7 +253,10 @@
             border-radius: 12px;
             font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.95rem; font-weight: 700;
             cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
-            margin-bottom: 8px;
+        }
+        .upload-record-btn.roster-captured {
+            border-color: #16a34a; background: linear-gradient(180deg, #f0fdf4 0%, #f8fafc 100%);
+            color: #16a34a;
         }
         .upload-record-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -8px rgba(59,130,246,0.35); }
         .upload-record-btn:active { transform: scale(0.98); }
@@ -564,19 +569,29 @@
     </div>
 
     <!-- Photo-to-record: pick a photo, let AI extract scores, then review + apply. -->
-    <button type="button" class="upload-record-btn fade-in-up delay-2" id="uploadRecordBtn"
-            onclick="triggerRecordPhoto()">
-        <i class="fa-solid fa-camera"></i>
-        Upload Record Photo
-    </button>
-    <div class="upload-sub-hint fade-in-up delay-2">Pick a field, then take (or pick) a photo of that column. AI will read only that column's scores.</div>
-    <!-- Two hidden file inputs: one forces the camera (capture=environment),
-         the other omits capture so the OS shows the photo gallery/picker.
-         Both dispatch to the same handleRecordPhotoPicked handler. -->
+    <div class="photo-btn-group fade-in-up delay-2">
+      <button type="button" class="upload-record-btn" id="uploadRosterBtn"
+              onclick="triggerRosterPhoto()" title="Take roster photo first">
+          <i class="fa-solid fa-id-card"></i>
+          <span id="rosterBtnLabel">Roster Photo</span>
+      </button>
+      <button type="button" class="upload-record-btn" id="uploadRecordBtn"
+              onclick="triggerRecordPhoto()">
+          <i class="fa-solid fa-camera"></i>
+          Upload Record Photo
+      </button>
+    </div>
+    <div class="upload-sub-hint fade-in-up delay-2" id="uploadHint">You need a roster photo so AI knows row order. Take it first, or skip (names from DB work too).</div>
+    <!-- Hidden file inputs for scores photo -->
     <input type="file" id="recordPhotoInputCamera" accept="image/*" capture="environment" style="display:none"
            onchange="handleRecordPhotoPicked(event)">
     <input type="file" id="recordPhotoInputGallery" accept="image/*" style="display:none"
            onchange="handleRecordPhotoPicked(event)">
+    <!-- Hidden file inputs for roster photo -->
+    <input type="file" id="rosterPhotoInputCamera" accept="image/*" capture="environment" style="display:none"
+           onchange="handleRosterPhotoPicked(event)">
+    <input type="file" id="rosterPhotoInputGallery" accept="image/*" style="display:none"
+           onchange="handleRosterPhotoPicked(event)">
 
     <!-- Field picker: shown when the facilitator taps "Upload Record Photo".
          They pick which column their photo is for (or Auto-detect from
@@ -1382,6 +1397,16 @@
             return _recCurrentRoster().map(x => x.idNo);
         }
 
+        function _recClearRosterPhoto() {
+            _cachedRosterImg = null;
+            const btn = document.getElementById('uploadRosterBtn');
+            const label = document.getElementById('rosterBtnLabel');
+            if (btn) btn.classList.remove('roster-captured');
+            if (label) label.textContent = 'Roster Photo';
+            const hint = document.getElementById('uploadHint');
+            if (hint) hint.textContent = 'You need a roster photo so AI knows row order. Take it first, or skip (names from DB work too).';
+        }
+
         let _analyzeProgressRAF = null;
         let _analyzeStartTime = 0;
         let _analyzeAbort = null;
@@ -1442,6 +1467,49 @@
             _resetAnalyzeProgress();
         }
 
+        let _cachedRosterImg = null; // { base64, mimeType } for roster photo
+
+        function triggerRosterPhoto() {
+            // Show source picker for roster photo only
+            const labelEl = document.getElementById('sourcePickerFieldLabel');
+            if (labelEl) labelEl.textContent = 'Roster (student names + ID numbers)';
+            document.getElementById('sourcePickerOverlay').classList.add('show');
+            // Override chooseSource to use roster photo handler
+            const orig = window.chooseSource;
+            window.chooseSource = function(source) {
+                closeSourcePicker();
+                setTimeout(() => {
+                    const id = source === 'camera' ? 'rosterPhotoInputCamera' : 'rosterPhotoInputGallery';
+                    const el = document.getElementById(id);
+                    if (el) el.click();
+                }, 80);
+                window.chooseSource = orig;
+            };
+        }
+
+        async function handleRosterPhotoPicked(event) {
+            const input = event.target;
+            const file = (input.files || [])[0];
+            input.value = '';
+            if (!file) return;
+            if (!/^image\//i.test(file.type || '')) {
+                showAlert('Not an image', 'Please pick a photo (JPEG, PNG, or WebP).', '#ef4444');
+                return;
+            }
+            try {
+                const { base64, mimeType } = await _recFileToBase64Jpeg(file);
+                _cachedRosterImg = { base64, mimeType };
+                const btn = document.getElementById('uploadRosterBtn');
+                const label = document.getElementById('rosterBtnLabel');
+                btn.classList.add('roster-captured');
+                label.textContent = '✓ Roster captured';
+                const hint = document.getElementById('uploadHint');
+                if (hint) hint.textContent = 'Roster photo set! Now take the scores photo.';
+            } catch (err) {
+                showAlert('Could not read photo', String(err), '#ef4444');
+            }
+        }
+
         async function handleRecordPhotoPicked(event) {
             const input = event.target;
             const file = (input.files || [])[0];
@@ -1479,7 +1547,9 @@
                         rosterIds: rosterIds,
                         targetFields: _recTargetFields,
                         // Back-compat: single-field key when exactly one chosen.
-                        targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : ''
+                        targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : '',
+                        rosterImageBase64: _cachedRosterImg ? _cachedRosterImg.base64 : '',
+                        rosterMimeType: _cachedRosterImg ? _cachedRosterImg.mimeType : ''
                     })
                 });
                 let payload;
