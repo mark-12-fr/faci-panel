@@ -66,7 +66,7 @@ RECORD_MODEL_ORDER = [
 ]
 MAX_IMAGE_BYTES = 6 * 1024 * 1024  # 6 MB after base64 decode
 MAX_ROSTER = 200
-CHUNK_SIZE = 25
+CHUNK_SIZE = 35
 
 RECORD_FIELDS: List[str] = list(CLASS_RECORD_SCORE_FIELDS)
 RECORD_FIELD_SET = set(RECORD_FIELDS)
@@ -119,6 +119,19 @@ def _roster_lines(roster: List[str], roster_ids: Optional[List[str]] = None) -> 
     if roster_ids and len(roster_ids) == len(roster):
         return "\n".join(f"{i + 1}. [{rid}] {n}" for i, (n, rid) in enumerate(zip(roster, roster_ids)))
     return "\n".join(f"{i + 1}. {n}" for i, n in enumerate(roster))
+
+
+def _id_anchor_section(roster_ids: Optional[List[str]]) -> str:
+    if not roster_ids:
+        return ""
+    return (
+        "\n\n═══ ID-ANCHORED MATCHING (HIGHEST PRIORITY) ═══\n"
+        "Each roster entry includes an ID NUMBER in brackets, e.g. \"[04-2526-121141] ALISEN, JOHN REN ALAGOS\".\n"
+        "The ID number is PRINTED on the sheet and is the UNIQUE row identifier.\n"
+        "MATCHING RULE: First find the row by its ID number in the photo. "
+        "Only use the name as a secondary check AFTER matching by ID.\n"
+        "If the photo does NOT show ID numbers, fall back to matching by name.\n"
+    )
 
 
 def _layout_note() -> str:
@@ -283,19 +296,16 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
     if len(fields) >= 2:
         label_list = "\n  • ".join(f'{_field_label(f)} (key: "{f}")' for f in fields)
         schema_scores = ", ".join(f'"{f}": <number>' for f in fields)
-        id_anchor = (
-            "\n\n═══ ID-ANCHORED MATCHING ═══\n"
-            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
-            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
-            "Always prefer matching by ID number over matching by name.\n"
-        ) if roster_ids else ""
         return (
             "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. "
             f"The facilitator has told you this photo contains scores for EXACTLY these {len(fields)} "
             "columns (ignore every OTHER column in the photo):\n  • " + label_list + "\n\n"
-            "YOUR JOB: for each student on the ROSTER below, find their row, then read the handwritten "
+            + _id_anchor_section(roster_ids)
+            + "YOUR JOB: for each student on the ROSTER below, find their row, then read the handwritten "
             "number in EACH of the above columns for that row. Put each into scores using its field key.\n\n"
             "═══ RULES (follow strictly) ═══\n"
+            "  ★ CRITICAL: EVERY student on the roster MUST appear in students[]. "
+            "No exceptions. If a cell is blank/unreadable, omit that field key from that student's scores object.\n"
             "  • Read the columns in the SAME left-to-right order they appear in the photo. Do NOT swap "
             "columns — a value under Module 1 must go to module_1, not module_2.\n"
             "  • Count digits per cell: '8' is ONE digit, '10'/'15' are TWO. Do NOT round '8' to '10'.\n"
@@ -306,10 +316,8 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
             "  • Blank / empty / unreadable cell → OMIT that one field for that student (do NOT guess 0).\n"
             "  • Numbers are 0..200. If a digit is ambiguous, return your best guess and LOWER confidence.\n"
             "  • Match names to the ROSTER exactly (tolerate small OCR errors in the name).\n"
-            "  • Only include a student who has AT LEAST ONE readable score among these columns.\n"
             + ROW_ORDER_NOTE + "\n"
             + _layout_note()
-            + id_anchor
             + "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
             "{\n"
             '  "students": [ { "row": <sheet row number for this student>, "name": "<exact roster name>", '
@@ -327,18 +335,15 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
     target_field = fields[0] if len(fields) == 1 else None
     target_label = _field_label(target_field)
     if target_field and target_field in RECORD_FIELD_SET:
-        id_anchor = (
-            "\n\n═══ ID-ANCHORED MATCHING ═══\n"
-            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
-            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
-            "Always prefer matching by ID number over matching by name.\n"
-        ) if roster_ids else ""
         return (
             "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. "
             "The facilitator has told you this photo contains scores for ONE specific field: "
             + target_label + ' (field key: "' + target_field + '"). You must read every student\'s '
             "score in that ONE column with the care of a person double-checking their own work.\n\n"
-            "═══ STEP-BY-STEP PROCEDURE (do NOT skip any step) ═══\n\n"
+            + _id_anchor_section(roster_ids)
+            + "═══ STEP-BY-STEP PROCEDURE (do NOT skip any step) ═══\n\n"
+            "STEP 0 — EVERY student on the roster MUST appear in students[]. "
+            "No exceptions. If a cell is blank/unreadable, omit scores[\"" + target_field + "\"] for that student.\n\n"
             "STEP 1 — LOCATE the " + target_label + " column. If the photo shows a table with a "
             "header row, identify the column labeled " + target_label + " (or its short form like "
             + target_field.replace("_", " ").upper() + "). Every score you extract must come "
@@ -348,7 +353,6 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
             "AND in the " + target_label + " column. That intersection is the cell you must read.\n"
             + ROW_ORDER_NOTE + "\n"
             + _layout_note()
-            + id_anchor
             + "STEP 3 — Before writing any number, count the DIGITS in the cell:\n"
             "  • 0 digits → the cell is BLANK. Do NOT write a score for this student.\n"
             "  • 1 digit  → single-digit number (0 through 9).\n"
@@ -408,12 +412,13 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
     return (
         "You are analyzing a photo of a classroom RECORD / GRADE BOOK page from a school in the Philippines. "
         "Rows are students, columns are score-holding fields.\n\n"
-        "IMPORTANT — Only include a student in the students array if you can read AT LEAST ONE score "
-        "for them. Students with ALL blank cells should NOT appear in the output.\n\n"
+        + _id_anchor_section(roster_ids)
+        + "CRITICAL: EVERY student on the roster MUST appear in students[]. "
+        "No exceptions. If a cell is blank/unreadable, omit that field from that student's scores object.\n\n"
         "STEP 1: Identify the header row. Read each column header and map it to the exact field key below.\n"
         "STEP 2: Read each student row from top to bottom. Match the name in the photo to the closest roster name.\n"
         "STEP 3: For each matched student, read the score from each column and record it under the correct field key.\n"
-        "STEP 4: If EVERY cell in that student's row is blank/empty, OMIT that student entirely.\n\n"
+        "STEP 4: If a student has NO readable scores, still include them with an empty scores object.\n\n"
         "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n"
         "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n"
         "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n"
@@ -428,12 +433,6 @@ def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[L
         "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n"
         + ROW_ORDER_NOTE + "\n"
         + _layout_note()
-        + (
-            "\n═══ ID-ANCHORED MATCHING ═══\n"
-            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
-            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
-            "Always prefer matching by ID number over matching by name.\n\n"
-        ) if roster_ids else ""
         + "SCORE READING RULES:\n"
         "- Only include a numeric value if you can CLEARLY read the digits. Empty/blank cells, dashes, "
         "'-', or unreadable cells are OMITTED (do not include the field at all).\n"
@@ -810,6 +809,7 @@ def sanitize_record_students(lst, roster_set) -> List[dict]:
                 continue
             scores[field] = round(num * 100) / 100
         if not scores:
+            out.append({"name": name, "scores": {}, "confidence": 0.2})
             continue
         seen.add(name)
         # Student confidence = the WORST cell: overall confidence min'd with
@@ -923,6 +923,7 @@ def merge_record_consensus(passes: List[List[dict]], target_fields) -> List[dict
                 merged[f] = vals[0]
                 any_conflict = True
         if not merged:
+            out.append({"name": name, "scores": {}, "confidence": 0.2})
             continue
         if any_conflict:
             confidence = 0.35
