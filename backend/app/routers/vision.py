@@ -66,6 +66,7 @@ RECORD_MODEL_ORDER = [
 ]
 MAX_IMAGE_BYTES = 6 * 1024 * 1024  # 6 MB after base64 decode
 MAX_ROSTER = 200
+CHUNK_SIZE = 25
 
 RECORD_FIELDS: List[str] = list(CLASS_RECORD_SCORE_FIELDS)
 RECORD_FIELD_SET = set(RECORD_FIELDS)
@@ -92,6 +93,7 @@ class VisionRequest(BaseModel):
     image_base64: str = Field(default="", alias="imageBase64")
     mime_type: str = Field(default="", alias="mimeType")
     roster: List[str] = Field(default_factory=list)
+    roster_ids: List[str] = Field(default_factory=list, alias="rosterIds")
     target_fields: List[str] = Field(default_factory=list, alias="targetFields")
     target_field: str = Field(default="", alias="targetField")
 
@@ -113,8 +115,20 @@ def _field_label(f: Optional[str]) -> str:
     }.get(f, f)
 
 
-def _roster_lines(roster: List[str]) -> str:
+def _roster_lines(roster: List[str], roster_ids: Optional[List[str]] = None) -> str:
+    if roster_ids and len(roster_ids) == len(roster):
+        return "\n".join(f"{i + 1}. [{rid}] {n}" for i, (n, rid) in enumerate(zip(roster, roster_ids)))
     return "\n".join(f"{i + 1}. {n}" for i, n in enumerate(roster))
+
+
+def _layout_note() -> str:
+    return (
+        "\n═══ SHEET LAYOUT (standard Filipino grade sheet) ═══\n"
+        "Column order: # | STUDENT NAME | ID NUMBER | O | 1 | 2 | ... | 25 | "
+        "1 | 2 | ... | 10 | AT | PT 1 | PT 2 | QE\n"
+        "NOTE: Column 'O' (Orientation) comes BEFORE Module 1. Do NOT read 'O' "
+        "as Module 1. Module 1 is the column AFTER 'O'.\n"
+    )
 
 
 ROW_ORDER_NOTE = (
@@ -262,13 +276,19 @@ def build_attendance_prompt(roster: List[str]) -> str:
     )
 
 
-def build_record_prompt(roster: List[str], target_fields) -> str:
+def build_record_prompt(roster: List[str], target_fields, roster_ids: Optional[List[str]] = None) -> str:
     raw = target_fields if isinstance(target_fields, list) else ([target_fields] if target_fields else [])
     fields = [f for f in (str(x or "").strip() for x in raw) if f in RECORD_FIELD_SET]
 
     if len(fields) >= 2:
         label_list = "\n  • ".join(f'{_field_label(f)} (key: "{f}")' for f in fields)
         schema_scores = ", ".join(f'"{f}": <number>' for f in fields)
+        id_anchor = (
+            "\n\n═══ ID-ANCHORED MATCHING ═══\n"
+            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
+            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
+            "Always prefer matching by ID number over matching by name.\n"
+        ) if roster_ids else ""
         return (
             "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. "
             f"The facilitator has told you this photo contains scores for EXACTLY these {len(fields)} "
@@ -288,7 +308,9 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "  • Match names to the ROSTER exactly (tolerate small OCR errors in the name).\n"
             "  • Only include a student who has AT LEAST ONE readable score among these columns.\n"
             + ROW_ORDER_NOTE + "\n"
-            "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
+            + _layout_note()
+            + id_anchor
+            + "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
             "{\n"
             '  "students": [ { "row": <sheet row number for this student>, "name": "<exact roster name>", '
             '"scores": { ' + schema_scores + ' }, "cell_confidence": { "<field>": <0..1 for that cell> }, '
@@ -299,12 +321,18 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             '"row" is the row you read the student from (the # column if printed, else counting data rows '
             "from 1). Two students can NEVER share a row.\n\n"
             "ROSTER (match names to these exact strings):\n"
-            + _roster_lines(roster)
+            + _roster_lines(roster, roster_ids)
         )
 
     target_field = fields[0] if len(fields) == 1 else None
     target_label = _field_label(target_field)
     if target_field and target_field in RECORD_FIELD_SET:
+        id_anchor = (
+            "\n\n═══ ID-ANCHORED MATCHING ═══\n"
+            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
+            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
+            "Always prefer matching by ID number over matching by name.\n"
+        ) if roster_ids else ""
         return (
             "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. "
             "The facilitator has told you this photo contains scores for ONE specific field: "
@@ -319,7 +347,9 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "whose Student Name matches the roster name). Then find the CELL that is on that row "
             "AND in the " + target_label + " column. That intersection is the cell you must read.\n"
             + ROW_ORDER_NOTE + "\n"
-            "STEP 3 — Before writing any number, count the DIGITS in the cell:\n"
+            + _layout_note()
+            + id_anchor
+            + "STEP 3 — Before writing any number, count the DIGITS in the cell:\n"
             "  • 0 digits → the cell is BLANK. Do NOT write a score for this student.\n"
             "  • 1 digit  → single-digit number (0 through 9).\n"
             "  • 2 digits → two-digit number (10 through 99).\n"
@@ -372,7 +402,7 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
             "Match student names in the photo to the ROSTER (ground truth). Tolerate small OCR "
             "errors in names, but names in `students[].name` MUST match the roster string EXACTLY.\n\n"
             "ROSTER (match names to these exact strings):\n"
-            + _roster_lines(roster)
+            + _roster_lines(roster, roster_ids)
         )
 
     return (
@@ -397,7 +427,14 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
         '- Write the EXACT roster string in the "name" field — do NOT modify the name.\n'
         "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n"
         + ROW_ORDER_NOTE + "\n"
-        "SCORE READING RULES:\n"
+        + _layout_note()
+        + (
+            "\n═══ ID-ANCHORED MATCHING ═══\n"
+            "Each roster entry includes an ID NUMBER in brackets, e.g. \"[2024-0001] Name\". "
+            "The ID number is PRINTED on the sheet and is the MOST RELIABLE row identifier. "
+            "Always prefer matching by ID number over matching by name.\n\n"
+        ) if roster_ids else ""
+        + "SCORE READING RULES:\n"
         "- Only include a numeric value if you can CLEARLY read the digits. Empty/blank cells, dashes, "
         "'-', or unreadable cells are OMITTED (do not include the field at all).\n"
         "- Numbers must be non-negative and at most 200. Decimals are allowed but rare; prefer integers.\n"
@@ -416,7 +453,7 @@ def build_record_prompt(roster: List[str], target_fields) -> str:
         '  "notes": "<optional observation>"\n'
         "}\n\n"
         "ROSTER (use these exact names for matching):\n"
-        + _roster_lines(roster)
+        + _roster_lines(roster, roster_ids)
     )
 
 
@@ -923,6 +960,9 @@ async def vision_analyze(
     image_b64 = (body.image_base64 or "").strip()
     mime_type = (body.mime_type or "").strip().lower()
     roster = [n for n in (str(x or "").strip() for x in body.roster) if n]
+    roster_ids = [str(x or "").strip() for x in body.roster_ids] if body.roster_ids else []
+    if roster_ids and len(roster_ids) != len(roster):
+        roster_ids = []
 
     raw_fields = body.target_fields if isinstance(body.target_fields, list) else []
     target_fields = [str(f or "").strip() for f in raw_fields]
@@ -953,8 +993,55 @@ async def vision_analyze(
     if not gemini_key and not groq_key:
         return JSONResponse({"error": not_configured}, status_code=503)
 
+    # Chunk large record rosters for better accuracy
+    if type_ == "record" and len(roster) > CHUNK_SIZE:
+        all_students: List[dict] = []
+        all_unmatched: List[str] = []
+        all_notes: List[str] = []
+        for i in range(0, len(roster), CHUNK_SIZE):
+            chunk_names = roster[i:i + CHUNK_SIZE]
+            chunk_ids = roster_ids[i:i + CHUNK_SIZE] if roster_ids else None
+            prompt = build_record_prompt(chunk_names, target_fields, chunk_ids)
+            schema = build_record_schema(chunk_names, target_fields)
+
+            raw_reply = None
+            if gemini_key:
+                try:
+                    raw_reply = await gemini_vision(
+                        gemini_key, prompt, image_b64, mime_type,
+                        prefer_accurate=True, response_schema=schema,
+                    )
+                except (_RateLimit, _Upstream):
+                    pass
+
+            if not raw_reply and groq_key:
+                try:
+                    raw_reply = await groq_vision(groq_key, prompt, image_b64, mime_type)
+                except (_RateLimit, _Upstream):
+                    pass
+
+            if raw_reply:
+                try:
+                    parsed = parse_vision_json(raw_reply)
+                    chunk_set = set(chunk_names)
+                    chunk_students = sanitize_record_students(parsed.get("students"), chunk_set)
+                    if chunk_students:
+                        all_students.extend(chunk_students)
+                    if isinstance(parsed.get("unmatched"), list):
+                        all_unmatched.extend(str(n or "").strip() for n in parsed["unmatched"] if str(n or "").strip())
+                    n = str(parsed.get("notes") or "").strip()[:240]
+                    if n:
+                        all_notes.append(n)
+                except Exception:
+                    pass
+        return JSONResponse({
+            "students": all_students,
+            "unmatched": all_unmatched[:30],
+            "notes": " | ".join(all_notes)[:480],
+        })
+
     if type_ == "record":
-        prompt = build_record_prompt(roster, target_fields)
+        prompt = build_record_prompt(roster, target_fields, roster_ids if roster_ids else None)
         schema = build_record_schema(roster, target_fields)
     else:
         prompt = build_attendance_prompt(roster)

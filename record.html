@@ -951,6 +951,7 @@
             const tr = document.createElement('tr');
             tr.className = 'student-data-row';
             tr.dataset.uuid = student.id;
+            if (student.id_no) tr.dataset.idNo = student.id_no;
 
             const quarter = getCurrentQuarter();
             const studentRecs = existingRecords ? existingRecords.filter(r => r.student_id === student.id) : [];
@@ -1365,9 +1366,20 @@
 
         function _recCurrentRoster() {
             // Grab the names in the same order they're rendered in the table.
-            return Array.from(document.querySelectorAll('.student-data-row .clickable-name'))
-                .map(el => (el.textContent || '').trim())
-                .filter(Boolean);
+            return Array.from(document.querySelectorAll('.student-data-row'))
+                .map(row => ({
+                    name: (row.querySelector('.clickable-name')?.textContent || '').trim(),
+                    idNo: row.dataset.idNo || ''
+                }))
+                .filter(x => x.name);
+        }
+
+        function _recCurrentRosterNames() {
+            return _recCurrentRoster().map(x => x.name);
+        }
+
+        function _recCurrentRosterIds() {
+            return _recCurrentRoster().map(x => x.idNo);
         }
 
         let _analyzeProgressRAF = null;
@@ -1440,7 +1452,8 @@
                 return;
             }
 
-            const roster = _recCurrentRoster();
+            const roster = _recCurrentRosterNames();
+            const rosterIds = _recCurrentRosterIds();
             if (roster.length === 0) {
                 showAlert('No students yet', 'Wait for the class list to load first, then try again.', '#f59e0b');
                 return;
@@ -1463,6 +1476,7 @@
                         imageBase64: base64,
                         mimeType: mimeType,
                         roster: roster,
+                        rosterIds: rosterIds,
                         targetFields: _recTargetFields,
                         // Back-compat: single-field key when exactly one chosen.
                         targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : ''

@@ -454,6 +454,7 @@ export default function RecordPage() {
       return;
     }
     const roster = rows.map((r) => String(r.student.full_name || "").trim()).filter(Boolean);
+    const rosterIds = rows.map((r) => String((r.student as any).id_no || "").trim()).filter(Boolean);
     if (roster.length === 0) {
       showAlert("No students yet", "Wait for the class list to load first, then try again.", "#f59e0b");
       return;
@@ -474,6 +475,7 @@ export default function RecordPage() {
           imageBase64: base64,
           mimeType,
           roster,
+          rosterIds,
           targetFields: tf,
           targetField: tf.length === 1 ? tf[0] : "",
         }),
@@ -703,6 +705,7 @@ export default function RecordPage() {
                       className="student-data-row"
                       data-uuid={row.student.id}
                       data-recordid={row.recordId || undefined}
+                      data-id-no={(row.student as any).id_no || undefined}
                       style={hidden ? { display: "none" } : undefined}
                       key={`${row.student.id}-${dataVersion}`}
                     >
