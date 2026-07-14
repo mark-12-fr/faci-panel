@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#3b82f6">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="offlineSyncUtility.js" defer></script>
     <style>
         :root {
             --primary-bg: #f8fafc;
@@ -162,6 +163,10 @@
     </style>
 </head>
 <body>
+
+    <div id="offlineStatusBar" style="display:none; position:sticky; top:0; z-index:9999; padding:8px 16px; font-size:13px; font-weight:600; text-align:center; transition:all 0.3s; cursor:pointer;" onclick="this.style.display='none'">
+        <span id="offlineStatusText"></span>
+    </div>
 
     <div class="attendance-header fade-in-up">
         <div class="status-lock">
@@ -613,6 +618,20 @@
                 return;
             }
 
+            // Offline check — queue to IndexedDB if no connection
+            if (!navigator.onLine && window.__offlineSync) {
+                await window.__offlineSync.queue('attendance', attendanceData);
+                btn.style.background = '#d97706';
+                btn.innerHTML = '<i class="fa-solid fa-clock"></i> Saved Offline!';
+                setTimeout(async () => {
+                    await loadDynamicStudents(section);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
+                    btn.style.background = 'var(--accent-blue)';
+                }, 2000);
+                return;
+            }
+
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
             btn.disabled = true;
 
@@ -668,8 +687,51 @@
         });
 
     </script>
+    <script>
+        /* ── Offline Status Bar ── */
+        function updateOfflineStatusBar(items) {
+            var bar = document.getElementById('offlineStatusBar');
+            var text = document.getElementById('offlineStatusText');
+            if (!bar || !text) return;
+            var count = items ? items.length : 0;
+            if (navigator.onLine && count === 0) {
+                bar.style.display = 'none';
+            } else if (!navigator.onLine && count === 0) {
+                bar.style.display = 'block';
+                bar.style.background = '#d97706';
+                bar.style.color = '#fff';
+                text.textContent = '🟡 Offline — data will be saved locally and sync when connected';
+            } else if (navigator.onLine && count > 0) {
+                bar.style.display = 'block';
+                bar.style.background = '#d97706';
+                bar.style.color = '#fff';
+                text.textContent = '🟡 Syncing ' + count + ' pending record' + (count > 1 ? 's' : '') + '...';
+            } else {
+                bar.style.display = 'block';
+                bar.style.background = '#d97706';
+                bar.style.color = '#fff';
+                text.textContent = '🟡 Offline (' + count + ' record' + (count > 1 ? 's' : '') + ' pending sync)';
+            }
+        }
+        if (window.__offlineSync) {
+            window.__offlineSync.onchange = updateOfflineStatusBar;
+            window.__offlineSync.pendingCount().then(function (c) {
+                updateOfflineStatusBar(c > 0 ? [{ id: 1 }] : []);
+            });
+        }
+        window.addEventListener('online', function () {
+            window.__offlineSync && window.__offlineSync.pendingCount().then(function (c) {
+                updateOfflineStatusBar(c > 0 ? [{ id: 1 }] : []);
+            });
+        });
+        window.addEventListener('offline', function () {
+            window.__offlineSync && window.__offlineSync.pendingCount().then(function (c) {
+                updateOfflineStatusBar(c > 0 ? [{ id: 1 }] : []);
+            });
+        });
+    </script>
     <script src="mjr-notify.js" defer></script>
-<script src="mjr-guard.js" defer></script>
-<script src="faci-session.js" defer></script>
+    <script src="mjr-guard.js" defer></script>
+    <script src="faci-session.js" defer></script>
 </body>
 </html>
