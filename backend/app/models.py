@@ -76,7 +76,7 @@ class Student(Base):
     id = _uuid_pk()
     section_id = Column(PGUUID(as_uuid=True))
     full_name = Column(Text)
-    gender = Column(Text, nullable=True)
+    id_no = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True))
 
 

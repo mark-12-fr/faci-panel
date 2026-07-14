@@ -249,7 +249,7 @@
         .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
         .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
 
-        /* Class Performance */
+        /* Top Students */
         .performance-panel {
             background-color: var(--panel-bg);
             padding: 18px 20px;
@@ -539,7 +539,7 @@
         </div>
     </div>
 
-    <div class="section-title fade-in-up delay-4">Class Performance</div>
+    <div class="section-title fade-in-up delay-4">Top Students</div>
     <div class="performance-panel fade-in-up delay-4">
         <div class="perf-stats perf-stats-two">
             <div class="perf-stat">
@@ -952,7 +952,7 @@
                             <div class="avatar">${escapeHtml(initials(s.full_name))}</div>
                             <div class="info">
                                 <div class="name">${escapeHtml(s.full_name)}</div>
-                                <div class="sub">${s.gender ? escapeHtml(s.gender) : ''}</div>
+                                <div class="sub">${s.id_no ? escapeHtml(s.id_no) : ''}</div>
                             </div>
                         </div>`).join('');
                 }

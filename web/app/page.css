@@ -232,7 +232,7 @@
         .overview-item h3 { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
         .overview-item p  { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600;}
 
-        /* Class Performance */
+        /* Top Students */
         .performance-panel {
             background-color: var(--panel-bg);
             padding: 18px 20px;

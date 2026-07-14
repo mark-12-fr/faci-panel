@@ -290,7 +290,7 @@ export default function DashboardPage() {
           <div className="avatar">{initials(s.full_name)}</div>
           <div className="info">
             <div className="name">{s.full_name}</div>
-            <div className="sub">{s.gender || ""}</div>
+            <div className="sub">{s.id_no || ""}</div>
           </div>
         </div>
       ));
@@ -646,7 +646,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="section-title fade-in-up delay-4">Class Performance</div>
+      <div className="section-title fade-in-up delay-4">Top Students</div>
       <div className="performance-panel fade-in-up delay-4">
         <div className="perf-stats perf-stats-two">
           <div className="perf-stat">
