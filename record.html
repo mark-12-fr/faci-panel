@@ -611,15 +611,15 @@
       <button type="button" class="upload-record-btn" id="uploadRosterBtn"
               onclick="triggerRosterPhoto()" title="Take roster photo first">
           <i class="fa-solid fa-id-card"></i>
-          <span id="rosterBtnLabel">Roster Photo</span>
+          <span id="rosterBtnLabel">ID no & Students Name</span>
       </button>
       <button type="button" class="upload-record-btn" id="uploadRecordBtn"
               onclick="triggerRecordPhoto()">
           <i class="fa-solid fa-camera"></i>
-          Upload Record Photo
+          Upload Score
       </button>
     </div>
-    <div class="upload-sub-hint fade-in-up delay-2" id="uploadHint">You need a roster photo so AI knows row order. Take it first, or skip (names from DB work too).</div>
+    <div class="upload-sub-hint fade-in-up delay-2" id="uploadHint">Upload the ID no & Students Name photo so AI knows row order. Take it first, or skip (names from DB work too).</div>
     <!-- Hidden file inputs for scores photo -->
     <input type="file" id="recordPhotoInputCamera" accept="image/*" capture="environment" style="display:none"
            onchange="handleRecordPhotoPicked(event)">
@@ -1607,9 +1607,9 @@
             const btn = document.getElementById('uploadRosterBtn');
             const label = document.getElementById('rosterBtnLabel');
             if (btn) btn.classList.remove('roster-captured');
-            if (label) label.textContent = 'Roster Photo';
+            if (label) label.textContent = 'ID no & Students Name';
             const hint = document.getElementById('uploadHint');
-            if (hint) hint.textContent = 'You need a roster photo so AI knows row order. Take it first, or skip (names from DB work too).';
+            if (hint) hint.textContent = 'Upload the ID no & Students Name photo so AI knows row order. Take it first, or skip (names from DB work too).';
         }
 
         let _analyzeProgressRAF = null;
@@ -1709,7 +1709,7 @@
                 btn.classList.add('roster-captured');
                 label.textContent = '✓ Roster captured';
                 const hint = document.getElementById('uploadHint');
-                if (hint) hint.textContent = 'Roster photo set! Now take the scores photo.';
+                if (hint) hint.textContent = 'ID no & Students Name photo set! Now take the scores photo.';
             } catch (err) {
                 showAlert('Could not read photo', String(err), '#ef4444');
             }
