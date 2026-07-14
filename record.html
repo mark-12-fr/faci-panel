@@ -1348,6 +1348,7 @@
         }
 
         function _cropEndDrag(e) {
+            if (!_cropDrawing) return;
             e.preventDefault();
             _cropDrawing = false;
             const st = _cropState;
