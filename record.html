@@ -1362,19 +1362,26 @@
             const overlay = document.getElementById('cropOverlay');
             const canvas = document.getElementById('cropCanvas');
             const wrap = document.getElementById('cropCanvasWrap');
-            const wrapRect = wrap.getBoundingClientRect();
-            const maxW = wrapRect.width - 4, maxH = wrapRect.height - 4;
-            const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-            const scale = Math.min(maxW / iw, maxH / ih, 1);
-            const dw = Math.round(iw * scale), dh = Math.round(ih * scale);
-            _cropState = {
-                img, srcBase64, srcMime, origW: iw, origH: ih,
-                displayW: dw, displayH: dh, sel: null
-            };
-            _cropCanvasCtx = canvas.getContext('2d');
+            const cvsCtx = canvas.getContext('2d');
+            _cropState = { img, srcBase64, srcMime, loaded: false, sel: null };
+            _cropCanvasCtx = cvsCtx;
             document.getElementById('cropConfirmBtn').disabled = true;
-            _cropRedraw();
+            // Show overlay FIRST so the wrap has dimensions, then compute layout
             overlay.classList.add('show');
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                const wrapRect = wrap.getBoundingClientRect();
+                const maxW = wrapRect.width - 4;
+                const maxH = wrapRect.height - 4;
+                const iw = img.naturalWidth || img.width;
+                const ih = img.naturalHeight || img.height;
+                const scale = Math.min(maxW / iw, maxH / ih, 1);
+                _cropState.origW = iw;
+                _cropState.origH = ih;
+                _cropState.displayW = Math.round(iw * scale);
+                _cropState.displayH = Math.round(ih * scale);
+                _cropState.loaded = true;
+                _cropRedraw();
+            }));
             // Add event listeners
             const onStart = (e) => _cropStartDrag(e);
             const onMove = (e) => _cropMoveDrag(e);
