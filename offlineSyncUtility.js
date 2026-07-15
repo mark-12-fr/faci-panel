@@ -17,7 +17,7 @@
 
 (function () {
     var DB_NAME = 'acadtrack-offline';
-    var DB_VERSION = 1;
+    var DB_VERSION = 2;
     var STORE = 'sync_queue';
     var _db = null;
     var _listeners = [];
@@ -31,6 +31,9 @@
                 var db = e.target.result;
                 if (!db.objectStoreNames.contains(STORE)) {
                     db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+                }
+                if (!db.objectStoreNames.contains('local_creds')) {
+                    db.createObjectStore('local_creds', { keyPath: 'accountId' });
                 }
             };
             req.onsuccess = function (e) { _db = e.target.result; resolve(_db); };
@@ -72,6 +75,30 @@
                 var store = tx.objectStore(STORE);
                 var req = store.delete(id);
                 req.onsuccess = function () { resolve(); };
+                req.onerror = function () { reject(req.error); };
+            });
+        });
+    }
+
+    function saveLocalCreds(accountId, passwordHash, faciData) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction('local_creds', 'readwrite');
+                var store = tx.objectStore('local_creds');
+                store.put({ accountId: accountId, passwordHash: passwordHash, faciData: faciData });
+                tx.oncomplete = function () { resolve(); };
+                tx.onerror = function () { reject(tx.error); };
+            });
+        });
+    }
+
+    function getLocalCreds(accountId) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction('local_creds', 'readonly');
+                var store = tx.objectStore('local_creds');
+                var req = store.get(accountId);
+                req.onsuccess = function () { resolve(req.result || null); };
                 req.onerror = function () { reject(req.error); };
             });
         });
@@ -234,6 +261,8 @@
         queue: queue,
         flush: flush,
         destroy: destroy,
+        saveLocalCreds: saveLocalCreds,
+        getLocalCreds: getLocalCreds,
         get onchange() { return _onchange; },
         set onchange(fn) { _onchange = fn; }
     };

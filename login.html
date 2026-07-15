@@ -13,6 +13,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+    <script src="offlineSyncUtility.js" defer></script>
     
     <style>
         :root {
@@ -292,6 +293,10 @@
 </head>
 <body>
 
+    <div id="offlineStatusBar" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#fff;text-align:center;padding:8px 12px;font-size:13px;z-index:100000;font-family:'Inter',sans-serif;">
+        <i class="fa-solid fa-wifi-slash"></i> You are offline — <span id="offlineQueueCount">0</span> pending submission(s)
+    </div>
+
     <div id="splashScreen" class="splash-screen">
         <div class="splash-content">
             <div class="splash-logo-container">
@@ -400,6 +405,34 @@
             }
         });
 
+        // Offline Status Bar
+        window.addEventListener('load', function () {
+            if (window.__offlineSync) {
+                window.__offlineSync.onchange = function (items) {
+                    var bar = document.getElementById('offlineStatusBar');
+                    var count = document.getElementById('offlineQueueCount');
+                    if (bar && count) {
+                        if (!window.__offlineSync.isOnline || items.length > 0) {
+                            bar.style.display = 'block';
+                            count.textContent = items.length;
+                        } else {
+                            bar.style.display = 'none';
+                        }
+                    }
+                };
+                window.__offlineSync.pendingCount().then(function (count) {
+                    var bar = document.getElementById('offlineStatusBar');
+                    var countEl = document.getElementById('offlineQueueCount');
+                    if (bar && countEl) {
+                        if (!navigator.onLine || count > 0) {
+                            bar.style.display = 'block';
+                            countEl.textContent = count;
+                        }
+                    }
+                });
+            }
+        });
+
         // Password Visibility Toggle Logic
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
@@ -424,6 +457,37 @@
             loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
             loginBtn.disabled = true;
 
+            // Offline path: check saved credentials in IndexedDB
+            if (!navigator.onLine) {
+                var bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
+                var creds = null;
+                if (bcryptLib && window.__offlineSync) {
+                    creds = await window.__offlineSync.getLocalCreds(accountId);
+                }
+                if (creds && bcryptLib.compareSync(password, creds.passwordHash)) {
+                    var faciData = creds.faciData;
+                    if (rememberMe) { localStorage.setItem('remembered_faci_id', accountId); } else { localStorage.removeItem('remembered_faci_id'); }
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('cached_user_name');
+                    localStorage.removeItem('cached_user_avatar');
+                    localStorage.setItem('faci_id', faciData.id);
+                    localStorage.setItem('faci_name', faciData.full_name);
+                    localStorage.setItem('faci_section', faciData.section);
+                    localStorage.setItem('faci_subject', faciData.subject);
+                    if (faciData.teacher_id) localStorage.setItem('faci_teacher_id', faciData.teacher_id);
+                    else localStorage.removeItem('faci_teacher_id');
+                    loginBtn.style.backgroundColor = '#10b981';
+                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
+                    setTimeout(function () { window.location.href = 'index.html'; }, 800);
+                    return;
+                }
+                showAlert("Offline", "Not connected to the internet and no saved credentials found. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
+                loginBtn.innerHTML = 'Login';
+                loginBtn.disabled = false;
+                return;
+            }
+
             try {
                 // Fast path: verify the login in the browser with bcrypt.js, so we
                 // don't wait on the (sleepy free-tier) backend to wake up. Only the
@@ -441,6 +505,9 @@
                     if (error) throw error;
                     if (row && row.password && bcryptLib.compareSync(password, row.password)) {
                         faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
+                        if (window.__offlineSync) {
+                            window.__offlineSync.saveLocalCreds(accountId, row.password, faciData);
+                        }
                     }
                 } else {
                     const res = await fetch(`${API_URL}/api/faci/login`, {
