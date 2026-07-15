@@ -27,20 +27,34 @@
  *     copy is fetched in the background for next time. A cache MISS falls
  *     back to the network, and only if that ALSO fails do we show a
  *     friendly "never opened on this device yet" page — never a blank one.
+ *
+ * v2 of this attempt (rewritten here) shipped a SECOND, Safari-only bug:
+ * Vercel's cleanUrls 308-redirects "/login.html" -> "/login", and v2 fetched
+ * BOTH forms at install time, caching the ".html" entry as whatever the
+ * fetch() call followed the redirect to — a Response with `redirected: true`.
+ * Per spec, a service worker must not fulfill a NAVIGATION with a redirected
+ * Response; Chromium quietly allows it, but Safari correctly rejects it
+ * ("Response served by service worker has redirections"), which broke the
+ * PWA's manifest start_url ("/login.html") on iOS on the very first launch.
+ * Fixed by never fetching/caching a URL that redirects at all: every ".html"
+ * request is normalized to its canonical extensionless form (for both the
+ * cache lookup AND the network fetch) before it ever reaches the cache.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v2';
+var CACHE_NAME = 'acadtrack-faci-shell-v3';
 
-// Same-origin app shell. Both the extensionless path (what real in-app
-// navigation requests under Vercel's cleanUrls) and the .html path (what the
-// installed PWA's manifest start_url, and any stale bookmark, requests) are
-// listed so either form hits the cache.
+// Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
+// a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
+// follows that transparently, producing a `redirected: true` Response that
+// Safari refuses to use for a navigation (see note above). "/login.html" etc.
+// are still served correctly offline — canonicalPath() below maps them to
+// these same entries at request time instead.
 var SHELL_URLS = [
-    '/', '/index.html',
-    '/login', '/login.html',
-    '/attendance', '/attendance.html',
-    '/record', '/record.html',
-    '/profile', '/profile.html',
+    '/',
+    '/login',
+    '/attendance',
+    '/record',
+    '/profile',
     '/grading.js',
     '/faci-session.js',
     '/mjr-notify.js',
@@ -51,6 +65,16 @@ var SHELL_URLS = [
     '/logo.jpg',
     '/logo-192.png'
 ];
+
+// Maps a request path to the canonical, non-redirecting path it should be
+// fetched/cached under — "/login.html" and "/index.html" both resolve to a
+// SHELL_URLS entry so a redirected Response is never fetched, cached, or
+// (critically, for Safari) used to fulfill a navigation.
+function canonicalPath(pathname) {
+    if (pathname === '/index.html') return '/';
+    var m = pathname.match(/^(.*)\.html?$/i);
+    return m ? (m[1] || '/') : pathname;
+}
 
 // Cross-origin vendor scripts the pages depend on just to boot (bcrypt for
 // offline login, the Supabase client, icons). Precached once at install and
@@ -137,16 +161,26 @@ self.addEventListener('fetch', function (event) {
         return; // same-origin but not a page or known asset (e.g. a same-origin /api/* GET): untouched
     }
 
+    // Same-origin: always cache/fetch under the CANONICAL path (never the
+    // literal ".html" one, which redirects — see the Safari note up top).
+    // Cross-origin vendor URLs have no such redirect and pass through as-is.
+    var lookupUrl = isVendor
+        ? request.url
+        : url.origin + canonicalPath(url.pathname) + url.search;
+
     event.respondWith(
         caches.open(CACHE_NAME).then(function (cache) {
-            return cache.match(request).then(function (cached) {
+            return cache.match(lookupUrl, { ignoreSearch: true }).then(function (cached) {
                 // Vendor scripts are requested by <script> tags in no-cors
                 // mode, which yields an opaque (unreadable, always "not ok")
                 // response — re-fetch those explicitly in cors mode so the
                 // background refresh can actually tell whether it succeeded.
-                var networkFetch = (isVendor ? fetch(request.url, { mode: 'cors' }) : fetch(request))
+                // Same-origin fetches use `lookupUrl` too, NOT the original
+                // request, so a ".html" request never triggers a redirect-
+                // following fetch whose response would carry redirected:true.
+                var networkFetch = fetch(lookupUrl, isVendor ? { mode: 'cors' } : undefined)
                     .then(function (response) {
-                        if (response && response.ok) cache.put(request, response.clone()).catch(function () {});
+                        if (response && response.ok) cache.put(lookupUrl, response.clone()).catch(function () {});
                         return response;
                     })
                     .catch(function () { return null; });
