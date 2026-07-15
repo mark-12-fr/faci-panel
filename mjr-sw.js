@@ -39,9 +39,15 @@
  * Fixed by never fetching/caching a URL that redirects at all: every ".html"
  * request is normalized to its canonical extensionless form (for both the
  * cache lookup AND the network fetch) before it ever reaches the cache.
+ *
+ * v4: all precache/revalidation fetches now force `cache: 'reload'`, so the
+ * shell is always seeded from a genuinely fresh network response instead of
+ * whatever Vercel/the browser's own HTTP cache happened to be holding. Cache
+ * name bumped so devices that installed an earlier, buggier version start
+ * clean instead of carrying over anything cached under the old logic.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v3';
+var CACHE_NAME = 'acadtrack-faci-shell-v4';
 
 // Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
 // a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
@@ -119,7 +125,7 @@ self.addEventListener('install', function (event) {
             // gaps in on the next successful visit anyway.
             return Promise.all(
                 SHELL_URLS.concat(VENDOR_URLS).map(function (url) {
-                    return fetch(url, { mode: 'cors' }).then(function (response) {
+                    return fetch(url, { mode: 'cors', cache: 'reload' }).then(function (response) {
                         if (response && response.ok) return cache.put(url, response);
                     }).catch(function () { /* non-critical */ });
                 })
@@ -178,7 +184,7 @@ self.addEventListener('fetch', function (event) {
                 // Same-origin fetches use `lookupUrl` too, NOT the original
                 // request, so a ".html" request never triggers a redirect-
                 // following fetch whose response would carry redirected:true.
-                var networkFetch = fetch(lookupUrl, isVendor ? { mode: 'cors' } : undefined)
+                var networkFetch = fetch(lookupUrl, isVendor ? { mode: 'cors', cache: 'reload' } : { cache: 'reload' })
                     .then(function (response) {
                         if (response && response.ok) cache.put(lookupUrl, response.clone()).catch(function () {});
                         return response;
