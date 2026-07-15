@@ -31,7 +31,7 @@ import base64
 import io
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, Depends
@@ -245,9 +245,67 @@ def focus_prompt(prompt: str, disputed: List[str]) -> str:
     )
 
 
+def build_attendance_prompt(roster: List[str]) -> str:
+    return (
+        "You are analyzing a photo of a classroom attendance sheet from a school in the Philippines. "
+        "For each student on the ROSTER below, find their attendance cell and read the LETTER written in it:\n\n"
+        "  LETTER 'P' → \"Present\"\n"
+        "  LETTER 'A' → \"Absent\"\n"
+        "  LETTER 'L' → \"Late\"\n"
+        "  LETTER 'E' → \"Excused\"\n"
+        "  EMPTY / BLANK cell → \"Absent\"\n\n"
+        "NOTE: A small dot (.) or faint mark that is NOT clearly one of the letters P, A, L, E counts as BLANK → \"Absent\".\n"
+        "Only a clear, intentional letter P, A, L, or E should be read as marked.\n\n"
+        f"CRITICAL — You MUST return ALL {len(roster)} roster students:\n"
+        f"  • students[] MUST have exactly {len(roster)} entries in ROSTER ORDER. No omissions, no duplicates.\n"
+        "  • Read each row left-to-right, match to the roster name, then read the attendance letter.\n"
+        "  • If you CANNOT find a student's row, include them as Absent with confidence 0.2.\n\n"
+        "MATCHING RULES:\n"
+        "  • Match photo names to the closest roster name (tolerate missing accents, wrong middle initial).\n"
+        "  • Never invent names not on the roster. Names must match EXACTLY.\n"
+        + ROW_ORDER_NOTE + "\n"
+        "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n"
+        "{\n"
+        '  "students": [\n'
+        '    { "name": "<exact roster name>", "status": "Present", "confidence": 1.0 },\n'
+        '    { "name": "<exact roster name>", "status": "Absent", "confidence": 0.9 }\n'
+        "  ],\n"
+        '  "unmatched": [],\n'
+        '  "notes": ""\n'
+        "}\n\n"
+        f"ROSTER ({len(roster)} names — return exactly this many):\n"
+        + _roster_lines(roster)
+    )
+
+
 # ── Gemini structured-output schemas ─────────────────────────────────────────
 # Constraining `name` to the exact roster strings eliminates name drift (case,
 # spacing, accents) at the decoder level; sanitizers below stay as the backstop.
+
+def build_attendance_schema(roster: List[str]) -> dict:
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "students": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "name": {"type": "STRING", "enum": list(roster)},
+                        "status": {"type": "STRING", "enum": ["Present", "Absent", "Late", "Excused"]},
+                        "confidence": {"type": "NUMBER"},
+                    },
+                    "required": ["name", "status"],
+                    "propertyOrdering": ["name", "status", "confidence"],
+                },
+            },
+            "unmatched": {"type": "ARRAY", "items": {"type": "STRING"}},
+            "notes": {"type": "STRING"},
+        },
+        "required": ["students"],
+        "propertyOrdering": ["students", "unmatched", "notes"],
+    }
+
 
 def build_record_schema(roster: List[str], target_fields: List[str]) -> dict:
     fields = [f for f in (target_fields or RECORD_FIELDS) if f in RECORD_FIELD_SET]
@@ -849,6 +907,24 @@ def sanitize_record_students(lst, roster_set) -> List[dict]:
     return out
 
 
+def sanitize_students(lst, roster_set) -> List[dict]:
+    if not isinstance(lst, list):
+        return []
+    seen = set()
+    valid = {"Present", "Absent", "Late", "Excused"}
+    out = []
+    for item in lst:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        status = str(item.get("status") or "").strip()
+        if not name or name not in roster_set or status not in valid or name in seen:
+            continue
+        seen.add(name)
+        out.append({"name": name, "status": status, "confidence": _clamp_conf(item.get("confidence"))})
+    return out
+
+
 def record_disputed_names(a: List[dict], b: List[dict]) -> List[str]:
     """Roster names whose shared cells the two passes read differently."""
     bmap = {s["name"]: (s.get("scores") or {}) for s in b}
@@ -953,6 +1029,142 @@ def merge_record_consensus(passes: List[List[dict]], target_fields) -> List[dict
     return out
 
 
+class _ScopeFailure(Exception):
+    """Total read failure for one process_record_scope() call. Carries the
+    exact status/payload the endpoint would have returned for a whole-roster
+    scan, so a non-chunked caller can re-raise it straight to the client while
+    a chunked caller can catch it and degrade to blank per-student entries
+    instead of aborting the whole multi-chunk scan over one bad chunk."""
+    def __init__(self, status_code: int, payload: dict):
+        super().__init__(payload.get("error", "vision scope failed"))
+        self.status_code = status_code
+        self.payload = payload
+
+
+async def process_record_scope(
+    gemini_key: Optional[str],
+    groq_key: Optional[str],
+    image_b64: str,
+    mime_type: str,
+    names: List[str],
+    ids: Optional[List[str]],
+    target_fields: List[str],
+) -> Tuple[List[dict], List[str], str]:
+    """Read ONE roster scope — the whole class, or a single chunk — with the
+    full accuracy pipeline: primary read, decorrelated verification pass,
+    targeted tie-break on disputes, majority-of-3 consensus, and duplicate-row
+    flagging. Used by BOTH the small-class and chunked-large-class code paths
+    so a 55-student sheet gets exactly the same rigor as a 20-student one.
+    Chunking used to mean a single un-verified read per chunk with none of
+    this machinery — which made LARGE classes less accurate than small ones,
+    the opposite of the point of chunking.
+
+    Raises _ScopeFailure on total failure of the primary read.
+    """
+    roster_set = set(names)
+    prompt = build_record_prompt(names, target_fields, ids)
+    schema = build_record_schema(names, target_fields)
+
+    raw_reply = None
+    if gemini_key:
+        try:
+            raw_reply = await gemini_vision(
+                gemini_key, prompt, image_b64, mime_type,
+                prefer_accurate=True, response_schema=schema,
+            )
+        except _RateLimit as e:
+            if not groq_key:
+                raise _ScopeFailure(502, {
+                    "error": "The AI vision service is having trouble right now. Please try again in a moment.",
+                    "upstream": _safe_upstream_message(e.raw),
+                })
+            # rate-limited → fall through to Groq
+        except _Upstream as e:
+            raise _ScopeFailure(502, {
+                "error": "The AI vision service is having trouble right now. Please try again in a moment.",
+                "upstream": _safe_upstream_message(e.raw),
+            })
+
+    if not raw_reply:
+        if not groq_key:
+            raise _ScopeFailure(503, {
+                "error": "AI vision is not configured yet. Add GEMINI_API_KEY (or GROQ_API_KEY) to the "
+                         "backend environment variables.",
+            })
+        try:
+            raw_reply = await groq_vision(groq_key, prompt, image_b64, mime_type)
+        except _RateLimit:
+            raise _ScopeFailure(429, {
+                "error": "The AI hit its free-tier rate limit. Please wait a moment and try again.",
+            })
+        except _Upstream as e:
+            raise _ScopeFailure(502, {
+                "error": "The AI vision service is having trouble right now. Please try again in a moment.",
+                "upstream": _safe_upstream_message(e.raw),
+            })
+
+    try:
+        parsed = parse_vision_json(raw_reply)
+    except Exception as e:  # noqa: BLE001
+        raise _ScopeFailure(502, {
+            "error": "The AI reply was not valid JSON. Please try another photo.",
+            "upstream": _safe_upstream_message(f"parse:{e} | raw:{str(raw_reply or '')[:220]}"),
+        })
+
+    students = sanitize_record_students(parsed.get("students"), roster_set)
+    unmatched = [str(n or "").strip() for n in (parsed.get("unmatched") or []) if str(n or "").strip()]
+    notes = str(parsed.get("notes") or "").strip()[:240]
+
+    # Multi-pass consensus: every scan is read at least twice; if the two
+    # reads disagree on any cell a third read breaks the tie, and cells with
+    # no majority are confidence-flagged so the review modal forces a check.
+    if len(target_fields) >= 1 and gemini_key and students:
+        try:
+            # Pass 2 is DECORRELATED from pass 1: bottom-up (or column-major
+            # for multi-column scans) on a rotated model order, so the two
+            # passes cannot simply repeat the same first-impression mistake.
+            raw_reply2 = await gemini_vision(
+                gemini_key, verification_prompt(prompt, column_major=len(target_fields) >= 2),
+                image_b64, mime_type,
+                prefer_accurate=True, response_schema=schema, rotate=1,
+            )
+            parsed2 = parse_vision_json(raw_reply2)
+            students2 = sanitize_record_students(parsed2.get("students"), roster_set)
+            passes = [students, students2]
+            disputed = record_disputed_names(students, students2) if students2 else []
+            if disputed:
+                try:
+                    # Pass 3 tie-break is TARGETED: names the disputed rows
+                    # so the strongest model concentrates exactly there.
+                    raw_reply3 = await gemini_vision(
+                        gemini_key, focus_prompt(prompt, disputed), image_b64, mime_type,
+                        prefer_accurate=True, response_schema=schema,
+                    )
+                    parsed3 = parse_vision_json(raw_reply3)
+                    students3 = sanitize_record_students(parsed3.get("students"), roster_set)
+                    if students3:
+                        passes.append(students3)
+                except Exception:  # noqa: BLE001
+                    pass  # tie-break is best-effort; 2-pass merge still applies
+            students = merge_record_consensus(passes, target_fields)
+            flag_duplicate_rows(students, passes)
+            notes2 = str(parsed2.get("notes") or "").strip()
+            if notes2 and notes2 not in notes:
+                notes = (notes + " | " if notes else "") + notes2
+                notes = notes[:240]
+        except Exception:  # noqa: BLE001
+            pass  # best-effort; fall back to single pass
+
+    # Row cross-check also covers the single-pass path (Groq fallback / no
+    # explicit fields) — after a consensus merge the entries carry no `row`
+    # key, so this is a no-op there. Then strip internal keys: the response
+    # contract stays exactly {name, scores, confidence}.
+    flag_duplicate_rows(students, [students])
+    for s in students:
+        s.pop("row", None)
+    return students, unmatched, notes
+
+
 def _safe_upstream_message(raw) -> str:
     s = str(raw or "").strip()
     if not s:
@@ -1001,6 +1213,15 @@ async def vision_analyze(
     if len(roster) > MAX_ROSTER:
         return JSONResponse({"error": f"Roster too large (max {MAX_ROSTER})."}, status_code=400)
 
+    gemini_key = settings.GEMINI_API_KEY
+    groq_key = settings.GROQ_API_KEY
+    not_configured = (
+        "AI vision is not configured yet. Add GEMINI_API_KEY (or GROQ_API_KEY) to the "
+        "backend environment variables."
+    )
+    if not gemini_key and not groq_key:
+        return JSONResponse({"error": not_configured}, status_code=503)
+
     # ── Image pre-processing: enhance legibility ──────────────────────────
     # Both the scores image and (when provided) the roster image are
     # converted to grayscale, auto-contrasted, and sharpened so the AI sees
@@ -1034,75 +1255,60 @@ async def vision_analyze(
         except Exception:
             pass  # fall back to original roster if extraction fails
 
-    gemini_key = settings.GEMINI_API_KEY
-    groq_key = settings.GROQ_API_KEY
-    not_configured = (
-        "AI vision is not configured yet. Add GEMINI_API_KEY (or GROQ_API_KEY) to the "
-        "backend environment variables."
-    )
-    if not gemini_key and not groq_key:
-        return JSONResponse({"error": not_configured}, status_code=503)
-
-    # Chunk large record rosters for better accuracy
-    if type_ == "record" and len(roster) > CHUNK_SIZE:
-        all_students: List[dict] = []
-        all_unmatched: List[str] = []
-        all_notes: List[str] = []
-        for i in range(0, len(roster), CHUNK_SIZE):
-            chunk_names = roster[i:i + CHUNK_SIZE]
-            chunk_ids = roster_ids[i:i + CHUNK_SIZE] if roster_ids else None
-            prompt = build_record_prompt(chunk_names, target_fields, chunk_ids)
-            schema = build_record_schema(chunk_names, target_fields)
-
-            raw_reply = None
-            if gemini_key:
-                try:
-                    raw_reply = await gemini_vision(
-                        gemini_key, prompt, image_b64, mime_type,
-                        prefer_accurate=True, response_schema=schema,
-                    )
-                except (_RateLimit, _Upstream):
-                    pass
-
-            if not raw_reply and groq_key:
-                try:
-                    raw_reply = await groq_vision(groq_key, prompt, image_b64, mime_type)
-                except (_RateLimit, _Upstream):
-                    pass
-
-            if raw_reply:
-                try:
-                    parsed = parse_vision_json(raw_reply)
-                    chunk_set = set(chunk_names)
-                    chunk_students = sanitize_record_students(parsed.get("students"), chunk_set)
-                    if chunk_students:
-                        all_students.extend(chunk_students)
-                    if isinstance(parsed.get("unmatched"), list):
-                        all_unmatched.extend(str(n or "").strip() for n in parsed["unmatched"] if str(n or "").strip())
-                    n = str(parsed.get("notes") or "").strip()[:240]
-                    if n:
-                        all_notes.append(n)
-                except Exception:
-                    pass
-        return JSONResponse({
-            "students": all_students,
-            "unmatched": all_unmatched[:30],
-            "notes": " | ".join(all_notes)[:480],
-        })
-
     if type_ == "record":
-        prompt = build_record_prompt(roster, target_fields, roster_ids if roster_ids else None)
-        schema = build_record_schema(roster, target_fields)
-    else:
-        prompt = build_record_prompt(roster, target_fields, roster_ids if roster_ids else None)
-        schema = build_record_schema(roster, target_fields)
+        if len(roster) > CHUNK_SIZE:
+            # Large class: chunked for the schema's name-enum size, but each
+            # chunk still gets the FULL accuracy pipeline (verification pass,
+            # tie-break, majority consensus) via process_record_scope — a big
+            # class must not be less accurate than a small one just because
+            # it needs chunking.
+            all_students: List[dict] = []
+            all_unmatched: List[str] = []
+            all_notes: List[str] = []
+            any_chunk_failed = False
+            for i in range(0, len(roster), CHUNK_SIZE):
+                chunk_names = roster[i:i + CHUNK_SIZE]
+                chunk_ids = roster_ids[i:i + CHUNK_SIZE] if roster_ids else None
+                try:
+                    s, u, n = await process_record_scope(
+                        gemini_key, groq_key, image_b64, mime_type, chunk_names, chunk_ids, target_fields,
+                    )
+                except _ScopeFailure:
+                    # This chunk's read failed entirely (rate limit / parse
+                    # error / no provider). Surface its roster names as
+                    # blank/0-confidence rather than silently dropping them —
+                    # a facilitator can rescan just the affected rows — and
+                    # keep going with the remaining chunks.
+                    s = [{"name": n, "scores": {}, "confidence": 0.0} for n in chunk_names]
+                    u, n = [], ""
+                    any_chunk_failed = True
+                all_students.extend(s)
+                all_unmatched.extend(u)
+                if n:
+                    all_notes.append(n)
+            if any_chunk_failed:
+                all_notes.append("Some rows could not be read (service busy) — rescan to fill them in.")
+            return JSONResponse({
+                "students": all_students,
+                "unmatched": all_unmatched[:30],
+                "notes": " | ".join(all_notes)[:480],
+            })
 
-    # Step 1: Gemini (primary)
+        try:
+            students, unmatched, notes = await process_record_scope(
+                gemini_key, groq_key, image_b64, mime_type, roster, roster_ids if roster_ids else None, target_fields,
+            )
+        except _ScopeFailure as e:
+            return JSONResponse(e.payload, status_code=e.status_code)
+        return JSONResponse({"students": students, "unmatched": unmatched[:30], "notes": notes})
+
+    # ── Attendance: single-shot read + one decorrelated verification pass ──────
+    prompt = build_attendance_prompt(roster)
+    schema = build_attendance_schema(roster)
+
     raw_reply = None
     if gemini_key:
         try:
-            # Accuracy-first model ordering for BOTH scan types — attendance
-            # letters deserve the same care as record scores.
             raw_reply = await gemini_vision(
                 gemini_key, prompt, image_b64, mime_type,
                 prefer_accurate=True, response_schema=schema,
@@ -1122,7 +1328,6 @@ async def vision_analyze(
                 status_code=502,
             )
 
-    # Step 2: Groq (fallback)
     if not raw_reply:
         if not groq_key:
             return JSONResponse({"error": not_configured}, status_code=503)
@@ -1150,62 +1355,36 @@ async def vision_analyze(
         )
 
     roster_set = set(roster)
-    students = sanitize_record_students(parsed.get("students"), roster_set)
+    students = sanitize_students(parsed.get("students"), roster_set)
     unmatched = []
     if isinstance(parsed.get("unmatched"), list):
         unmatched = [str(n or "").strip() for n in parsed["unmatched"] if str(n or "").strip()][:30]
     notes = str(parsed.get("notes") or "").strip()[:240]
 
-    # Multi-pass consensus (record + explicit fields + gemini available):
-    # every scan is read at least twice; if the two reads disagree on any cell
-    # a third read breaks the tie, and cells with no 2-of-3 majority are
-    # confidence-flagged so the review modal forces a human check.
-    if type_ == "record" and len(target_fields) >= 1 and gemini_key and students:
+    # Attendance verification pass: re-read once; agreements lock in at high
+    # confidence, disagreements drop to 0.35 so the letter gets double-checked.
+    if gemini_key and students:
         try:
-            # Pass 2 is DECORRELATED from pass 1: it re-reads the sheet
-            # bottom-up on a rotated model order, so the two passes cannot
-            # simply repeat the same first-impression mistake.
-            # Multi-column scans verify COLUMN-MAJOR (strongest row-shift
-            # decorrelation); single-column scans verify bottom-up.
             raw_reply2 = await gemini_vision(
-                gemini_key, verification_prompt(prompt, column_major=len(target_fields) >= 2),
-                image_b64, mime_type,
+                gemini_key, verification_prompt(prompt), image_b64, mime_type,
                 prefer_accurate=True, response_schema=schema, rotate=1,
             )
             parsed2 = parse_vision_json(raw_reply2)
-            students2 = sanitize_record_students(parsed2.get("students"), roster_set)
-            passes = [students, students2]
-            disputed = record_disputed_names(students, students2) if students2 else []
-            if disputed:
-                try:
-                    # Pass 3 tie-break is TARGETED: it names the disputed rows
-                    # so the strongest model spends its attention exactly there.
-                    raw_reply3 = await gemini_vision(
-                        gemini_key, focus_prompt(prompt, disputed), image_b64, mime_type,
-                        prefer_accurate=True, response_schema=schema,
-                    )
-                    parsed3 = parse_vision_json(raw_reply3)
-                    students3 = sanitize_record_students(parsed3.get("students"), roster_set)
-                    if students3:
-                        passes.append(students3)
-                except Exception:  # noqa: BLE001
-                    pass  # tie-break is best-effort; 2-pass merge still applies
-            students = merge_record_consensus(passes, target_fields)
-            flag_duplicate_rows(students, passes)
-            notes2 = str(parsed2.get("notes") or "").strip()
-            if notes2 and notes2 not in notes:
-                notes = (notes + " | " if notes else "") + notes2
-                notes = notes[:240]
+            students2 = sanitize_students(parsed2.get("students"), roster_set)
+            if students2:
+                second = {s["name"]: s for s in students2}
+                merged_att = []
+                for s in students:
+                    other = second.pop(s["name"], None)
+                    if other is None:
+                        merged_att.append(s)
+                    elif other["status"] == s["status"]:
+                        merged_att.append({**s, "confidence": max(s["confidence"], other["confidence"], 0.9)})
+                    else:
+                        merged_att.append({**s, "confidence": 0.35})
+                merged_att.extend(second.values())
+                students = merged_att
         except Exception:  # noqa: BLE001
-            pass  # best-effort; fall back to single pass
-
-    if type_ == "record":
-        # Row cross-check also covers the single-pass path (Groq fallback / no
-        # explicit fields) — after a consensus merge the entries carry no `row`
-        # key, so this is a no-op there. Then strip internal keys: the response
-        # contract stays exactly {name, scores, confidence}.
-        flag_duplicate_rows(students, [students])
-        for s in students:
-            s.pop("row", None)
+            pass  # best-effort; single pass is still returned
 
     return JSONResponse({"students": students, "unmatched": unmatched, "notes": notes})

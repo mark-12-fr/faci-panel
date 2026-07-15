@@ -453,8 +453,21 @@ export default function RecordPage() {
       showAlert("Not an image", "Please pick a photo (JPEG, PNG, or WebP).", "#ef4444");
       return;
     }
-    const roster = rows.map((r) => String(r.student.full_name || "").trim()).filter(Boolean);
-    const rosterIds = rows.map((r) => String((r.student as any).id_no || "").trim()).filter(Boolean);
+    // Build both from ONE filtered pass so they stay index-aligned. Filtering
+    // each array separately (by name, then independently by id_no) would
+    // desync them the moment any single student lacks an id_no — the backend
+    // then sees roster.length !== rosterIds.length and discards ALL ids,
+    // silently losing ID-anchored matching for the entire class over one
+    // missing field. An empty-string placeholder here keeps every OTHER
+    // student's id usable.
+    const rosterEntries = rows
+      .map((r) => ({
+        name: String(r.student.full_name || "").trim(),
+        id: String((r.student as any).id_no || "").trim(),
+      }))
+      .filter((e) => e.name);
+    const roster = rosterEntries.map((e) => e.name);
+    const rosterIds = rosterEntries.map((e) => e.id);
     if (roster.length === 0) {
       showAlert("No students yet", "Wait for the class list to load first, then try again.", "#f59e0b");
       return;
