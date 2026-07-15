@@ -2,7 +2,7 @@
   "name": "AcadTrack — Facilitator Portal",
   "short_name": "AcadTrack Faci",
   "description": "Facilitator portal for AcadTrack — submit attendance and class records for your assigned section.",
-  "start_url": "/login.html",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
