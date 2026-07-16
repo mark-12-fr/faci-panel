@@ -138,6 +138,19 @@ const BLANK_CELL_RULES =
     "  • Leaving a score OUT is always better than inventing one. If a student left a cell blank,\n" +
     "    they must come back with NO value for that field.\n";
 
+// These sheets head the MODULES columns with plain numbers, often starting at 0
+// (0, 1, 2, 3, ...). The printed header number IS the module number, so the AI
+// must map by the number, not by position — a leading "0" (Module 0) column
+// otherwise offsets a positional count and shifts every module's value sideways.
+const MODULE_HEADER_NOTE =
+    "═══ MODULE COLUMNS ARE HEADED WITH PLAIN NUMBERS (may start at 0) ═══\n" +
+    "  • Under the 'MODULES' heading the columns are labelled with plain numbers — often\n" +
+    "    0, 1, 2, 3, 4, ... The column whose printed header is '2' IS Module 2 (module_2); the\n" +
+    "    one headed '3' is module_3, and so on. MAP THE PRINTED HEADER NUMBER to the module number.\n" +
+    "  • Do NOT count module columns by position. There is frequently a leading '0' (Module 0)\n" +
+    "    column, so the FIRST module column is usually Module 0, NOT Module 1. Read the value for\n" +
+    "    Module N from the column whose header is printed 'N' — never the Nth column from the left.\n";
+
 // The single most damaging record-scan error: an OFF-BY-ONE row shift, where a
 // blank leading row gets skipped so every student ends up with the NEXT
 // student's scores. This note (shared by every prompt mode) forbids compressing
@@ -213,13 +226,15 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
             "common mistake, so guard against it deliberately:\n" +
             "  • Do NOT assume the columns appear in the same order I listed them above.\n" +
             "  • FIRST read the table's HEADER row. For EACH target column, find the physical column in\n" +
-            "    the photo whose header text matches that field's label — e.g. the value for MODULE 3\n" +
-            "    must come from the column headed 'M3' / 'MODULE 3', and MODULE 4 from the column headed\n" +
-            "    'M4' / 'MODULE 4'. Never store a value under a neighbouring column's key.\n" +
+            "    the photo whose printed header matches that field's number — e.g. the value for MODULE 3\n" +
+            "    must come from the column headed '3' (or 'M3' / 'MODULE 3'), and MODULE 4 from the\n" +
+            "    column headed '4'. Never store a value under a neighbouring column's key.\n" +
             "  • If two target columns sit next to each other, trace each one down from its header\n" +
             "    carefully so you do not read MODULE 3's cell into module_4 or vice-versa.\n" +
             "  • If you cannot clearly tell which field a column's header refers to, OMIT that column\n" +
             "    rather than guess where it goes.\n\n" +
+
+            MODULE_HEADER_NOTE + "\n" +
 
             "YOUR JOB: for each student on the ROSTER below, find their row, then read the handwritten " +
             "number in EACH matched column for that row and store it under THAT column's field key.\n\n" +
@@ -261,7 +276,14 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
             "STEP 1 — LOCATE the " + targetLabel + " column. If the photo shows a table with a " +
             "header row, identify the column labeled " + targetLabel + " (or its short form like " +
             targetField.replace('_', ' ').toUpperCase() + "). Every score you extract must come " +
-            "from THIS column and no other.\n\n" +
+            "from THIS column and no other.\n" +
+            (targetField.indexOf('module_') === 0
+                ? "  ★ Module columns are headed with PLAIN NUMBERS, often starting at 0 (0, 1, 2, 3, ...).\n" +
+                  "    " + targetLabel + " is the column whose printed header is '" + targetField.split('_')[1] + "'. Map by the\n" +
+                  "    printed number — do NOT count from the left, because a leading '0' (Module 0) column\n" +
+                  "    would offset the count and make you read the wrong module.\n"
+                : "") +
+            "\n" +
 
             "STEP 2 — For each student on the ROSTER below, find their row in the photo (the row " +
             "whose Student Name matches the roster name). Then find the CELL that is on that row " +
@@ -337,7 +359,10 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
         "STEP 2: Read each student row from top to bottom. Match the name in the photo to the closest roster name.\n" +
         "STEP 3: For each matched student, read the score from each column and record it under the correct field key.\n" +
         "STEP 4: If EVERY cell in that student's row is blank/empty, OMIT that student entirely.\n\n" +
+        MODULE_HEADER_NOTE + "\n" +
         "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n" +
+        "- Under 'MODULES': a column headed with the plain number 'N' → module_N (e.g. '2' → module_2).\n" +
+        "  A leading '0' column is Module 0 — ignore it unless you truly need module_0.\n" +
         "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n" +
         "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n" +
         "- 'AT' / 'Attendance' → at\n" +
