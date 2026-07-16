@@ -1505,6 +1505,37 @@
             _cropMode = null;
         }
 
+        // Encode a canvas to JPEG kept under a base64 byte budget, so a WIDE
+        // crop can never exceed Vercel's 4.5MB request-body limit (which shows
+        // as "Analyze failed (413)"). Lowers quality first; if still too big,
+        // re-draws the crop at smaller pixel sizes (from the ORIGINAL source, so
+        // steps don't compound blur) and tries again.
+        function _encodeUnderBudget(canvas, srcImg, sx, sy, sw, sh) {
+            const BUDGET = 3.5 * 1024 * 1024; // base64 chars; leaves headroom for the roster JSON
+            const qualities = [0.92, 0.84, 0.76, 0.68, 0.6];
+            let cvs = canvas;
+            for (let round = 0; round < 4; round++) {
+                for (let i = 0; i < qualities.length; i++) {
+                    const url = cvs.toDataURL('image/jpeg', qualities[i]);
+                    const b64 = url.split(',')[1] || '';
+                    if (b64.length <= BUDGET) return { dataUrl: url, base64: b64 };
+                }
+                const nw = Math.max(1, Math.round(cvs.width * 0.8));
+                const nh = Math.max(1, Math.round(cvs.height * 0.8));
+                if (nw < 40 || nh < 40) break;
+                const smaller = document.createElement('canvas');
+                smaller.width = nw; smaller.height = nh;
+                const sctx = smaller.getContext('2d');
+                sctx.imageSmoothingEnabled = true;
+                sctx.imageSmoothingQuality = 'high';
+                sctx.fillStyle = '#fff'; sctx.fillRect(0, 0, nw, nh);
+                sctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, nw, nh);
+                cvs = smaller;
+            }
+            const url = cvs.toDataURL('image/jpeg', 0.55);
+            return { dataUrl: url, base64: url.split(',')[1] || '' };
+        }
+
         function confirmCrop() {
             const st = _cropState;
             if (!st || !st.sel) return;
@@ -1540,8 +1571,11 @@
             tmpCtx.imageSmoothingQuality = 'high';
             tmpCtx.fillStyle = '#fff'; tmpCtx.fillRect(0, 0, outW, outH);
             tmpCtx.drawImage(st.img, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
-            const outDataUrl = tmpCanvas.toDataURL('image/jpeg', 0.92);
-            const base64 = outDataUrl.split(',')[1] || '';
+            // Encode under a byte budget so a WIDE crop (e.g. ID+Name through the
+            // modules) can't exceed Vercel's 4.5MB request-body limit → 413.
+            const enc = _encodeUnderBudget(tmpCanvas, st.img, cropX, cropY, cropW, cropH);
+            const outDataUrl = enc.dataUrl;
+            const base64 = enc.base64;
             // Capture the handler BEFORE cancelCrop() nulls _cropState. Scores
             // photos analyze immediately; the roster photo just stores its crop.
             const onConfirm = st.onConfirm || _analyzeRecordPhoto;
@@ -1885,9 +1919,11 @@
                         rosterIds: rosterIds,
                         targetFields: _recTargetFields,
                         // Back-compat: single-field key when exactly one chosen.
-                        targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : '',
-                        rosterImageBase64: _cachedRosterImg ? _cachedRosterImg.base64 : '',
-                        rosterMimeType: _cachedRosterImg ? _cachedRosterImg.mimeType : ''
+                        targetField: _recTargetFields.length === 1 ? _recTargetFields[0] : ''
+                        // NOTE: the roster photo is intentionally NOT sent — the
+                        // API reads names/IDs from the DB roster, not that image,
+                        // and shipping a second photo pushed the request over
+                        // Vercel's 4.5MB body limit ("Analyze failed (413)").
                     })
                 });
                 let payload;
