@@ -822,78 +822,77 @@ module.exports = async (req, res) => {
     // keeps each chunk locked to the right rows.
     //
     // Chunks run in PARALLEL, not one-after-another: sequential chunks summed
-    // their times and blew past the function timeout (504) on a big class,
-    // especially when the slow 2.5-pro model was rate-limited and each chunk
-    // cycled through fallbacks. Parallel makes total time ≈ the slowest single
-    // chunk. Each chunk also sticks to FAST flash models (skipping 2.5-pro) so
-    // no single chunk stalls.
+    // their times and blew past the function timeout (504) on a big class.
+    // Parallel makes total time ≈ the slowest single call. Each chunk is read
+    // TWICE by two DIFFERENT fast models and reconciled: digits the two models
+    // disagree on come back low-confidence and get flagged for double-check in
+    // the review UI, which is how the facilitator spots a misread number
+    // without hunting the whole sheet. All passes fire at once, so even with
+    // two passes per chunk the whole thing finishes in ~one call's time.
     const CHUNK_SIZE = 20;
     if (type === 'record' && roster.length > CHUNK_SIZE) {
-        const FAST_CHUNK_MODELS = [
-            'gemini-2.5-flash',
-            'gemini-flash-latest',
-            'gemini-2.5-flash-lite',
-            'gemini-2.0-flash'
-        ];
-        const chunkVision = async (p) => {
+        // Two decorrelated model orders — different primaries so they make
+        // different mistakes (that difference is exactly what flags an
+        // ambiguous digit). Each keeps a fallback so a single 429 doesn't
+        // drop the pass entirely.
+        const PASS_A_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+        const PASS_B_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+
+        const rosterSet = new Set(roster);
+        const onePass = async (prompt, models, chunkNames) => {
+            let raw;
             if (geminiKey) {
                 try {
-                    return await geminiVision(geminiKey, p, imageBase64, mimeType, { models: FAST_CHUNK_MODELS });
+                    raw = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { models: models });
                 } catch (e) {
                     const msg = String((e && (e.raw || e.message)) || e).toLowerCase();
                     const isLimit = (e && e.code === 429) || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
                     if (!(groqKey && isLimit)) throw e; // non-limit, or no Groq → propagate
                 }
             }
-            return await groqVision(groqKey, p, imageBase64, mimeType);
+            if (!raw) raw = await groqVision(groqKey, prompt, imageBase64, mimeType);
+            // Sanitize against the FULL roster (names are unique), then keep only
+            // students THIS chunk asked about so a stray out-of-chunk name can't
+            // leak in.
+            return sanitizeRecordStudents(parseVisionJSON(raw).students, rosterSet)
+                .filter((s) => chunkNames.has(s.name));
         };
 
-        const rosterSet = new Set(roster);
         const chunks = [];
         for (let i = 0; i < roster.length; i += CHUNK_SIZE) {
             chunks.push({ names: roster.slice(i, i + CHUNK_SIZE), ids: rosterIds.slice(i, i + CHUNK_SIZE) });
         }
 
-        // Fire every chunk at once; each resolves to its parsed result or an
-        // error marker. Promise.all preserves order so the merge stays stable.
+        // Fire every chunk's two passes at once. Each chunk resolves to its
+        // reconciled student list, or an error marker if BOTH passes failed.
         const results = await Promise.all(chunks.map(async (ch) => {
-            try {
-                const raw = await chunkVision(buildRecordPrompt(ch.names, targetFields, ch.ids));
-                return { ok: true, parsed: parseVisionJSON(raw), names: ch.names };
-            } catch (e) {
-                return { ok: false, err: (e && (e.raw || e.message)) || String(e) };
-            }
+            const prompt = buildRecordPrompt(ch.names, targetFields, ch.ids);
+            const chunkNames = new Set(ch.names);
+            const [ra, rb] = await Promise.all([
+                onePass(prompt, PASS_A_MODELS, chunkNames).catch((e) => ({ __err: (e && (e.raw || e.message)) || String(e) })),
+                onePass(prompt, PASS_B_MODELS, chunkNames).catch((e) => ({ __err: (e && (e.raw || e.message)) || String(e) }))
+            ]);
+            const aOk = Array.isArray(ra), bOk = Array.isArray(rb);
+            if (!aOk && !bOk) return { ok: false, err: (ra && ra.__err) || (rb && rb.__err) || 'chunk failed' };
+            // Both passes → consensus (agreement raises confidence, disagreement
+            // lowers it and flags the cell). One pass → use it as-is.
+            const students = (aOk && bOk) ? mergeRecordConsensus(ra, rb, targetFields) : (aOk ? ra : rb);
+            return { ok: true, students: students };
         }));
 
         const merged = [];
         const seenNames = new Set();
-        const unmatchedAll = [];
-        const notesAll = [];
         let anySuccess = false;
         let lastErr = null;
 
         for (const r of results) {
             if (!r.ok) { lastErr = r.err; console.error('Record chunk failed:', lastErr); continue; }
             anySuccess = true;
-            const chunkNames = new Set(r.names);
-            // Sanitize against the FULL roster (names are unique), then keep only
-            // students THIS chunk asked about so a stray out-of-chunk name can't
-            // leak in.
-            const chStudents = sanitizeRecordStudents(r.parsed && r.parsed.students, rosterSet)
-                .filter((s) => chunkNames.has(s.name));
-            for (const s of chStudents) {
+            for (const s of r.students) {
                 if (seenNames.has(s.name)) continue;
                 seenNames.add(s.name);
                 merged.push(s);
             }
-            if (Array.isArray(r.parsed && r.parsed.unmatched)) {
-                for (const u of r.parsed.unmatched) {
-                    const t = String(u || '').trim();
-                    if (t) unmatchedAll.push(t);
-                }
-            }
-            const nt = String((r.parsed && r.parsed.notes) || '').trim();
-            if (nt) notesAll.push(nt);
         }
 
         // Only error out if EVERY chunk failed. A partial result (some chunks
@@ -911,8 +910,8 @@ module.exports = async (req, res) => {
 
         res.status(200).json({
             students: merged,
-            unmatched: unmatchedAll.slice(0, 30),
-            notes: notesAll.join(' | ').slice(0, 240)
+            unmatched: [],
+            notes: ''
         });
         return;
     }
