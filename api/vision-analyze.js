@@ -468,77 +468,88 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
         : (opts && Array.isArray(opts.models) && opts.models.length) ? opts.models
         : (preferAccurate ? RECORD_MODEL_ORDER : GEMINI_MODELS);
     let lastErr = null;
-    // Track whether EVERY model we tried came back rate-limited. Only then do
-    // we surface a 429 to the caller -- a per-model 429 should just skip to
-    // the next model. This matters for gemini-2.5-pro which is heavily rate-
-    // limited on the free tier; the fallbacks (flash-latest, 2.5-flash) still
-    // have plenty of headroom.
-    let modelsTried = 0;
-    let modelsRateLimited = 0;
-    // Try each model up to twice: once WITH responseMimeType=application/json,
-    // then WITHOUT it if the model rejects the field (Gemini sometimes returns
-    // 400 INVALID_ARGUMENT on that param for older/preview models).
-    for (const m of models) {
-        modelsTried++;
-        let modelRateLimited = false;
-        for (const useJsonMime of [true, false]) {
-            try {
-                // 4k was not enough for a 50-student roster in JSON; bump to
-                // 32k so we can comfortably fit ~200 students with room for
-                // scores. Gemini 2.5 Flash supports up to 65535.
-                const gen = { temperature: 0.1, maxOutputTokens: 32768 };
-                if (useJsonMime) gen.responseMimeType = 'application/json';
-                const r = await fetch(
-                    'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent?key=' + apiKey,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [
-                                    { text: prompt },
-                                    { inline_data: { mime_type: mimeType, data: imageBase64 } }
-                                ]
-                            }],
-                            generationConfig: gen
-                        })
+    // "Retriable" = a per-model failure that is NOT the model's fault: a 429
+    // rate limit OR a 503 "high demand / UNAVAILABLE" overload. We skip such a
+    // model and try the next; only if EVERY model is retriable do we surface a
+    // 429 to the caller (so it can fall through to Groq or show "try again").
+    // A 503 spike clears up fast, so if a whole pass fails on transient 503s we
+    // wait briefly and try the model list ONCE more before giving up.
+    const TRANSIENT_RE = /unavailable|overloaded|high demand/i;
+    let allRetriable = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        let modelsTried = 0;
+        let modelsRetriable = 0;
+        let sawTransient = false;
+        for (const m of models) {
+            modelsTried++;
+            let modelRetriable = false;
+            // Try each model up to twice: once WITH responseMimeType=application/
+            // json, then WITHOUT it if the model rejects the field (Gemini
+            // sometimes 400s on that param for older/preview models).
+            for (const useJsonMime of [true, false]) {
+                try {
+                    // 32k output tokens comfortably fits ~200 students with scores.
+                    const gen = { temperature: 0.1, maxOutputTokens: 32768 };
+                    if (useJsonMime) gen.responseMimeType = 'application/json';
+                    const r = await fetch(
+                        'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent?key=' + apiKey,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{
+                                    parts: [
+                                        { text: prompt },
+                                        { inline_data: { mime_type: mimeType, data: imageBase64 } }
+                                    ]
+                                }],
+                                generationConfig: gen
+                            })
+                        }
+                    );
+                    const data = await r.json().catch(() => ({}));
+                    if (r.status === 200) {
+                        const parts = (((data.candidates || [{}])[0] || {}).content || {}).parts || [];
+                        const text = parts.map((p) => (p && p.text) || '').join('').trim();
+                        if (text) return text;
+                        lastErr = '[' + m + '] empty reply';
+                        break; // next model
                     }
-                );
-                const data = await r.json().catch(() => ({}));
-                if (r.status === 200) {
-                    const parts = (((data.candidates || [{}])[0] || {}).content || {}).parts || [];
-                    const text = parts.map((p) => (p && p.text) || '').join('').trim();
-                    if (text) return text;
-                    lastErr = '[' + m + '] empty reply';
-                    break; // next model
-                }
-                lastErr = '[' + m + '] ' + r.status + ' ' + JSON.stringify(data).slice(0, 300);
-                if (r.status === 429 || /RESOURCE_EXHAUSTED/i.test(lastErr)) {
-                    // This ONE model is rate-limited; skip to the next model.
-                    // Only propagate a 429 to the caller after every model in
-                    // the fallback list has been tried and rate-limited.
-                    modelRateLimited = true;
+                    lastErr = '[' + m + '] ' + r.status + ' ' + JSON.stringify(data).slice(0, 300);
+                    if (r.status === 429 || /RESOURCE_EXHAUSTED/i.test(lastErr)) {
+                        modelRetriable = true; // rate-limited: skip to the next model
+                        break;
+                    }
+                    if (r.status === 503 || TRANSIENT_RE.test(lastErr)) {
+                        modelRetriable = true; // temporary overload: skip, maybe retry the whole list
+                        sawTransient = true;
+                        break;
+                    }
+                    // If the model rejected responseMimeType, retry without it. Any
+                    // other 400 → next model. 404/403 → next model.
+                    if (useJsonMime && r.status === 400 && /responseMimeType|response_mime_type/i.test(lastErr)) {
+                        continue;
+                    }
+                    break; // give up on this model, try the next
+                } catch (e) {
+                    lastErr = '[' + m + '] ' + String((e && e.message) || e);
                     break;
                 }
-                // If the model rejected responseMimeType, retry without it. Any
-                // other 400 → next model. 404/403 → next model.
-                if (useJsonMime && r.status === 400 && /responseMimeType|response_mime_type/i.test(lastErr)) {
-                    continue;
-                }
-                break; // give up on this model, try the next
-            } catch (e) {
-                lastErr = '[' + m + '] ' + String((e && e.message) || e);
-                break;
             }
+            if (modelRetriable) modelsRetriable++;
         }
-        if (modelRateLimited) modelsRateLimited++;
+        allRetriable = (modelsTried > 0 && modelsRetriable === modelsTried);
+        // Only worth a second pass if EVERY model failed AND at least one was a
+        // transient 503 spike (a pure rate-limit won't clear in 1.5s).
+        if (allRetriable && sawTransient && attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            continue;
+        }
+        break;
     }
-    // Every model rate-limited → surface a 429 to the caller (so the handler
-    // can fall through to Groq if it's configured). Otherwise raise the last
-    // non-429 error we saw.
-    if (modelsTried > 0 && modelsRateLimited === modelsTried) {
-        const e = new Error(lastErr || 'rate limit');
-        e.code = 429;
+    if (allRetriable) {
+        const e = new Error(lastErr || 'unavailable');
+        e.code = 429; // retriable → caller may fall back to Groq / show "try again"
         e.raw = lastErr || '';
         throw e;
     }
@@ -983,10 +994,10 @@ module.exports = async (req, res) => {
         // Only error out if EVERY chunk failed. A partial result (some chunks
         // succeeded) is still useful — the review UI shows what we got.
         if (!anySuccess) {
-            const isLimit = /429|limit|rate|quota|resource_exhausted/i.test(String(lastErr || ''));
-            res.status(isLimit ? 429 : 502).json({
-                error: isLimit
-                    ? 'The AI hit its free-tier rate limit. Please wait a moment and try again.'
+            const busy = /429|limit|rate|quota|resource_exhausted|503|unavailable|overloaded|high demand/i.test(String(lastErr || ''));
+            res.status(busy ? 429 : 502).json({
+                error: busy
+                    ? 'The AI is very busy right now (high demand or free-tier limit). This is temporary — please wait a minute and try again.'
                     : 'The AI vision service is having trouble right now. Please try again in a moment.',
                 upstream: safeUpstreamMessage(lastErr)
             });
