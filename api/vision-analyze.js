@@ -138,12 +138,25 @@ const BLANK_CELL_RULES =
     "  • Leaving a score OUT is always better than inventing one. If a student left a cell blank,\n" +
     "    they must come back with NO value for that field.\n";
 
+// The single most damaging record-scan error: an OFF-BY-ONE row shift, where a
+// blank leading row gets skipped so every student ends up with the NEXT
+// student's scores. This note (shared by every prompt mode) forbids compressing
+// blank rows. Kept separate so all modes get the same wording.
+const ROW_ALIGNMENT_NOTE =
+    "═══ BLANK ROWS KEEP THEIR PLACE — NEVER SHIFT SCORES UP ═══\n" +
+    "  • MANY students are blank in these columns (they have not submitted) — that is normal.\n" +
+    "  • A blank row STILL occupies its position. NEVER skip a blank row, and NEVER pull the row\n" +
+    "    BELOW it upward to fill it. If the 1st student's row is blank, the 1st student has NO\n" +
+    "    score — do NOT give them the 2nd student's numbers.\n" +
+    "  • The worst possible mistake is an off-by-one shift: every student getting the NEXT\n" +
+    "    student's scores. Before you finish, sanity-check that each number really sits on ITS\n" +
+    "    OWN student's row, not the row above or below.\n";
+
 // Build the ROSTER section shared by every record-prompt mode. When ID numbers
 // are available it anchors each row on its ID — the unique per-row marker in
 // the leftmost column — which is the strongest defence against the model
-// drifting onto the wrong row as it works DOWN a long sheet. Row-drift is
-// exactly why the LAST rows of a big class tend to misread while the first and
-// middle rows are fine.
+// drifting onto the wrong row. Row-drift/off-by-one is exactly why some rows
+// misread while the rest are fine.
 function _rosterBlock(roster, rosterIds) {
     const ids = Array.isArray(rosterIds) ? rosterIds : [];
     const haveIds = ids.some((x) => String(x || '').trim());
@@ -154,17 +167,23 @@ function _rosterBlock(roster, rosterIds) {
         }).join('\n');
         return (
             "═══ ANCHOR EACH ROW ON ITS ID NUMBER ═══\n" +
-            "The leftmost column of the sheet is the student's ID Number. Use it as your anchor:\n" +
-            "  • For each roster entry below, FIND the row whose ID Number matches, then read THAT\n" +
-            "    row's scores. The ID is unique per student — the surest way to stay on the right row.\n" +
-            "  • Work down carefully: the LOWER you go on the sheet, the easier it is to slip one row\n" +
-            "    up or down. Re-check the ID Number (and the name) before recording each row's scores.\n" +
-            "  • A score belongs to the student on THAT physical row — never the row above or below.\n\n" +
-            "ROSTER (match each to the row with the SAME ID Number; the name must still match exactly):\n" +
+            "  • If the ID Number (or Student Name) column IS visible in this photo, use it as your\n" +
+            "    anchor: for each roster entry below, FIND the row whose ID/name matches, then read\n" +
+            "    THAT row's scores. The ID is unique per student — the surest way to stay on the right row.\n" +
+            "  • If the ID/name column is NOT visible (the photo shows only score columns), then the\n" +
+            "    roster below is in the EXACT top-to-bottom order of the rows: 1st entry = 1st row,\n" +
+            "    2nd entry = 2nd row, counting EVERY row — including blank ones.\n" +
+            "  • Re-check the anchor before recording each row; a score belongs to the student on THAT\n" +
+            "    physical row, never the row above or below.\n\n" +
+            ROW_ALIGNMENT_NOTE + "\n" +
+            "ROSTER (match each to its row by ID Number when visible, else by exact top-to-bottom order; the name must match exactly):\n" +
             lines
         );
     }
     return (
+        ROW_ALIGNMENT_NOTE + "\n" +
+        "The roster below is in the EXACT top-to-bottom order of the sheet's rows — 1st entry = 1st\n" +
+        "row, 2nd = 2nd row, counting EVERY row including blank ones.\n\n" +
         "ROSTER (match names to these exact strings):\n" +
         roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
     );
