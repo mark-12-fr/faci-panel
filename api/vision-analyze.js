@@ -438,7 +438,13 @@ async function geminiVision(apiKey, prompt, imageBase64, mimeType, opts) {
         'gemini-2.0-flash-exp',
         'gemini-1.5-flash'
     ];
-    const models = pinned ? [pinned] : (preferAccurate ? RECORD_MODEL_ORDER : GEMINI_MODELS);
+    // An explicit model list (opts.models) wins — the chunked record path uses
+    // it to stick to FAST, high-rate-limit flash models and skip the slow,
+    // heavily rate-limited 2.5-pro, so several chunks can finish within the
+    // function's time budget instead of timing out (504).
+    const models = pinned ? [pinned]
+        : (opts && Array.isArray(opts.models) && opts.models.length) ? opts.models
+        : (preferAccurate ? RECORD_MODEL_ORDER : GEMINI_MODELS);
     let lastErr = null;
     // Track whether EVERY model we tried came back rate-limited. Only then do
     // we surface a 429 to the caller -- a per-model 429 should just skip to
@@ -813,14 +819,26 @@ module.exports = async (req, res) => {
     // scores while the first/middle rows are fine (the model loses row
     // alignment and its output degrades over a long response). Read the roster
     // in smaller chunks so it only tracks ~20 rows at a time; the ID anchoring
-    // keeps each chunk locked to the right rows. One Gemini call per chunk
-    // (Groq fallback), run sequentially to stay friendly to free-tier limits.
+    // keeps each chunk locked to the right rows.
+    //
+    // Chunks run in PARALLEL, not one-after-another: sequential chunks summed
+    // their times and blew past the function timeout (504) on a big class,
+    // especially when the slow 2.5-pro model was rate-limited and each chunk
+    // cycled through fallbacks. Parallel makes total time ≈ the slowest single
+    // chunk. Each chunk also sticks to FAST flash models (skipping 2.5-pro) so
+    // no single chunk stalls.
     const CHUNK_SIZE = 20;
     if (type === 'record' && roster.length > CHUNK_SIZE) {
+        const FAST_CHUNK_MODELS = [
+            'gemini-2.5-flash',
+            'gemini-flash-latest',
+            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash'
+        ];
         const chunkVision = async (p) => {
             if (geminiKey) {
                 try {
-                    return await geminiVision(geminiKey, p, imageBase64, mimeType, { preferAccurate: true });
+                    return await geminiVision(geminiKey, p, imageBase64, mimeType, { models: FAST_CHUNK_MODELS });
                 } catch (e) {
                     const msg = String((e && (e.raw || e.message)) || e).toLowerCase();
                     const isLimit = (e && e.code === 429) || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
@@ -831,6 +849,22 @@ module.exports = async (req, res) => {
         };
 
         const rosterSet = new Set(roster);
+        const chunks = [];
+        for (let i = 0; i < roster.length; i += CHUNK_SIZE) {
+            chunks.push({ names: roster.slice(i, i + CHUNK_SIZE), ids: rosterIds.slice(i, i + CHUNK_SIZE) });
+        }
+
+        // Fire every chunk at once; each resolves to its parsed result or an
+        // error marker. Promise.all preserves order so the merge stays stable.
+        const results = await Promise.all(chunks.map(async (ch) => {
+            try {
+                const raw = await chunkVision(buildRecordPrompt(ch.names, targetFields, ch.ids));
+                return { ok: true, parsed: parseVisionJSON(raw), names: ch.names };
+            } catch (e) {
+                return { ok: false, err: (e && (e.raw || e.message)) || String(e) };
+            }
+        }));
+
         const merged = [];
         const seenNames = new Set();
         const unmatchedAll = [];
@@ -838,36 +872,28 @@ module.exports = async (req, res) => {
         let anySuccess = false;
         let lastErr = null;
 
-        for (let i = 0; i < roster.length; i += CHUNK_SIZE) {
-            const names = roster.slice(i, i + CHUNK_SIZE);
-            const ids = rosterIds.slice(i, i + CHUNK_SIZE);
-            const chunkNames = new Set(names);
-            try {
-                const raw = await chunkVision(buildRecordPrompt(names, targetFields, ids));
-                const parsed = parseVisionJSON(raw);
-                // Sanitize against the FULL roster (names are unique), then keep
-                // only students THIS chunk asked about so a stray out-of-chunk
-                // name can't leak in.
-                const chStudents = sanitizeRecordStudents(parsed && parsed.students, rosterSet)
-                    .filter((s) => chunkNames.has(s.name));
-                for (const s of chStudents) {
-                    if (seenNames.has(s.name)) continue;
-                    seenNames.add(s.name);
-                    merged.push(s);
-                }
-                if (Array.isArray(parsed && parsed.unmatched)) {
-                    for (const u of parsed.unmatched) {
-                        const t = String(u || '').trim();
-                        if (t) unmatchedAll.push(t);
-                    }
-                }
-                const nt = String((parsed && parsed.notes) || '').trim();
-                if (nt) notesAll.push(nt);
-                anySuccess = true;
-            } catch (e) {
-                lastErr = (e && (e.raw || e.message)) || String(e);
-                console.error('Record chunk starting at ' + i + ' failed:', lastErr);
+        for (const r of results) {
+            if (!r.ok) { lastErr = r.err; console.error('Record chunk failed:', lastErr); continue; }
+            anySuccess = true;
+            const chunkNames = new Set(r.names);
+            // Sanitize against the FULL roster (names are unique), then keep only
+            // students THIS chunk asked about so a stray out-of-chunk name can't
+            // leak in.
+            const chStudents = sanitizeRecordStudents(r.parsed && r.parsed.students, rosterSet)
+                .filter((s) => chunkNames.has(s.name));
+            for (const s of chStudents) {
+                if (seenNames.has(s.name)) continue;
+                seenNames.add(s.name);
+                merged.push(s);
             }
+            if (Array.isArray(r.parsed && r.parsed.unmatched)) {
+                for (const u of r.parsed.unmatched) {
+                    const t = String(u || '').trim();
+                    if (t) unmatchedAll.push(t);
+                }
+            }
+            const nt = String((r.parsed && r.parsed.notes) || '').trim();
+            if (nt) notesAll.push(nt);
         }
 
         // Only error out if EVERY chunk failed. A partial result (some chunks
