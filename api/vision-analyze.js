@@ -174,7 +174,11 @@ function _rosterBlock(roster, rosterIds) {
             "    roster below is in the EXACT top-to-bottom order of the rows: 1st entry = 1st row,\n" +
             "    2nd entry = 2nd row, counting EVERY row — including blank ones.\n" +
             "  • Re-check the anchor before recording each row; a score belongs to the student on THAT\n" +
-            "    physical row, never the row above or below.\n\n" +
+            "    physical row, never the row above or below.\n" +
+            "  • CRITICAL: in your output, put the ID Number you actually read on each row into that\n" +
+            "    student's \"id\" field, copied EXACTLY from the sheet. We use it to place the scores on\n" +
+            "    the right student, so read it as carefully as the scores. Leave \"id\" empty only if the\n" +
+            "    ID column is genuinely not visible in the photo.\n\n" +
             ROW_ALIGNMENT_NOTE + "\n" +
             "ROSTER (match each to its row by ID Number when visible, else by exact top-to-bottom order; the name must match exactly):\n" +
             lines
@@ -231,7 +235,7 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
 
             "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n" +
             "{\n" +
-            '  "students": [ { "name": "<exact roster name>", "scores": { ' + schemaScores + ' }, "confidence": <0..1> } ],\n' +
+            '  "students": [ { "name": "<exact roster name>", "id": "<ID Number written in THIS row, exactly; empty if the ID column is not visible>", "scores": { ' + schemaScores + ' }, "confidence": <0..1> } ],\n' +
             '  "unmatched": [ "<name text seen in photo>" ],\n' +
             '  "notes": "<optional one-line observation>"\n' +
             "}\n\n" +
@@ -311,7 +315,7 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
             "═══ OUTPUT ═══\n" +
             "Reply with STRICT JSON ONLY (no prose, no markdown, no code fences):\n" +
             "{\n" +
-            '  "students": [ { "name": "<exact roster name>", "scores": { "' + targetField +
+            '  "students": [ { "name": "<exact roster name>", "id": "<ID Number written in THIS row, exactly; empty if the ID column is not visible>", "scores": { "' + targetField +
                 '": <number> }, "confidence": <0..1> } ],\n' +
             '  "unmatched": [ "<name text seen in photo>" ],\n' +
             '  "notes": "<optional one-line observation, e.g. photo blur>"\n' +
@@ -359,7 +363,7 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n" +
         "{\n" +
         '  "students": [\n' +
-        '    { "name": "<exact roster name>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> },\n' +
+        '    { "name": "<exact roster name>", "id": "<ID Number written in THIS row, exactly; empty if the ID column is not visible>", "scores": { "<field_key>": <number>, ... }, "confidence": <0..1> },\n' +
         '    ...\n' +
         '  ],\n' +
         '  "unmatched": [ "<name text seen in photo but not matched>" ],\n' +
@@ -725,13 +729,38 @@ function sanitizeStudents(list, rosterSet) {
  *   - clamp confidence to [0..1]
  *   - dedupe by name (first entry wins)
  */
-function sanitizeRecordStudents(list, rosterSet) {
+// Normalize an ID Number for tolerant matching (ignore case, spaces, dashes).
+function _normId(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Map normalized ID Number -> canonical roster name, from parallel arrays.
+function buildIdMap(names, ids) {
+    const m = new Map();
+    if (!Array.isArray(names) || !Array.isArray(ids)) return m;
+    for (let i = 0; i < names.length; i++) {
+        const nid = _normId(ids[i]);
+        if (nid && !m.has(nid)) m.set(nid, names[i]);
+    }
+    return m;
+}
+
+// idMap (optional): when the model reports the ID Number it read on each row,
+// we trust THAT over its name claim and reassign the scores to whichever roster
+// student owns that ID. This repairs an off-by-one / row-shift at the source —
+// the ID uniquely identifies the student no matter which row the model thought
+// it was reading. Requires the ID column to be visible in the photo.
+function sanitizeRecordStudents(list, rosterSet, idMap) {
     if (!Array.isArray(list)) return [];
     const seen = new Set();
     const out = [];
     for (const item of list) {
         if (!item || typeof item !== 'object') continue;
-        const name = String(item.name || '').trim();
+        let name = String(item.name || '').trim();
+        if (idMap && idMap.size) {
+            const nid = _normId(item.id);
+            if (nid && idMap.has(nid)) name = idMap.get(nid); // ID wins over the name claim
+        }
         if (!name || !rosterSet.has(name) || seen.has(name)) continue;
 
         const rawScores = item.scores && typeof item.scores === 'object' ? item.scores : {};
@@ -848,6 +877,11 @@ module.exports = async (req, res) => {
     // the review UI, which is how the facilitator spots a misread number
     // without hunting the whole sheet. All passes fire at once, so even with
     // two passes per chunk the whole thing finishes in ~one call's time.
+    // ID Number → canonical roster name, so a score the model tagged with a
+    // wrong name but the RIGHT ID (a row shift) gets reassigned to its true
+    // owner. Empty when the roster has no IDs; then we fall back to name/order.
+    const idMap = buildIdMap(roster, rosterIds);
+
     const CHUNK_SIZE = 20;
     if (type === 'record' && roster.length > CHUNK_SIZE) {
         // Two decorrelated model orders — different primaries so they make
@@ -870,10 +904,10 @@ module.exports = async (req, res) => {
                 }
             }
             if (!raw) raw = await groqVision(groqKey, prompt, imageBase64, mimeType);
-            // Sanitize against the FULL roster (names are unique), then keep only
-            // students THIS chunk asked about so a stray out-of-chunk name can't
-            // leak in.
-            return sanitizeRecordStudents(parseVisionJSON(raw).students, rosterSet)
+            // Reconcile by the ID the model read (fixes row shifts), sanitize
+            // against the FULL roster (names are unique), then keep only students
+            // THIS chunk asked about so a stray out-of-chunk name can't leak in.
+            return sanitizeRecordStudents(parseVisionJSON(raw).students, rosterSet, idMap)
                 .filter((s) => chunkNames.has(s.name));
         };
 
@@ -1017,7 +1051,7 @@ module.exports = async (req, res) => {
 
     const rosterSet = new Set(roster);
     let students = type === 'record'
-        ? sanitizeRecordStudents(parsed && parsed.students, rosterSet)
+        ? sanitizeRecordStudents(parsed && parsed.students, rosterSet, idMap)
         : sanitizeStudents(parsed && parsed.students, rosterSet);
     let unmatched = Array.isArray(parsed && parsed.unmatched)
         ? parsed.unmatched.map((n) => String(n || '').trim()).filter(Boolean).slice(0, 30)
@@ -1038,7 +1072,7 @@ module.exports = async (req, res) => {
         try {
             const rawReply2 = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { preferAccurate: true });
             const parsed2 = parseVisionJSON(rawReply2);
-            const students2 = sanitizeRecordStudents(parsed2 && parsed2.students, rosterSet);
+            const students2 = sanitizeRecordStudents(parsed2 && parsed2.students, rosterSet, idMap);
             students = mergeRecordConsensus(students, students2, targetFields);
             const notes2 = String((parsed2 && parsed2.notes) || '').trim();
             if (notes2 && notes.indexOf(notes2) === -1) {
