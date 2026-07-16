@@ -749,10 +749,12 @@
         <span id="updateToastMsg">Live Update: Teacher modified a score.</span>
     </div>
 
-    <!-- Crop modal: lets the user select the scores region before AI analysis -->
+    <!-- Crop modal: lets the user select a region (scores OR the ID/Name
+         roster columns) before AI analysis. Adjustable: draw, then drag the
+         edges/corners to resize or drag inside to move. -->
     <div id="cropOverlay" class="crop-overlay">
         <div class="crop-header">
-            <h3><i class="fa-solid fa-crop"></i> Crop to scores area</h3>
+            <h3><i class="fa-solid fa-crop"></i> <span id="cropTitleText">Crop to scores area</span></h3>
             <div class="crop-actions">
                 <button type="button" onclick="cancelCrop()">Cancel</button>
                 <button type="button" class="crop-confirm" id="cropConfirmBtn" onclick="confirmCrop()" disabled>Analyze</button>
@@ -761,7 +763,7 @@
         <div class="crop-canvas-wrap" id="cropCanvasWrap">
             <canvas id="cropCanvas"></canvas>
         </div>
-        <div class="crop-hint">Drag to select the scores area. After drawing, drag the edges/corners to resize or drag inside to move it.</div>
+        <div class="crop-hint" id="cropHint">Drag to select the scores area. After drawing, drag the edges/corners to resize or drag inside to move it.</div>
     </div>
 
     <!-- Analyzing overlay -->
@@ -1423,16 +1425,29 @@
             }
         }
 
-        function showCropModal(img, srcBase64, srcMime) {
+        // opts (all optional): { onConfirm(base64, mime, dataUrl), title, hint,
+        // confirmLabel }. Defaults reproduce the original scores-photo flow, so
+        // existing callers keep working unchanged; the roster photo passes its
+        // own onConfirm + labels to reuse this same adjustable crop UI.
+        function showCropModal(img, srcBase64, srcMime, opts) {
+            opts = opts || {};
             const overlay = document.getElementById('cropOverlay');
             const canvas = document.getElementById('cropCanvas');
             const wrap = document.getElementById('cropCanvasWrap');
             const cvsCtx = canvas.getContext('2d');
-            _cropState = { img, srcBase64, srcMime, loaded: false, sel: null };
+            _cropState = { img, srcBase64, srcMime, loaded: false, sel: null, onConfirm: opts.onConfirm || _analyzeRecordPhoto };
             _cropCanvasCtx = cvsCtx;
             _cropDrawing = false;
             _cropMode = null;
-            document.getElementById('cropConfirmBtn').disabled = true;
+            // Retitle the modal for whichever photo we're cropping.
+            const titleEl = document.getElementById('cropTitleText');
+            if (titleEl) titleEl.textContent = opts.title || 'Crop to scores area';
+            const hintEl = document.getElementById('cropHint');
+            if (hintEl) hintEl.textContent = opts.hint ||
+                'Drag to select the scores area. After drawing, drag the edges/corners to resize or drag inside to move it.';
+            const confirmBtn = document.getElementById('cropConfirmBtn');
+            confirmBtn.textContent = opts.confirmLabel || 'Analyze';
+            confirmBtn.disabled = true;
             overlay.classList.add('show');
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 const wrapRect = wrap.getBoundingClientRect();
@@ -1492,8 +1507,11 @@
             tmpCtx.drawImage(st.img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
             const outDataUrl = tmpCanvas.toDataURL('image/jpeg', 0.92);
             const base64 = outDataUrl.split(',')[1] || '';
+            // Capture the handler BEFORE cancelCrop() nulls _cropState. Scores
+            // photos analyze immediately; the roster photo just stores its crop.
+            const onConfirm = st.onConfirm || _analyzeRecordPhoto;
             cancelCrop();
-            _analyzeRecordPhoto(base64, 'image/jpeg', outDataUrl);
+            onConfirm(base64, 'image/jpeg', outDataUrl);
         }
         // to the /api/vision-analyze call so the AI knows which single column
         // to read. Null / '' → auto-detect from column headers (fallback).
@@ -1772,13 +1790,29 @@
             }
             try {
                 const { base64, mimeType } = await _recFileToBase64Jpeg(file);
-                _cachedRosterImg = { base64, mimeType };
-                const btn = document.getElementById('uploadRosterBtn');
-                const label = document.getElementById('rosterBtnLabel');
-                btn.classList.add('roster-captured');
-                label.textContent = '✓ Info Students captured';
-                const hint = document.getElementById('uploadHint');
-                if (hint) hint.textContent = 'ID no & Students Name photo set! Now take the scores photo.';
+                // Same adjustable crop UI as the scores photo, so the facilitator
+                // can trim the roster photo down to just the ID no + Name columns.
+                const img = new Image();
+                img.onload = () => {
+                    showCropModal(img, base64, mimeType, {
+                        title: 'Crop to ID no & Name area',
+                        hint: 'Drag to select the ID no & Students Name columns. Drag the edges/corners to resize or drag inside to move it.',
+                        confirmLabel: 'Use this',
+                        onConfirm: (cropB64, cropMime) => {
+                            _cachedRosterImg = { base64: cropB64, mimeType: cropMime };
+                            const btn = document.getElementById('uploadRosterBtn');
+                            const label = document.getElementById('rosterBtnLabel');
+                            if (btn) btn.classList.add('roster-captured');
+                            if (label) label.textContent = '✓ Info Students captured';
+                            const hint = document.getElementById('uploadHint');
+                            if (hint) hint.textContent = 'ID no & Students Name photo set! Now take the scores photo.';
+                        }
+                    });
+                };
+                img.onerror = () => {
+                    showAlert('Could not decode the photo', 'Try another photo.', '#ef4444');
+                };
+                img.src = 'data:image/jpeg;base64,' + base64;
             } catch (err) {
                 showAlert('Could not read photo', String(err), '#ef4444');
             }
