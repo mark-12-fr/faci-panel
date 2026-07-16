@@ -161,26 +161,25 @@ function _rosterBlock(roster, rosterIds) {
     const ids = Array.isArray(rosterIds) ? rosterIds : [];
     const haveIds = ids.some((x) => String(x || '').trim());
     if (haveIds) {
-        const lines = roster.map((n, i) => {
-            const id = String(ids[i] || '').trim();
-            return (i + 1) + '. ' + (id ? '[ID ' + id + '] ' : '') + n;
-        }).join('\n');
+        // NAMES ONLY — deliberately NO IDs here. If we listed each student's ID,
+        // the model would just copy it into the "id" field instead of reading the
+        // real one off the sheet, and a row-shift would go undetected. With no IDs
+        // to copy, the "id" it returns is the one it actually read from the image,
+        // which is what lets the server place each score on the right student.
+        const lines = roster.map((n, i) => (i + 1) + '. ' + n).join('\n');
         return (
-            "═══ ANCHOR EACH ROW ON ITS ID NUMBER ═══\n" +
-            "  • If the ID Number (or Student Name) column IS visible in this photo, use it as your\n" +
-            "    anchor: for each roster entry below, FIND the row whose ID/name matches, then read\n" +
-            "    THAT row's scores. The ID is unique per student — the surest way to stay on the right row.\n" +
-            "  • If the ID/name column is NOT visible (the photo shows only score columns), then the\n" +
-            "    roster below is in the EXACT top-to-bottom order of the rows: 1st entry = 1st row,\n" +
-            "    2nd entry = 2nd row, counting EVERY row — including blank ones.\n" +
-            "  • Re-check the anchor before recording each row; a score belongs to the student on THAT\n" +
-            "    physical row, never the row above or below.\n" +
-            "  • CRITICAL: in your output, put the ID Number you actually read on each row into that\n" +
-            "    student's \"id\" field, copied EXACTLY from the sheet. We use it to place the scores on\n" +
-            "    the right student, so read it as carefully as the scores. Leave \"id\" empty only if the\n" +
-            "    ID column is genuinely not visible in the photo.\n\n" +
+            "═══ READ EACH ROW'S ID NUMBER OFF THE SHEET ═══\n" +
+            "Work DOWN the sheet one physical row at a time, top to bottom. For each row:\n" +
+            "  • Read the ID Number printed in that row's leftmost ID column and put it in that\n" +
+            "    entry's \"id\" field, copied EXACTLY from the image. Read it as carefully as the\n" +
+            "    scores — it is how we identify the student.\n" +
+            "  • Do NOT guess the ID and do NOT copy it from the roster list below — the list has NO\n" +
+            "    IDs on purpose. The \"id\" MUST come from the sheet itself.\n" +
+            "  • Read that SAME row's scores. The id and the scores must come from the SAME physical\n" +
+            "    row, so they can never drift apart.\n" +
+            "  • Match the name you see to the roster below for the \"name\" field.\n\n" +
             ROW_ALIGNMENT_NOTE + "\n" +
-            "ROSTER (match each to its row by ID Number when visible, else by exact top-to-bottom order; the name must match exactly):\n" +
+            "ROSTER (names only — read each student's ID Number from the sheet, not from here):\n" +
             lines
         );
     }
@@ -734,22 +733,46 @@ function _normId(s) {
     return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Map normalized ID Number -> canonical roster name, from parallel arrays.
+// Map ID Number -> canonical roster name, from parallel arrays. Also keeps a
+// map keyed by just the last 6 digits (the unique student number) for rows where
+// the model misread a digit in the shared "04-2526" prefix — used only as a
+// fallback, and only for last-6 values that are unique across the roster.
 function buildIdMap(names, ids) {
-    const m = new Map();
-    if (!Array.isArray(names) || !Array.isArray(ids)) return m;
-    for (let i = 0; i < names.length; i++) {
-        const nid = _normId(ids[i]);
-        if (nid && !m.has(nid)) m.set(nid, names[i]);
+    const full = new Map();
+    const last6 = new Map();
+    const last6dupes = new Set();
+    if (Array.isArray(names) && Array.isArray(ids)) {
+        for (let i = 0; i < names.length; i++) {
+            const nid = _normId(ids[i]);
+            if (!nid) continue;
+            if (!full.has(nid)) full.set(nid, names[i]);
+            const l6 = nid.slice(-6);
+            if (l6.length === 6) {
+                if (last6.has(l6)) last6dupes.add(l6);
+                else last6.set(l6, names[i]);
+            }
+        }
     }
-    return m;
+    last6dupes.forEach((d) => last6.delete(d)); // keep only unique last-6 keys
+    return { full: full, last6: last6, size: full.size };
 }
 
-// idMap (optional): when the model reports the ID Number it read on each row,
-// we trust THAT over its name claim and reassign the scores to whichever roster
-// student owns that ID. This repairs an off-by-one / row-shift at the source —
-// the ID uniquely identifies the student no matter which row the model thought
-// it was reading. Requires the ID column to be visible in the photo.
+// Resolve the ID the model read on a row to a canonical roster name: exact
+// match first, then a unique last-6-digit fallback for a single misread digit.
+function _resolveIdName(idMap, rawId) {
+    const nid = _normId(rawId);
+    if (!nid) return null;
+    if (idMap.full.has(nid)) return idMap.full.get(nid);
+    const l6 = nid.slice(-6);
+    if (l6.length === 6 && idMap.last6.has(l6)) return idMap.last6.get(l6);
+    return null;
+}
+
+// idMap (optional): the model reports the ID Number it READ on each row (never
+// given the IDs, so it can't parrot them), and we reassign that row's scores to
+// whichever roster student owns that ID. This repairs an off-by-one / row-shift
+// at the source — the ID identifies the student no matter which row the model
+// thought it was on. Requires the ID column to be visible in the photo.
 function sanitizeRecordStudents(list, rosterSet, idMap) {
     if (!Array.isArray(list)) return [];
     const seen = new Set();
@@ -758,8 +781,8 @@ function sanitizeRecordStudents(list, rosterSet, idMap) {
         if (!item || typeof item !== 'object') continue;
         let name = String(item.name || '').trim();
         if (idMap && idMap.size) {
-            const nid = _normId(item.id);
-            if (nid && idMap.has(nid)) name = idMap.get(nid); // ID wins over the name claim
+            const resolved = _resolveIdName(idMap, item.id);
+            if (resolved) name = resolved; // ID read from the image wins over the name claim
         }
         if (!name || !rosterSet.has(name) || seen.has(name)) continue;
 
