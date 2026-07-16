@@ -1329,17 +1329,31 @@
             const ctx = _cropCanvasCtx, st = _cropState;
             if (!ctx || !st) return;
             const cvs = ctx.canvas;
-            cvs.width = st.displayW; cvs.height = st.displayH;
-            ctx.clearRect(0, 0, cvs.width, cvs.height);
-            ctx.drawImage(st.img, 0, 0, st.displayW, st.displayH);
+            // Render at DEVICE resolution, not CSS resolution: on a retina phone
+            // (devicePixelRatio 2-3) a CSS-sized canvas is stretched across 2-3x
+            // the physical pixels, which is what made the preview look blurry.
+            // The backing store is dpr-scaled while all the selection math stays
+            // in logical (CSS) pixels via setTransform. Capped at 3 to bound the
+            // canvas memory.
+            const dpr = Math.min(window.devicePixelRatio || 1, 3);
+            const W = st.displayW, H = st.displayH;
+            cvs.width = Math.round(W * dpr);
+            cvs.height = Math.round(H * dpr);
+            cvs.style.width = W + 'px';
+            cvs.style.height = H + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.clearRect(0, 0, W, H);
+            ctx.drawImage(st.img, 0, 0, W, H);
             if (!st.sel) return;
             const s = st.sel;
             // Dim everything outside the selection
             ctx.fillStyle = 'rgba(0,0,0,0.35)';
-            ctx.fillRect(0, 0, cvs.width, s.y);
-            ctx.fillRect(0, s.y + s.h, cvs.width, cvs.height - s.y - s.h);
+            ctx.fillRect(0, 0, W, s.y);
+            ctx.fillRect(0, s.y + s.h, W, H - s.y - s.h);
             ctx.fillRect(0, s.y, s.x, s.h);
-            ctx.fillRect(s.x + s.w, s.y, cvs.width - s.x - s.w, s.h);
+            ctx.fillRect(s.x + s.w, s.y, W - s.x - s.w, s.h);
             // Selection border
             ctx.strokeStyle = '#3b82f6';
             ctx.lineWidth = 2.5;
