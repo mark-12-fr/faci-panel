@@ -45,9 +45,23 @@
  * whatever Vercel/the browser's own HTTP cache happened to be holding. Cache
  * name bumped so devices that installed an earlier, buggier version start
  * clean instead of carrying over anything cached under the old logic.
+ *
+ * v5: the "has redirections" Safari crash was STILL reachable for anyone whose
+ * device was stuck on a pre-v3 worker (its redirected "/index.html" cache
+ * entry served the "Home" link's navigation). Two defences make it impossible
+ * from here on, independent of any stale cache:
+ *   1. NAVIGATIONS ARE NOW NETWORK-FIRST. When online, a page navigation is
+ *      always served fresh from the network under its canonical URL; the cache
+ *      (the part that ever held a redirected response) is touched ONLY as an
+ *      offline fallback — never while there's a network.
+ *   2. stripRedirect(): any response we are about to hand back for a
+ *      navigation is rebuilt from its body if its `redirected` flag is set, so
+ *      a navigation can NEVER be fulfilled with a redirected response again,
+ *      no matter where the response came from. Static assets stay cache-first
+ *      (instant load); they aren't navigations, so the restriction can't bite.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v4';
+var CACHE_NAME = 'acadtrack-faci-shell-v5';
 
 // Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
 // a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
@@ -117,6 +131,22 @@ function isNavigation(request) {
 
 var SAME_ORIGIN_ASSET_RE = /\.(js|css|json|png|jpg|jpeg|svg|webp|ico)$/i;
 
+// A service worker MUST NOT fulfill a NAVIGATION with a response whose
+// `redirected` flag is set — Safari rejects it outright ("Response served by
+// service worker has redirections"). Rebuild an identical but redirect-free
+// Response from the body so the navigation can safely use it. Non-redirected
+// responses (the normal case) pass straight through untouched.
+function stripRedirect(response) {
+    if (!response || !response.redirected) return Promise.resolve(response);
+    return response.blob().then(function (body) {
+        return new Response(body, {
+            status: response.status || 200,
+            statusText: response.statusText,
+            headers: response.headers
+        });
+    }).catch(function () { return response; });
+}
+
 self.addEventListener('install', function (event) {
     event.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
@@ -161,59 +191,86 @@ self.addEventListener('fetch', function (event) {
     }
     var isVendor = VENDOR_URLS.indexOf(request.url) !== -1;
 
+    // Cross-origin: only the fixed vendor allowlist is ever intercepted. Every
+    // other cross-origin call (Supabase / Render / Gemini) goes straight to
+    // the network, untouched.
     if (url.origin !== self.location.origin) {
-        if (!isVendor) return; // every other cross-origin call: untouched, straight to network
-    } else if (!isNavigation(request) && !SAME_ORIGIN_ASSET_RE.test(url.pathname)) {
-        return; // same-origin but not a page or known asset (e.g. a same-origin /api/* GET): untouched
+        if (!isVendor) return;
+        event.respondWith(cacheFirst(request.url, { mode: 'cors', cache: 'reload' }, event));
+        return;
     }
 
-    // Same-origin: always cache/fetch under the CANONICAL path (never the
-    // literal ".html" one, which redirects — see the Safari note up top).
-    // Cross-origin vendor URLs have no such redirect and pass through as-is.
-    var lookupUrl = isVendor
-        ? request.url
-        : url.origin + canonicalPath(url.pathname) + url.search;
+    // Same-origin PAGE navigation: NETWORK-FIRST (see v5 note up top). When
+    // online we serve a fresh, canonical, redirect-free page; the cache is used
+    // ONLY when the network fails (i.e. genuinely offline). This keeps the
+    // risky cached-HTML path away from Safari entirely whenever there's a
+    // network, while still letting the app open offline.
+    if (isNavigation(request)) {
+        event.respondWith(navigationNetworkFirst(url));
+        return;
+    }
 
-    event.respondWith(
-        caches.open(CACHE_NAME).then(function (cache) {
+    // Same-origin static asset (js/css/img/json): cache-first with background
+    // revalidate — instant load, refreshed for next time. Never an /api/* GET.
+    if (SAME_ORIGIN_ASSET_RE.test(url.pathname)) {
+        var assetUrl = url.origin + canonicalPath(url.pathname) + url.search;
+        event.respondWith(cacheFirst(assetUrl, { cache: 'reload' }, event));
+        return;
+    }
+
+    // Anything else same-origin (e.g. a same-origin /api/* GET): untouched.
+});
+
+// Network-first page navigation with an offline cache fallback. Every branch
+// resolves through stripRedirect so the navigation can never be fulfilled with
+// a redirected response (the Safari crash).
+function navigationNetworkFirst(url) {
+    var lookupUrl = url.origin + canonicalPath(url.pathname) + url.search;
+    return caches.open(CACHE_NAME).then(function (cache) {
+        return fetch(lookupUrl, { cache: 'reload' }).then(function (response) {
+            if (response && response.ok) {
+                cache.put(lookupUrl, response.clone()).catch(function () {});
+                return stripRedirect(response);
+            }
+            // Non-OK (404/500): prefer a cached copy if we have one.
             return cache.match(lookupUrl, { ignoreSearch: true }).then(function (cached) {
-                // Vendor scripts are requested by <script> tags in no-cors
-                // mode, which yields an opaque (unreadable, always "not ok")
-                // response — re-fetch those explicitly in cors mode so the
-                // background refresh can actually tell whether it succeeded.
-                // Same-origin fetches use `lookupUrl` too, NOT the original
-                // request, so a ".html" request never triggers a redirect-
-                // following fetch whose response would carry redirected:true.
-                var networkFetch = fetch(lookupUrl, isVendor ? { mode: 'cors', cache: 'reload' } : { cache: 'reload' })
-                    .then(function (response) {
-                        if (response && response.ok) cache.put(lookupUrl, response.clone()).catch(function () {});
-                        return response;
-                    })
-                    .catch(function () { return null; });
-
-                if (cached) {
-                    // Instant response from cache — this is what makes the
-                    // app open with no network. Refresh the cache in the
-                    // background so the next open (online or offline) has
-                    // whatever changed since.
-                    event.waitUntil(networkFetch);
-                    return cached;
-                }
-
-                return networkFetch.then(function (response) {
-                    if (response) return response;
-                    if (isNavigation(request)) {
-                        return new Response(OFFLINE_FALLBACK_HTML, {
-                            status: 200,
-                            headers: { 'Content-Type': 'text/html; charset=utf-8' }
-                        });
-                    }
-                    return new Response('', { status: 503 });
+                return stripRedirect(cached || response);
+            });
+        }).catch(function () {
+            // Network threw → offline. Serve the cached page, else the notice.
+            return cache.match(lookupUrl, { ignoreSearch: true }).then(function (cached) {
+                if (cached) return stripRedirect(cached);
+                return new Response(OFFLINE_FALLBACK_HTML, {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' }
                 });
             });
-        })
-    );
-});
+        });
+    });
+}
+
+// Cache-first with background revalidation, for static assets and the fixed
+// vendor scripts. A cache HIT responds instantly (this is what makes offline
+// opening possible) while a fresh copy is fetched in the background; a MISS
+// falls back to the network. Not used for navigations — see above.
+function cacheFirst(lookupUrl, fetchOpts, event) {
+    return caches.open(CACHE_NAME).then(function (cache) {
+        return cache.match(lookupUrl, { ignoreSearch: true }).then(function (cached) {
+            var networkFetch = fetch(lookupUrl, fetchOpts).then(function (response) {
+                if (response && response.ok) cache.put(lookupUrl, response.clone()).catch(function () {});
+                return response;
+            }).catch(function () { return null; });
+
+            if (cached) {
+                event.waitUntil(networkFetch);
+                return cached;
+            }
+            return networkFetch.then(function (response) {
+                return response || new Response('', { status: 503 });
+            });
+        });
+    });
+}
 
 self.addEventListener('push', (event) => {
     let payload = {};
