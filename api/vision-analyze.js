@@ -808,6 +808,17 @@ function sanitizeRecordStudents(list, rosterSet, idMap) {
     return out;
 }
 
+// Reject a promise if it hasn't settled within `ms`, so one slow upstream call
+// can never let the whole function run past Vercel's timeout (a 504). The
+// underlying fetch keeps running but its result is ignored once we've timed out.
+function withTimeout(promise, ms, label) {
+    let t;
+    const timer = new Promise(function (_, reject) {
+        t = setTimeout(function () { reject(new Error('timeout' + (label ? ':' + label : ''))); }, ms);
+    });
+    return Promise.race([promise, timer]).finally(function () { clearTimeout(t); });
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -907,19 +918,24 @@ module.exports = async (req, res) => {
 
     const CHUNK_SIZE = 20;
     if (type === 'record' && roster.length > CHUNK_SIZE) {
-        // Two decorrelated model orders — different primaries so they make
-        // different mistakes (that difference is exactly what flags an
-        // ambiguous digit). Each keeps a fallback so a single 429 doesn't
-        // drop the pass entirely.
-        const PASS_A_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
-        const PASS_B_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+        // ONE fast pass per chunk. A previous two-passes-per-chunk consensus
+        // doubled the upstream calls (6 for a 57-student class) and, under
+        // free-tier rate limiting, pushed the function past its 60s budget
+        // (504). One pass per chunk on fast flash models — plus a per-chunk
+        // timeout so a single slow model can never hang the whole request —
+        // keeps big classes reliable. Row-shift accuracy comes from the ID
+        // reconciliation, not the second pass, so dropping it costs nothing there.
+        const CHUNK_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+        const CHUNK_TIMEOUT_MS = 45000;
 
         const rosterSet = new Set(roster);
-        const onePass = async (prompt, models, chunkNames) => {
+        const runChunk = async (ch) => {
+            const prompt = buildRecordPrompt(ch.names, targetFields, ch.ids);
+            const chunkNames = new Set(ch.names);
             let raw;
             if (geminiKey) {
                 try {
-                    raw = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { models: models });
+                    raw = await geminiVision(geminiKey, prompt, imageBase64, mimeType, { models: CHUNK_MODELS });
                 } catch (e) {
                     const msg = String((e && (e.raw || e.message)) || e).toLowerCase();
                     const isLimit = (e && e.code === 429) || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
@@ -939,22 +955,15 @@ module.exports = async (req, res) => {
             chunks.push({ names: roster.slice(i, i + CHUNK_SIZE), ids: rosterIds.slice(i, i + CHUNK_SIZE) });
         }
 
-        // Fire every chunk's two passes at once. Each chunk resolves to its
-        // reconciled student list, or an error marker if BOTH passes failed.
-        const results = await Promise.all(chunks.map(async (ch) => {
-            const prompt = buildRecordPrompt(ch.names, targetFields, ch.ids);
-            const chunkNames = new Set(ch.names);
-            const [ra, rb] = await Promise.all([
-                onePass(prompt, PASS_A_MODELS, chunkNames).catch((e) => ({ __err: (e && (e.raw || e.message)) || String(e) })),
-                onePass(prompt, PASS_B_MODELS, chunkNames).catch((e) => ({ __err: (e && (e.raw || e.message)) || String(e) }))
-            ]);
-            const aOk = Array.isArray(ra), bOk = Array.isArray(rb);
-            if (!aOk && !bOk) return { ok: false, err: (ra && ra.__err) || (rb && rb.__err) || 'chunk failed' };
-            // Both passes → consensus (agreement raises confidence, disagreement
-            // lowers it and flags the cell). One pass → use it as-is.
-            const students = (aOk && bOk) ? mergeRecordConsensus(ra, rb, targetFields) : (aOk ? ra : rb);
-            return { ok: true, students: students };
-        }));
+        // All chunks in parallel, each bounded by a timeout so one slow call
+        // can't blow the function's time budget. A chunk that fails or times out
+        // just contributes nothing; the other chunks still return their scores.
+        const results = await Promise.all(chunks.map((ch) =>
+            withTimeout(runChunk(ch), CHUNK_TIMEOUT_MS, 'chunk').then(
+                (students) => ({ ok: true, students: students }),
+                (e) => ({ ok: false, err: (e && (e.raw || e.message)) || String(e) })
+            )
+        ));
 
         const merged = [];
         const seenNames = new Set();
