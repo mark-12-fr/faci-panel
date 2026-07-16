@@ -815,10 +815,18 @@ function sanitizeRecordStudents(list, rosterSet, idMap) {
     const out = [];
     for (const item of list) {
         if (!item || typeof item !== 'object') continue;
-        let name = String(item.name || '').trim();
+        const claimedName = String(item.name || '').trim();
+        let name = claimedName;
+        let idNameDisagree = false;
         if (idMap && idMap.size) {
             const resolved = _resolveIdName(idMap, item.id);
-            if (resolved) name = resolved; // ID read from the image wins over the name claim
+            if (resolved) {
+                // The ID the model READ points to a different student than the
+                // name it claimed → we trust the ID, but this row deserves a
+                // double-check, so we flag it via low confidence below.
+                if (claimedName && resolved !== claimedName) idNameDisagree = true;
+                name = resolved; // ID read from the image wins over the name claim
+            }
         }
         if (!name || !rosterSet.has(name) || seen.has(name)) continue;
 
@@ -837,6 +845,9 @@ function sanitizeRecordStudents(list, rosterSet, idMap) {
         let conf = Number(item.confidence);
         if (!isFinite(conf) || conf < 0) conf = 0;
         if (conf > 1) conf = 1;
+        // Name and ID disagreed → cap confidence low so the review UI flags the
+        // whole row for the facilitator to verify the reassignment.
+        if (idNameDisagree) conf = Math.min(conf, 0.4);
 
         seen.add(name);
         out.push({ name, scores, confidence: conf });
