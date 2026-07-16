@@ -138,7 +138,39 @@ const BLANK_CELL_RULES =
     "  • Leaving a score OUT is always better than inventing one. If a student left a cell blank,\n" +
     "    they must come back with NO value for that field.\n";
 
-function buildRecordPrompt(roster, targetFields) {
+// Build the ROSTER section shared by every record-prompt mode. When ID numbers
+// are available it anchors each row on its ID — the unique per-row marker in
+// the leftmost column — which is the strongest defence against the model
+// drifting onto the wrong row as it works DOWN a long sheet. Row-drift is
+// exactly why the LAST rows of a big class tend to misread while the first and
+// middle rows are fine.
+function _rosterBlock(roster, rosterIds) {
+    const ids = Array.isArray(rosterIds) ? rosterIds : [];
+    const haveIds = ids.some((x) => String(x || '').trim());
+    if (haveIds) {
+        const lines = roster.map((n, i) => {
+            const id = String(ids[i] || '').trim();
+            return (i + 1) + '. ' + (id ? '[ID ' + id + '] ' : '') + n;
+        }).join('\n');
+        return (
+            "═══ ANCHOR EACH ROW ON ITS ID NUMBER ═══\n" +
+            "The leftmost column of the sheet is the student's ID Number. Use it as your anchor:\n" +
+            "  • For each roster entry below, FIND the row whose ID Number matches, then read THAT\n" +
+            "    row's scores. The ID is unique per student — the surest way to stay on the right row.\n" +
+            "  • Work down carefully: the LOWER you go on the sheet, the easier it is to slip one row\n" +
+            "    up or down. Re-check the ID Number (and the name) before recording each row's scores.\n" +
+            "  • A score belongs to the student on THAT physical row — never the row above or below.\n\n" +
+            "ROSTER (match each to the row with the SAME ID Number; the name must still match exactly):\n" +
+            lines
+        );
+    }
+    return (
+        "ROSTER (match names to these exact strings):\n" +
+        roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+    );
+}
+
+function buildRecordPrompt(roster, targetFields, rosterIds) {
     // Normalize to an array of valid field keys.
     const fields = (Array.isArray(targetFields) ? targetFields : (targetFields ? [targetFields] : []))
         .map(f => String(f || '').trim())
@@ -184,8 +216,7 @@ function buildRecordPrompt(roster, targetFields) {
             '  "unmatched": [ "<name text seen in photo>" ],\n' +
             '  "notes": "<optional one-line observation>"\n' +
             "}\n\n" +
-            "ROSTER (match names to these exact strings):\n" +
-            roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+            _rosterBlock(roster, rosterIds)
         );
     }
 
@@ -270,8 +301,7 @@ function buildRecordPrompt(roster, targetFields) {
             "Match student names in the photo to the ROSTER (ground truth). Tolerate small OCR " +
             "errors in names, but names in `students[].name` MUST match the roster string EXACTLY.\n\n" +
 
-            "ROSTER (match names to these exact strings):\n" +
-            roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+            _rosterBlock(roster, rosterIds)
         );
     }
 
@@ -316,8 +346,7 @@ function buildRecordPrompt(roster, targetFields) {
         '  "unmatched": [ "<name text seen in photo but not matched>" ],\n' +
         '  "notes": "<optional observation>"\n' +
         "}\n\n" +
-        "ROSTER (use these exact names for matching):\n" +
-        roster.map((n, i) => (i + 1) + '. ' + n).join('\n')
+        _rosterBlock(roster, rosterIds)
     );
 }
 
@@ -717,7 +746,20 @@ module.exports = async (req, res) => {
     const type = String(body.type || '').toLowerCase();
     const imageBase64 = String(body.imageBase64 || '').trim();
     const mimeType = String(body.mimeType || '').trim().toLowerCase();
-    const roster = Array.isArray(body.roster) ? body.roster.map((n) => String(n || '').trim()).filter(Boolean) : [];
+    // Parse roster names + their optional parallel ID numbers TOGETHER, so
+    // dropping an empty name also drops its ID and the two arrays stay aligned
+    // (a name-only filter would shift every ID after the gap onto the wrong
+    // student — the ID anchoring then hurts instead of helps).
+    const _rawRoster = Array.isArray(body.roster) ? body.roster : [];
+    const _rawIds = Array.isArray(body.rosterIds) ? body.rosterIds : [];
+    const roster = [];
+    const rosterIds = [];
+    for (let i = 0; i < _rawRoster.length; i++) {
+        const nm = String(_rawRoster[i] || '').trim();
+        if (!nm) continue;
+        roster.push(nm);
+        rosterIds.push(String(_rawIds[i] || '').trim());
+    }
     // Optional: target field(s) for record uploads. Accepts either
     // targetFields (array of field keys, e.g. ["module_1","module_2"]) or the
     // legacy single targetField string. When provided, the prompt only reads
@@ -765,8 +807,92 @@ module.exports = async (req, res) => {
         return;
     }
 
+    // ═══ CHUNK LARGE RECORD ROSTERS ═══
+    // A single read of a whole big sheet (e.g. 55 students) gets sloppy toward
+    // the BOTTOM — the last rows come back with wrong, swapped, or invented
+    // scores while the first/middle rows are fine (the model loses row
+    // alignment and its output degrades over a long response). Read the roster
+    // in smaller chunks so it only tracks ~20 rows at a time; the ID anchoring
+    // keeps each chunk locked to the right rows. One Gemini call per chunk
+    // (Groq fallback), run sequentially to stay friendly to free-tier limits.
+    const CHUNK_SIZE = 20;
+    if (type === 'record' && roster.length > CHUNK_SIZE) {
+        const chunkVision = async (p) => {
+            if (geminiKey) {
+                try {
+                    return await geminiVision(geminiKey, p, imageBase64, mimeType, { preferAccurate: true });
+                } catch (e) {
+                    const msg = String((e && (e.raw || e.message)) || e).toLowerCase();
+                    const isLimit = (e && e.code === 429) || ['429', 'limit', 'rate', 'quota', 'resource_exhausted'].some((x) => msg.includes(x));
+                    if (!(groqKey && isLimit)) throw e; // non-limit, or no Groq → propagate
+                }
+            }
+            return await groqVision(groqKey, p, imageBase64, mimeType);
+        };
+
+        const rosterSet = new Set(roster);
+        const merged = [];
+        const seenNames = new Set();
+        const unmatchedAll = [];
+        const notesAll = [];
+        let anySuccess = false;
+        let lastErr = null;
+
+        for (let i = 0; i < roster.length; i += CHUNK_SIZE) {
+            const names = roster.slice(i, i + CHUNK_SIZE);
+            const ids = rosterIds.slice(i, i + CHUNK_SIZE);
+            const chunkNames = new Set(names);
+            try {
+                const raw = await chunkVision(buildRecordPrompt(names, targetFields, ids));
+                const parsed = parseVisionJSON(raw);
+                // Sanitize against the FULL roster (names are unique), then keep
+                // only students THIS chunk asked about so a stray out-of-chunk
+                // name can't leak in.
+                const chStudents = sanitizeRecordStudents(parsed && parsed.students, rosterSet)
+                    .filter((s) => chunkNames.has(s.name));
+                for (const s of chStudents) {
+                    if (seenNames.has(s.name)) continue;
+                    seenNames.add(s.name);
+                    merged.push(s);
+                }
+                if (Array.isArray(parsed && parsed.unmatched)) {
+                    for (const u of parsed.unmatched) {
+                        const t = String(u || '').trim();
+                        if (t) unmatchedAll.push(t);
+                    }
+                }
+                const nt = String((parsed && parsed.notes) || '').trim();
+                if (nt) notesAll.push(nt);
+                anySuccess = true;
+            } catch (e) {
+                lastErr = (e && (e.raw || e.message)) || String(e);
+                console.error('Record chunk starting at ' + i + ' failed:', lastErr);
+            }
+        }
+
+        // Only error out if EVERY chunk failed. A partial result (some chunks
+        // succeeded) is still useful — the review UI shows what we got.
+        if (!anySuccess) {
+            const isLimit = /429|limit|rate|quota|resource_exhausted/i.test(String(lastErr || ''));
+            res.status(isLimit ? 429 : 502).json({
+                error: isLimit
+                    ? 'The AI hit its free-tier rate limit. Please wait a moment and try again.'
+                    : 'The AI vision service is having trouble right now. Please try again in a moment.',
+                upstream: safeUpstreamMessage(lastErr)
+            });
+            return;
+        }
+
+        res.status(200).json({
+            students: merged,
+            unmatched: unmatchedAll.slice(0, 30),
+            notes: notesAll.join(' | ').slice(0, 240)
+        });
+        return;
+    }
+
     const prompt = type === 'record'
-        ? buildRecordPrompt(roster, targetFields)
+        ? buildRecordPrompt(roster, targetFields, rosterIds)
         : buildAttendancePrompt(roster);
 
     // Sanitize an upstream error message before sending it back to the client.
