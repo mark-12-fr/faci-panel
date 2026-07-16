@@ -1495,16 +1495,37 @@
             const st = _cropState;
             if (!st || !st.sel) return;
             const s = st.sel;
+            // Map the on-screen selection back to ORIGINAL (full-res) pixels.
             const scaleX = st.origW / st.displayW;
             const scaleY = st.origH / st.displayH;
-            const cropX = Math.round(s.x * scaleX);
-            const cropY = Math.round(s.y * scaleY);
-            const cropW = Math.round(s.w * scaleX);
-            const cropH = Math.round(s.h * scaleY);
+            let cropX = Math.round(s.x * scaleX);
+            let cropY = Math.round(s.y * scaleY);
+            let cropW = Math.round(s.w * scaleX);
+            let cropH = Math.round(s.h * scaleY);
+            // Clamp to the image (a drag can run past the edges).
+            cropX = Math.max(0, Math.min(cropX, st.origW));
+            cropY = Math.max(0, Math.min(cropY, st.origH));
+            cropW = Math.max(1, Math.min(cropW, st.origW - cropX));
+            cropH = Math.max(1, Math.min(cropH, st.origH - cropY));
+            // Downscale ONLY the cropped region, and only if it's still larger
+            // than the budget — so a tight crop of the scores keeps its native
+            // resolution instead of being pre-shrunk with the whole sheet. The
+            // 2600px cap keeps the JPEG comfortably under the 4.5MB upload limit.
+            const MAX_SIDE = 2600;
+            let outW = cropW, outH = cropH;
+            const longSide = Math.max(cropW, cropH);
+            if (longSide > MAX_SIDE) {
+                const k = MAX_SIDE / longSide;
+                outW = Math.max(1, Math.round(cropW * k));
+                outH = Math.max(1, Math.round(cropH * k));
+            }
             const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width = cropW; tmpCanvas.height = cropH;
+            tmpCanvas.width = outW; tmpCanvas.height = outH;
             const tmpCtx = tmpCanvas.getContext('2d');
-            tmpCtx.drawImage(st.img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            tmpCtx.imageSmoothingEnabled = true;
+            tmpCtx.imageSmoothingQuality = 'high';
+            tmpCtx.fillStyle = '#fff'; tmpCtx.fillRect(0, 0, outW, outH);
+            tmpCtx.drawImage(st.img, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
             const outDataUrl = tmpCanvas.toDataURL('image/jpeg', 0.92);
             const base64 = outDataUrl.split(',')[1] || '';
             // Capture the handler BEFORE cancelCrop() nulls _cropState. Scores
@@ -1631,9 +1652,13 @@
             }, 80);
         }
 
-        // Read a picked file → downsize (JPEG, longest side ≤ 1800 for records
-        // so column headers stay readable) → return { base64, mimeType, thumbDataUrl }.
-        async function _recFileToBase64Jpeg(file) {
+        // Read a picked file into a FULL-RESOLUTION Image, WITHOUT downscaling.
+        // The old version shrank the whole photo to 2400px up front, so cropping
+        // to just the scores/roster columns started from an already-degraded
+        // image and small handwriting (8 vs 10 vs 15) blurred out. Now the crop
+        // (confirmCrop) works from the original pixels and only the final cropped
+        // region is downscaled — the region the AI reads keeps maximum detail.
+        async function _recFileToImage(file) {
             const dataUrl = await new Promise((resolve, reject) => {
                 const r = new FileReader();
                 r.onload = () => resolve(r.result);
@@ -1646,29 +1671,10 @@
                 im.onerror = () => reject(new Error('Could not decode the image. Try another photo.'));
                 im.src = dataUrl;
             });
-            // Records need higher resolution than attendance: the scores are
-            // small handwritten digits (8 vs 10 vs 15) and a compressed image
-            // makes them almost impossible to distinguish. Push to 2400px on
-            // the long side + JPEG q=0.92; 4.5MB Vercel body limit still fits
-            // even for large photos.
-            const side = 2400;
-            let w = img.naturalWidth || img.width;
-            let h = img.naturalHeight || img.height;
-            if (!w || !h) throw new Error('Empty image.');
-            if (Math.max(w, h) > side) {
-                const scale = side / Math.max(w, h);
-                w = Math.round(w * scale); h = Math.round(h * scale);
+            if (!(img.naturalWidth || img.width) || !(img.naturalHeight || img.height)) {
+                throw new Error('Empty image.');
             }
-            const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
-            const outDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            const base64 = outDataUrl.split(',')[1] || '';
-            return { base64, mimeType: 'image/jpeg', thumbDataUrl: outDataUrl };
+            return { img, dataUrl };
         }
 
         function _recCurrentRoster() {
@@ -1789,30 +1795,23 @@
                 return;
             }
             try {
-                const { base64, mimeType } = await _recFileToBase64Jpeg(file);
-                // Same adjustable crop UI as the scores photo, so the facilitator
-                // can trim the roster photo down to just the ID no + Name columns.
-                const img = new Image();
-                img.onload = () => {
-                    showCropModal(img, base64, mimeType, {
-                        title: 'Crop to ID no & Name area',
-                        hint: 'Drag to select the ID no & Students Name columns. Drag the edges/corners to resize or drag inside to move it.',
-                        confirmLabel: 'Use this',
-                        onConfirm: (cropB64, cropMime) => {
-                            _cachedRosterImg = { base64: cropB64, mimeType: cropMime };
-                            const btn = document.getElementById('uploadRosterBtn');
-                            const label = document.getElementById('rosterBtnLabel');
-                            if (btn) btn.classList.add('roster-captured');
-                            if (label) label.textContent = '✓ Info Students captured';
-                            const hint = document.getElementById('uploadHint');
-                            if (hint) hint.textContent = 'ID no & Students Name photo set! Now take the scores photo.';
-                        }
-                    });
-                };
-                img.onerror = () => {
-                    showAlert('Could not decode the photo', 'Try another photo.', '#ef4444');
-                };
-                img.src = 'data:image/jpeg;base64,' + base64;
+                // Full-res image → adjustable crop → only the cropped ID/Name
+                // region is downscaled, so it stays sharp for the AI.
+                const { img } = await _recFileToImage(file);
+                showCropModal(img, '', 'image/jpeg', {
+                    title: 'Crop to ID no & Name area',
+                    hint: 'Drag to select the ID no & Students Name columns. Drag the edges/corners to resize or drag inside to move it.',
+                    confirmLabel: 'Use this',
+                    onConfirm: (cropB64, cropMime) => {
+                        _cachedRosterImg = { base64: cropB64, mimeType: cropMime };
+                        const btn = document.getElementById('uploadRosterBtn');
+                        const label = document.getElementById('rosterBtnLabel');
+                        if (btn) btn.classList.add('roster-captured');
+                        if (label) label.textContent = '✓ Info Students captured';
+                        const hint = document.getElementById('uploadHint');
+                        if (hint) hint.textContent = 'ID no & Students Name photo set! Now take the scores photo.';
+                    }
+                });
             } catch (err) {
                 showAlert('Could not read photo', String(err), '#ef4444');
             }
@@ -1836,18 +1835,10 @@
             }
 
             try {
-                const { base64, mimeType, thumbDataUrl } = await _recFileToBase64Jpeg(file);
-                if (!base64) throw new Error('Could not read the photo.');
-
-                // Show crop modal so the user can select the scores area
-                const img = new Image();
-                img.onload = () => {
-                    showCropModal(img, base64, mimeType);
-                };
-                img.onerror = () => {
-                    showAlert('Could not decode the photo', 'Try another photo.', '#ef4444');
-                };
-                img.src = 'data:image/jpeg;base64,' + base64;
+                // Full-res image → adjustable crop → only the cropped scores
+                // region is downscaled, so small digits stay sharp for the AI.
+                const { img } = await _recFileToImage(file);
+                showCropModal(img, '', 'image/jpeg');
             } catch (err) {
                 console.error('Photo read error:', err);
                 showAlert('Could not read photo', String(err?.message || err), '#ef4444');
