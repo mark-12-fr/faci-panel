@@ -114,6 +114,30 @@ const RECORD_FIELDS = (function () {
 })();
 const RECORD_FIELD_SET = new Set(RECORD_FIELDS);
 
+// Shared, reusable guidance blocks so the multi-field and auto-detect prompts
+// give the vision model the SAME careful rules for reading handwritten digits
+// and for refusing to invent a score in a blank cell. Keeping them in one
+// place means an accuracy tweak improves every mode at once.
+const DIGIT_READING_RULES =
+    "═══ HOW TO READ EACH HANDWRITTEN NUMBER ═══\n" +
+    "  • First COUNT the digits in the cell: '8' is ONE digit; '10', '12', '15' are TWO digits.\n" +
+    "    A one-digit and a two-digit number look DIFFERENT — do NOT round '8' up to '10'.\n" +
+    "  • Digit shapes for the usual confusions:\n" +
+    "      8 = two stacked loops    |  10 = a '1' then a '0' (TWO separate marks)\n" +
+    "      0 = plain closed oval    |  6  = a loop at the BOTTOM only\n" +
+    "      5 = flat top + curve     |  0  = closed oval  (so '15' is NOT '10')\n" +
+    "      7 = flat top + diagonal  |  1  = a single vertical stroke\n" +
+    "  • Numbers range 0..200. If a digit is genuinely ambiguous, give your best guess and LOWER confidence.\n";
+
+const BLANK_CELL_RULES =
+    "═══ BLANK CELLS — NEVER INVENT A SCORE ═══\n" +
+    "  • A cell that is empty, blank, a dash '-', a dot '.', a tick/check, or has NO clearly written\n" +
+    "    number is UNANSWERED. For an unanswered cell you MUST omit that field for that student —\n" +
+    "    do NOT write 0, do NOT guess, do NOT copy the value from the row above/below or a\n" +
+    "    neighbouring column.\n" +
+    "  • Leaving a score OUT is always better than inventing one. If a student left a cell blank,\n" +
+    "    they must come back with NO value for that field.\n";
+
 function buildRecordPrompt(roster, targetFields) {
     // Normalize to an array of valid field keys.
     const fields = (Array.isArray(targetFields) ? targetFields : (targetFields ? [targetFields] : []))
@@ -129,17 +153,31 @@ function buildRecordPrompt(roster, targetFields) {
             "You are a METICULOUS PROCTOR reading a handwritten Filipino classroom grade book. " +
             "The facilitator has told you this photo contains scores for EXACTLY these " + fields.length +
             " columns (ignore every OTHER column in the photo):\n  • " + labelList + "\n\n" +
+
+            "═══ MATCH EACH COLUMN BY ITS HEADER — DO NOT GUESS BY POSITION ═══\n" +
+            "This is the most important rule. Getting two columns' values swapped is the single most\n" +
+            "common mistake, so guard against it deliberately:\n" +
+            "  • Do NOT assume the columns appear in the same order I listed them above.\n" +
+            "  • FIRST read the table's HEADER row. For EACH target column, find the physical column in\n" +
+            "    the photo whose header text matches that field's label — e.g. the value for MODULE 3\n" +
+            "    must come from the column headed 'M3' / 'MODULE 3', and MODULE 4 from the column headed\n" +
+            "    'M4' / 'MODULE 4'. Never store a value under a neighbouring column's key.\n" +
+            "  • If two target columns sit next to each other, trace each one down from its header\n" +
+            "    carefully so you do not read MODULE 3's cell into module_4 or vice-versa.\n" +
+            "  • If you cannot clearly tell which field a column's header refers to, OMIT that column\n" +
+            "    rather than guess where it goes.\n\n" +
+
             "YOUR JOB: for each student on the ROSTER below, find their row, then read the handwritten " +
-            "number in EACH of the above columns for that row. Put each into scores using its field key.\n\n" +
-            "═══ RULES (follow strictly) ═══\n" +
-            "  • Read the columns in the SAME left-to-right order they appear in the photo. Do NOT swap " +
-            "columns — a value under Module 1 must go to module_1, not module_2.\n" +
-            "  • Count digits per cell: '8' is ONE digit, '10'/'15' are TWO. Do NOT round '8' to '10'.\n" +
+            "number in EACH matched column for that row and store it under THAT column's field key.\n\n" +
+
+            DIGIT_READING_RULES + "\n" +
+            BLANK_CELL_RULES + "\n" +
+
+            "═══ MORE RULES ═══\n" +
             "  • Each student's numbers are INDEPENDENT — do NOT copy one student's value to the next.\n" +
-            "  • Blank / empty / unreadable cell → OMIT that one field for that student (do NOT guess 0).\n" +
-            "  • Numbers are 0..200. If a digit is ambiguous, return your best guess and LOWER confidence.\n" +
             "  • Match names to the ROSTER exactly (tolerate small OCR errors in the name).\n" +
             "  • Only include a student who has AT LEAST ONE readable score among these columns.\n\n" +
+
             "OUTPUT — STRICT JSON ONLY, no prose, no markdown:\n" +
             "{\n" +
             '  "students": [ { "name": "<exact roster name>", "scores": { ' + schemaScores + ' }, "confidence": <0..1> } ],\n' +
@@ -254,17 +292,19 @@ function buildRecordPrompt(roster, targetFields) {
         "- 'PT 1' / 'PT1' / 'Performance Task 1' → pt_1\n" +
         "- 'PT 2' / 'PT2' / 'Performance Task 2' → pt_2\n" +
         "- 'QE' / 'Q.E.' / 'Quarterly Exam' / 'Exam' → qe\n" +
-        "- If a header does not clearly map to one of the above field keys, IGNORE that entire column.\n\n" +
+        "- If a header does not clearly map to one of the above field keys, IGNORE that entire column.\n" +
+        "- Bind every score to the field key of the column HEADER above it — NEVER to a neighbouring\n" +
+        "  column. Reading Module 3's cell into module_4 (or vice-versa) is the most common mistake:\n" +
+        "  trace each value straight up to its own header before writing it.\n\n" +
         "NAME MATCHING RULES:\n" +
         "- Find each student's name in the leftmost column(s) of the photo. Match it to the EXACT ROSTER NAME below.\n" +
         "- Write the EXACT roster string in the \"name\" field — do NOT modify the name.\n" +
         "- NEVER invent a name not on the roster. NEVER fabricate a score for a blank cell.\n\n" +
+        BLANK_CELL_RULES + "\n" +
+        DIGIT_READING_RULES + "\n" +
         "SCORE READING RULES:\n" +
-        "- Only include a numeric value if you can CLEARLY read the digits. Empty/blank cells, dashes, " +
-        "'-', or unreadable cells are OMITTED (do not include the field at all).\n" +
-        "- Numbers must be non-negative and at most 200. Decimals are allowed but rare; prefer integers.\n" +
+        "- Decimals are allowed but rare; prefer integers.\n" +
         "- If you're not confident about a value, still return your best guess and lower the confidence.\n" +
-        "- Make sure each score is in the CORRECT column — double-check alignment left-to-right.\n" +
         "- A COMMON MISTAKE is assigning a score from one student to the next student. Double-check " +
         "that each score is on the CORRECT row and in the CORRECT column.\n\n" +
         "OUTPUT FORMAT — reply with STRICT JSON ONLY, no prose, no markdown fences. Exactly this shape:\n" +
