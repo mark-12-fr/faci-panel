@@ -587,6 +587,65 @@
 
         /* Auto-advance highlight */
         .score-input.advance-target { outline: 2px solid var(--accent-blue); }
+
+        /* Quick-score presets bar */
+        .qs-bar {
+            display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;
+            align-items: center; background: var(--panel-bg); padding: 10px 12px;
+            border-radius: 10px; box-shadow: var(--premium-shadow);
+        }
+        .qs-btn {
+            padding: 6px 14px; border-radius: 8px; border: 1.5px solid #e2e8f0;
+            background: #fff; font-weight: 800; font-size: 0.82rem;
+            cursor: pointer; transition: all 0.15s; color: var(--text-main);
+        }
+        .qs-btn:active { transform: scale(0.93); }
+        .qs-btn:hover { border-color: var(--accent-blue); background: #eff6ff; }
+        .qs-btn.qs-all { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .qs-btn.qs-none { border-color: #94a3b8; color: #64748b; }
+        .qs-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
+        .qs-count { font-size: 0.72rem; color: var(--text-sub); font-weight: 700; margin-left: auto; }
+
+        /* Row checkbox + selection highlight */
+        .row-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue); }
+        .student-data-row.selected { background: #eff6ff !important; outline: 2px solid var(--accent-blue); }
+
+        /* Bulk paste modal */
+        .paste-overlay {
+            position: fixed; inset: 0; z-index: 3100;
+            background: rgba(15,23,42,0.5); backdrop-filter: blur(3px);
+            display: none; align-items: center; justify-content: center;
+        }
+        .paste-overlay.show { display: flex; }
+        .paste-box {
+            background: #fff; width: 92%; max-width: 420px; border-radius: 16px;
+            padding: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        .paste-box h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
+        .paste-box .hint { font-size: 0.78rem; color: var(--text-sub); margin-bottom: 12px; }
+        .paste-box textarea {
+            width: 100%; height: 180px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+            padding: 10px; font-family: 'Inter','Segoe UI',sans-serif; font-size: 0.85rem;
+            resize: vertical; outline: none;
+        }
+        .paste-box textarea:focus { border-color: var(--accent-blue); }
+        .paste-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .paste-actions button {
+            flex: 1; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 0.88rem;
+            border: none; cursor: pointer; font-family: 'Inter','Segoe UI',sans-serif;
+        }
+        .paste-actions .paste-cancel { background: #f1f5f9; color: var(--text-sub); }
+        .paste-actions .paste-apply { background: var(--accent-blue); color: #fff; }
+        .paste-actions .paste-apply:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Quick-input mode indicator */
+        .quick-input-badge {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 998;
+            background: #1e293b; color: #fff; font-size: 0.75rem; font-weight: 700;
+            padding: 6px 16px; border-radius: 20px; opacity: 0; transition: opacity 0.2s;
+            pointer-events: none; white-space: nowrap;
+        }
+        .quick-input-badge.show { opacity: 0.9; }
 </head>
 <body>
 
@@ -711,6 +770,25 @@
         </div>
     </div>
 
+    <!-- Quick-score presets bar -->
+    <div class="qs-bar fade-in-up delay-2">
+        <span class="qs-count" id="qsCount">Select students</span>
+        <div class="qs-sep"></div>
+        <button class="qs-btn" onclick="qsApply(5)">5</button>
+        <button class="qs-btn" onclick="qsApply(7)">7</button>
+        <button class="qs-btn" onclick="qsApply(8)">8</button>
+        <button class="qs-btn" onclick="qsApply(9)">9</button>
+        <button class="qs-btn" onclick="qsApply(10)">10</button>
+        <button class="qs-btn" onclick="qsApply(15)">15</button>
+        <button class="qs-btn" onclick="qsApply(20)">20</button>
+        <button class="qs-btn" onclick="qsApply(25)">25</button>
+        <button class="qs-btn" onclick="qsApply(50)">50</button>
+        <button class="qs-btn" onclick="qsApply(100)">100</button>
+        <div class="qs-sep"></div>
+        <button class="qs-btn qs-all" onclick="qsSelectAll()">All</button>
+        <button class="qs-btn qs-none" onclick="qsSelectNone()">None</button>
+    </div>
+
     <div class="search-bar fade-in-up delay-2">
         <i class="fa-solid fa-magnifying-glass" style="color: var(--text-sub);"></i>
         <input type="text" id="searchInput" placeholder="Search student name...">
@@ -721,7 +799,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th class="sticky-col-1" rowspan="2">#</th>
+                        <th class="sticky-col-1" rowspan="2"><input type="checkbox" class="row-checkbox" id="masterCheck" onchange="qsToggleMaster(this.checked)" title="Select all"></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
                         <th colspan="25" style="background: #f1f5f9;">MODULES</th>
                         <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
@@ -1080,7 +1158,7 @@
 
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
-                <td class="td-sticky-1">${index}</td>
+                <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsUpdateCount()"></td>
                 <td class="td-sticky-2 search-target">
                     <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
                         ${student.full_name}
@@ -1445,7 +1523,64 @@
             restoreDraft();
             attachAdvanceListeners();
             updateGradePreview();
+            qsUpdateCount();
         }
+
+        // ── Quick-score presets ──────────────────────────────────────────
+        function qsUpdateCount() {
+            const checked = document.querySelectorAll('.row-checkbox:checked').length;
+            const el = document.getElementById('qsCount');
+            if (el) el.textContent = checked ? checked + ' selected' : 'Select students';
+        }
+
+        function qsToggleMaster(checked) {
+            document.querySelectorAll('.row-checkbox').forEach(cb => {
+                cb.checked = checked;
+                cb.closest('.student-data-row')?.classList.toggle('selected', checked);
+            });
+            qsUpdateCount();
+        }
+
+        function qsSelectAll() {
+            document.getElementById('masterCheck').checked = true;
+            qsToggleMaster(true);
+        }
+
+        function qsSelectNone() {
+            document.getElementById('masterCheck').checked = false;
+            qsToggleMaster(false);
+        }
+
+        function qsApply(score) {
+            haptic();
+            const checked = document.querySelectorAll('.row-checkbox:checked');
+            if (!checked.length) {
+                showAlert('No students selected', 'Check the box beside each student or tap "All" to select everyone.', '#f59e0b');
+                return;
+            }
+            let count = 0;
+            checked.forEach(cb => {
+                const row = cb.closest('.student-data-row');
+                if (!row) return;
+                row.querySelectorAll('.score-input').forEach(inp => {
+                    if (!inp.disabled && !inp.value.trim()) {
+                        inp.value = score;
+                        count++;
+                    }
+                });
+            });
+            scheduleDraftSave();
+            updateGradePreview();
+            showUpdateToast('Applied ' + score + ' to ' + checked.length + ' student(s) (' + count + ' cells)');
+        }
+
+        // Add checkbox change listener for row highlighting
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('row-checkbox')) {
+                const row = e.target.closest('.student-data-row');
+                if (row) row.classList.toggle('selected', e.target.checked);
+            }
+        });
            Same shape as attendance.html: pick photo → downsize to JPEG →
            POST /api/vision-analyze with type="record" → review modal shows
            every extracted score (editable) → Apply fills only the ENABLED
