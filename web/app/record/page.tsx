@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import { API_BASE } from "@/lib/config";
 import { clearSession, getItem, getToken, isLoggedIn } from "@/lib/session";
 import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
+import { haptic } from "@/lib/haptic";
+import { enqueue, isNetworkError, startAutoFlush } from "@/lib/offline-queue";
+import { setSubjectConfigs, finalGrade, passingFor, attScore } from "@/lib/grading";
 import { useAlert } from "@/components/CustomAlert";
 import BottomNav from "@/components/BottomNav";
 import "./record.css";
@@ -23,6 +27,31 @@ const REC_FIELD_LABEL = (f: string) =>
   f.replace("module_", "M").replace("activity_", "A").toUpperCase().replace("_", " ");
 
 const filled = (v: any) => v !== null && v !== undefined && v !== "";
+
+// Draft scores survive an accidental close/refresh mid-entry. Keyed by section +
+// quarter; only editable (not carried / already-submitted) fields are drafted.
+const recDraftKey = (section: string, quarter: string) => `faci_rec_draft_${section}_${quarter}`;
+const loadRecDraft = (section: string, quarter: string): Record<string, Record<string, string>> => {
+  try {
+    const r = localStorage.getItem(recDraftKey(section, quarter));
+    return r ? JSON.parse(r) : {};
+  } catch {
+    return {};
+  }
+};
+const saveRecDraftField = (section: string, quarter: string, studentId: string, field: string, value: string) => {
+  try {
+    const d = loadRecDraft(section, quarter);
+    if (!d[studentId]) d[studentId] = {};
+    if (value === "") delete d[studentId][field];
+    else d[studentId][field] = value;
+    if (Object.keys(d[studentId]).length === 0) delete d[studentId];
+    localStorage.setItem(recDraftKey(section, quarter), JSON.stringify(d));
+  } catch {}
+};
+const clearRecDraft = (section: string, quarter: string) => {
+  try { localStorage.removeItem(recDraftKey(section, quarter)); } catch {}
+};
 
 interface Cell {
   field: string;
@@ -52,6 +81,8 @@ export default function RecordPage() {
   const [infoQuarter, setInfoQuarter] = useState("Q1");
   const [infoTotal, setInfoTotal] = useState(0);
   const [rows, setRows] = useState<Row[]>([]);
+  const [grades, setGrades] = useState<Record<string, number | null>>({}); // live grade per student
+  const [attendance, setAttendance] = useState<any[]>([]); // for the attendance grade component
   const [dataVersion, setDataVersion] = useState(0);
   const [loadState, setLoadState] = useState<"loading" | "ok" | "empty" | "error">("loading");
   const [search, setSearch] = useState("");
@@ -128,6 +159,14 @@ export default function RecordPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Replay offline-queued submits — now, and whenever the connection returns.
+  useEffect(() => {
+    return startAutoFlush((n) =>
+      showAlert("Back online", `${n} offline submission${n > 1 ? "s" : ""} synced.`, "#10b981")
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function loadData() {
     setLoadState("loading");
     try {
@@ -144,12 +183,16 @@ export default function RecordPage() {
         setLoadState("empty");
         return;
       }
-      const [studentsResp, recordsResp] = await Promise.all([
+      const [studentsResp, recordsResp, subjectsResp, attendanceResp] = await Promise.all([
         apiGet("/api/faci/students"),
         apiGet("/api/faci/class-records"),
+        apiGet("/api/faci/subjects").catch(() => ({ subjects: [] })), // for live-grade weights
+        apiGet("/api/faci/attendance").catch(() => ({ attendance: [] })), // for the attendance component
       ]);
       const students = studentsResp.students || [];
       const records = recordsResp.records || [];
+      setSubjectConfigs(subjectsResp.subjects || []);
+      setAttendance(attendanceResp.attendance || []);
       setInfoTotal(students.length);
       if (!students.length) {
         setRows([]);
@@ -157,6 +200,7 @@ export default function RecordPage() {
         return;
       }
       const quarter = currentQuarterRef.current;
+      const draft = loadRecDraft(getItem("faci_section") || "sec", quarter);
       const built: Row[] = students.map((student: any, i: number) => {
         const studentRecs = records.filter((r: any) => r.student_id === student.id);
         const currentRec =
@@ -178,7 +222,10 @@ export default function RecordPage() {
           const currentVal = currentRec ? currentRec[field] : null;
           const hasCurrent = filled(currentVal);
           const carried = hasCurrent ? null : fallbackValue(field);
-          const displayVal = hasCurrent ? currentVal : carried !== null ? carried : "";
+          // Restore a draft value only into a still-editable (unsubmitted, not
+          // carried) field, so drafts never mask real/locked scores.
+          const draftVal = !hasCurrent && carried === null ? draft[student.id]?.[field] : undefined;
+          const displayVal = hasCurrent ? currentVal : carried !== null ? carried : draftVal ?? "";
           return {
             field,
             value: displayVal === "" || displayVal === null || displayVal === undefined ? "" : String(displayVal),
@@ -189,6 +236,7 @@ export default function RecordPage() {
         return { student, index: i + 1, recordId: currentRec?.id, cells };
       });
       setRows(built);
+      recomputeAllGrades(built);
       setDataVersion((v) => v + 1);
       setLoadState("ok");
     } catch (e) {
@@ -220,6 +268,7 @@ export default function RecordPage() {
       `.student-data-row[data-uuid="${drawer.studentId}"]`
     );
     if (!rowEl) return;
+    const sectionName = getItem("faci_section") || "sec";
     drawerRef.current?.querySelectorAll<HTMLInputElement>("input[data-field]").forEach((di) => {
       const field = di.getAttribute("data-field")!;
       const target = rowEl.querySelector<HTMLInputElement>(`input[data-field="${field}"]`);
@@ -229,13 +278,105 @@ export default function RecordPage() {
           target.style.backgroundColor = "#eff6ff";
           target.style.borderColor = "var(--accent-blue)";
         }
+        saveRecDraftField(sectionName, currentQuarterRef.current, drawer.studentId, field, di.value.trim());
       }
     });
+    recomputeGrade(drawer.studentId); // programmatic .value doesn't fire onInput
     closeDrawer();
     showToast("Scores applied to table. Don't forget to Submit!");
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Live grade ──────────────────────────────────────────────────────────────
+  function attendanceScoreFor(fullName: string): number {
+    const key = String(fullName || "").trim().toLowerCase();
+    let present = 0;
+    let late = 0;
+    let total = 0;
+    for (const a of attendance) {
+      if (String(a.student_name || "").trim().toLowerCase() !== key) continue;
+      const st = String(a.status || "").toLowerCase();
+      if (st === "present") present++;
+      else if (st === "late" || st === "excused") late++;
+      total++;
+    }
+    return attScore({ present, late, total });
+  }
+
+  // Live grade read straight from a row's current inputs (called as the faci types).
+  function recomputeGrade(studentId: string) {
+    const rowEl = tableRef.current?.querySelector<HTMLTableRowElement>(
+      `.student-data-row[data-uuid="${studentId}"]`
+    );
+    const rec: Record<string, any> = {};
+    rowEl?.querySelectorAll<HTMLInputElement>(".score-input").forEach((inp) => {
+      const v = inp.value.trim();
+      if (v !== "") rec[inp.dataset.field!] = v;
+    });
+    const student = rows.find((r) => r.student.id === studentId)?.student;
+    const g = REC_FIELDS.some((f) => filled(rec[f]))
+      ? finalGrade(rec, getItem("faci_subject") || "", attendanceScoreFor(student?.full_name || ""))
+      : null;
+    setGrades((m) => ({ ...m, [studentId]: g }));
+  }
+
+  // Recompute every row's grade from the live DOM — after a bulk change (photo
+  // scan) whose programmatic .value writes don't fire onInput.
+  function refreshGradesFromDom() {
+    const g: Record<string, number | null> = {};
+    tableRef.current?.querySelectorAll<HTMLTableRowElement>(".student-data-row").forEach((rowEl) => {
+      const sid = rowEl.dataset.uuid!;
+      const rec: Record<string, any> = {};
+      rowEl.querySelectorAll<HTMLInputElement>(".score-input").forEach((inp) => {
+        const v = inp.value.trim();
+        if (v !== "") rec[inp.dataset.field!] = v;
+      });
+      const student = rows.find((r) => r.student.id === sid)?.student;
+      g[sid] = REC_FIELDS.some((f) => filled(rec[f]))
+        ? finalGrade(rec, getItem("faci_subject") || "", attendanceScoreFor(student?.full_name || ""))
+        : null;
+    });
+    setGrades(g);
+  }
+
+  // Initial (and post-bulk) grades computed from row cells, not the DOM (which
+  // may not have rendered the new rows yet).
+  function recomputeAllGrades(builtRows: Row[]) {
+    const g: Record<string, number | null> = {};
+    builtRows.forEach((r) => {
+      const rec: Record<string, any> = {};
+      r.cells.forEach((c) => {
+        if (c.value !== "") rec[c.field] = c.value;
+      });
+      g[r.student.id] = REC_FIELDS.some((f) => filled(rec[f]))
+        ? finalGrade(rec, getItem("faci_subject") || "", attendanceScoreFor(r.student.full_name || ""))
+        : null;
+    });
+    setGrades(g);
+  }
+
+  // As the faci types a score: refresh that student's live grade and save a draft.
+  function onScoreInput(studentId: string, field: string, value: string) {
+    recomputeGrade(studentId);
+    saveRecDraftField(getItem("faci_section") || "sec", currentQuarterRef.current, studentId, field, value);
+  }
+
+  // Enter / ↓ → next student's same field; ↑ → previous. Speeds a column of entry.
+  function onScoreKeyDown(e: ReactKeyboardEvent<HTMLInputElement>, field: string) {
+    if (e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const dir = e.key === "ArrowUp" ? -1 : 1;
+    const tr = e.currentTarget.closest("tr");
+    let next = (dir > 0 ? tr?.nextElementSibling : tr?.previousElementSibling) as HTMLElement | null;
+    while (next && (next.style.display === "none" || !next.classList.contains("student-data-row")))
+      next = (dir > 0 ? next.nextElementSibling : next.previousElementSibling) as HTMLElement | null;
+    const target = next?.querySelector<HTMLInputElement>(`.score-input[data-field="${field}"]`);
+    if (target && !target.disabled) {
+      target.focus();
+      target.select();
+    }
+  }
+
   async function handleSubmit() {
     const sectionId = sectionIdRef.current;
     if (!sectionId) {
@@ -276,10 +417,13 @@ export default function RecordPage() {
     }
 
     setSubmitState("submitting");
-    try {
-      await apiPost("/api/faci/class-records", records);
+    const sectionName = getItem("faci_section") || "sec";
+    // Lock the newly-filled inputs + clear the draft + confirm with a haptic —
+    // shared by the online-saved and the offline-queued paths.
+    const markSubmitted = () => {
+      clearRecDraft(sectionName, quarter);
+      haptic([10, 30, 10]);
       setSubmitState("success");
-      // Lock the newly-filled inputs, then reload so carry-over recomputes.
       tableRef.current?.querySelectorAll<HTMLInputElement>(".score-input").forEach((input) => {
         if (input.value.trim() !== "") {
           input.disabled = true;
@@ -288,13 +432,28 @@ export default function RecordPage() {
           input.style.borderColor = "transparent";
         }
       });
+    };
+    try {
+      await apiPost("/api/faci/class-records", records);
+      markSubmitted();
       setTimeout(() => {
         loadData();
         setSubmitState("idle");
       }, 2000);
     } catch (e: any) {
-      showAlert("System Error", "Failed to submit records: " + (e?.message || ""), "#ef4444");
-      setSubmitState("idle");
+      // No connection → queue it; it syncs automatically once back online.
+      if (isNetworkError(e)) {
+        enqueue("/api/faci/class-records", records, `Scores • ${dateStr}`);
+        markSubmitted();
+        showAlert(
+          "Saved offline",
+          "No connection right now — these scores will submit automatically once you're back online.",
+          "#f59e0b"
+        );
+      } else {
+        showAlert("System Error", "Failed to submit records: " + (e?.message || ""), "#ef4444");
+        setSubmitState("idle");
+      }
     }
   }
 
@@ -564,6 +723,7 @@ export default function RecordPage() {
     });
     let applied = 0;
     let skippedLocked = 0;
+    const sectionName = getItem("faci_section") || "sec";
     reviewListRef.current?.querySelectorAll<HTMLElement>(".rev-student-card").forEach((card) => {
       const name = card.dataset.name || "";
       const row = rowByName.get(name);
@@ -580,9 +740,11 @@ export default function RecordPage() {
           return;
         }
         target.value = String(n);
+        saveRecDraftField(sectionName, currentQuarterRef.current, row.dataset.uuid || "", field, String(n));
         applied++;
       });
     });
+    refreshGradesFromDom(); // programmatic .value writes don't fire onInput
     closeReview();
     const msg =
       "Applied " +
@@ -676,6 +838,7 @@ export default function RecordPage() {
                 <th rowSpan={2} style={{ background: "#f8fafc" }}>PT 1</th>
                 <th rowSpan={2} style={{ background: "#f8fafc" }}>PT 2</th>
                 <th rowSpan={2} style={{ background: "#f8fafc" }}>QE</th>
+                <th rowSpan={2} style={{ background: "#eef2ff" }}>GRADE</th>
               </tr>
               <tr style={{ fontSize: "0.6rem" }}>
                 {Array.from({ length: 25 }, (_, i) => (
@@ -691,21 +854,21 @@ export default function RecordPage() {
             <tbody ref={tableRef}>
               {loadState === "loading" && (
                 <tr>
-                  <td colSpan={41} style={{ textAlign: "center", padding: 30 }}>
+                  <td colSpan={42} style={{ textAlign: "center", padding: 30 }}>
                     <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "2rem" }} />
                   </td>
                 </tr>
               )}
               {loadState === "empty" && (
                 <tr>
-                  <td colSpan={41} style={{ color: "var(--text-sub)", textAlign: "center", padding: 20 }}>
+                  <td colSpan={42} style={{ color: "var(--text-sub)", textAlign: "center", padding: 20 }}>
                     No students assigned yet.
                   </td>
                 </tr>
               )}
               {loadState === "error" && (
                 <tr>
-                  <td colSpan={41} style={{ color: "red", textAlign: "center" }}>
+                  <td colSpan={42} style={{ color: "red", textAlign: "center" }}>
                     Failed to load data.
                   </td>
                 </tr>
@@ -735,11 +898,18 @@ export default function RecordPage() {
                         <td key={c.field}>
                           <input
                             type="number"
+                            inputMode="decimal"
                             className="score-input"
                             data-field={c.field}
                             data-carried={c.carried ? "1" : undefined}
                             defaultValue={c.value}
                             disabled={c.disabled}
+                            onKeyDown={c.disabled ? undefined : (e) => onScoreKeyDown(e, c.field)}
+                            onInput={
+                              c.disabled
+                                ? undefined
+                                : (e) => onScoreInput(row.student.id, c.field, (e.target as HTMLInputElement).value)
+                            }
                             title={
                               c.disabled
                                 ? c.carried
@@ -750,6 +920,23 @@ export default function RecordPage() {
                           />
                         </td>
                       ))}
+                      {(() => {
+                        const g = grades[row.student.id] ?? null;
+                        const pass = g !== null && g >= passingFor(getItem("faci_subject") || "");
+                        return (
+                          <td
+                            className="grade-live-cell"
+                            style={{
+                              fontWeight: 700,
+                              textAlign: "center",
+                              color: g === null ? "var(--text-sub)" : pass ? "#059669" : "#dc2626",
+                              background: g === null ? undefined : pass ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)",
+                            }}
+                          >
+                            {g === null ? "—" : g}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   );
                 })}
