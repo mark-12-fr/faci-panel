@@ -631,6 +631,15 @@
         .qs-btn.qs-none { border-color: #94a3b8; color: #64748b; }
         .qs-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
         .qs-count { font-size: 0.72rem; color: var(--text-sub); font-weight: 700; margin-left: auto; }
+        .qs-field-select {
+            border: 1.5px solid var(--accent-blue); border-radius: 8px; padding: 6px 8px;
+            font-weight: 800; font-size: 0.82rem; outline: none; font-family: inherit;
+            background: #eff6ff; color: var(--accent-blue); max-width: 150px;
+        }
+        .qs-field-select:focus-visible {
+            outline: 2px solid var(--accent-blue); outline-offset: 2px;
+        }
+        .qs-field-select option { color: #1e293b; }
 
         /* Row checkbox + selection highlight */
         .row-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue); }
@@ -800,6 +809,10 @@
     <!-- Quick-score presets bar -->
     <div class="qs-bar fade-in-up delay-2">
         <span class="qs-count" id="qsCount">Select students</span>
+        <div class="qs-sep"></div>
+        <select id="qsFieldSelect" class="qs-field-select" title="Which column the score goes into">
+            <option value="">All empty cells</option>
+        </select>
         <div class="qs-sep"></div>
         <button class="qs-btn" onclick="qsApply(5)">5</button>
         <button class="qs-btn" onclick="qsApply(10)">10</button>
@@ -1164,6 +1177,7 @@
                 attachAdvanceListeners();
                 updateGradePreview();
                 qsUpdateCount();
+                _qsPopulateFieldSelect();
 
             } catch (error) {
                 console.error("Error loading records:", error);
@@ -1646,6 +1660,34 @@
             if (el) el.textContent = checked ? checked + ' selected' : 'Select students';
         }
 
+        // Fill the "which column" dropdown once, using the same M1../A1../Other
+        // grouping and labels as the AI-scan field picker (openFieldPicker),
+        // so a facilitator sees the same names in both places.
+        function _qsPopulateFieldSelect() {
+            const sel = document.getElementById('qsFieldSelect');
+            if (!sel || sel.dataset.populated) return;
+            const group = (label, entries) => {
+                const og = document.createElement('optgroup');
+                og.label = label;
+                entries.forEach(([field, text]) => {
+                    const opt = document.createElement('option');
+                    opt.value = field;
+                    opt.textContent = text;
+                    og.appendChild(opt);
+                });
+                return og;
+            };
+            const modules = [];
+            for (let i = 1; i <= 25; i++) modules.push(['module_' + i, 'M' + i]);
+            const activities = [];
+            for (let i = 1; i <= 10; i++) activities.push(['activity_' + i, 'A' + i]);
+            const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
+            sel.appendChild(group('Modules', modules));
+            sel.appendChild(group('Activities', activities));
+            sel.appendChild(group('Other', others));
+            sel.dataset.populated = '1';
+        }
+
         function qsToggleMaster(checked) {
             document.querySelectorAll('.row-checkbox').forEach(cb => {
                 cb.checked = checked;
@@ -1671,11 +1713,19 @@
                 showAlert('No students selected', 'Check the box beside each student or tap "All" to select everyone.', '#f59e0b');
                 return;
             }
+            // Empty = old "fill everything empty" behaviour; a specific field
+            // (e.g. M3) targets ONLY that column, so the facilitator chooses
+            // exactly where a score like 10 goes instead of it landing in
+            // every blank cell.
+            const targetField = document.getElementById('qsFieldSelect')?.value || '';
             let count = 0;
             checked.forEach(cb => {
                 const row = cb.closest('.student-data-row');
                 if (!row) return;
-                row.querySelectorAll('.score-input').forEach(inp => {
+                const inputs = targetField
+                    ? row.querySelectorAll(`.score-input[data-field="${targetField}"]`)
+                    : row.querySelectorAll('.score-input');
+                inputs.forEach(inp => {
                     if (!inp.disabled && !inp.value.trim()) {
                         inp.value = score;
                         count++;
@@ -1684,7 +1734,8 @@
             });
             scheduleDraftSave();
             updateGradePreview();
-            showUpdateToast('Applied ' + score + ' to ' + checked.length + ' student(s) (' + count + ' cells)');
+            const where = targetField ? REC_FIELD_LABEL(targetField) : 'all empty cells';
+            showUpdateToast('Applied ' + score + ' to ' + where + ' for ' + checked.length + ' student(s) (' + count + ' cells)');
         }
 
         function qsApplyCustom() {
