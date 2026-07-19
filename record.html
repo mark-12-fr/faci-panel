@@ -775,15 +775,14 @@
         <span class="qs-count" id="qsCount">Select students</span>
         <div class="qs-sep"></div>
         <button class="qs-btn" onclick="qsApply(5)">5</button>
-        <button class="qs-btn" onclick="qsApply(7)">7</button>
-        <button class="qs-btn" onclick="qsApply(8)">8</button>
-        <button class="qs-btn" onclick="qsApply(9)">9</button>
         <button class="qs-btn" onclick="qsApply(10)">10</button>
         <button class="qs-btn" onclick="qsApply(15)">15</button>
         <button class="qs-btn" onclick="qsApply(20)">20</button>
         <button class="qs-btn" onclick="qsApply(25)">25</button>
         <button class="qs-btn" onclick="qsApply(50)">50</button>
-        <button class="qs-btn" onclick="qsApply(100)">100</button>
+        <div class="qs-sep"></div>
+        <input type="number" id="qsCustomInput" min="1" max="100" placeholder="1-50" style="width:62px;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-weight:700;font-size:0.82rem;outline:none;font-family:inherit;" onkeydown="if(event.key==='Enter')qsApplyCustom()">
+        <button class="qs-btn" onclick="qsApplyCustom()" style="border-color:var(--accent-blue);color:var(--accent-blue);">Apply</button>
         <div class="qs-sep"></div>
         <button class="qs-btn qs-all" onclick="qsSelectAll()">All</button>
         <button class="qs-btn qs-none" onclick="qsSelectNone()">None</button>
@@ -1572,6 +1571,17 @@
             scheduleDraftSave();
             updateGradePreview();
             showUpdateToast('Applied ' + score + ' to ' + checked.length + ' student(s) (' + count + ' cells)');
+        }
+
+        function qsApplyCustom() {
+            const inp = document.getElementById('qsCustomInput');
+            const val = parseInt(inp.value);
+            if (!val || val < 1 || val > 100) {
+                showAlert('Invalid score', 'Enter a number between 1 and 100.', '#f59e0b');
+                return;
+            }
+            qsApply(val);
+            inp.value = '';
         }
 
         // Add checkbox change listener for row highlighting
