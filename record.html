@@ -565,7 +565,28 @@
             text-align: center; color: rgba(255,255,255,0.6);
             font-size: 0.78rem; padding: 6px 0 10px;
         }
-    </style>
+        /* Grade preview row */
+        .grade-preview-bar {
+            display: flex; gap: 12px; padding: 10px 12px; background: #f0fdf4;
+            border: 1px solid #bbf7d0; border-radius: 10px; margin-bottom: 12px;
+            flex-wrap: wrap; align-items: center;
+        }
+        .grade-preview-bar .gp-item { font-size: 0.82rem; font-weight: 700; color: #166534; }
+        .grade-preview-bar .gp-item span { color: var(--text-sub); font-weight: 400; }
+        .gp-high { color: #15803d; font-weight: 800; }
+        .gp-low { color: #b91c1c; font-weight: 800; }
+
+        /* Draft autosave indicator */
+        .draft-indicator {
+            position: fixed; bottom: 80px; right: 16px; z-index: 999;
+            background: #1e293b; color: #fff; font-size: 0.72rem; font-weight: 700;
+            padding: 6px 12px; border-radius: 20px; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none; display: flex; align-items: center; gap: 5px;
+        }
+        .draft-indicator.show { opacity: 1; }
+
+        /* Auto-advance highlight */
+        .score-input.advance-target { outline: 2px solid var(--accent-blue); }
 </head>
 <body>
 
@@ -724,6 +745,8 @@
         </div>
     </div>
 
+    <div id="gradePreviewBar" class="grade-preview-bar fade-in-up delay-4" style="display:none;"></div>
+
     <button class="submit-btn fade-in-up delay-4" id="submitBtn">
         <i class="fa-solid fa-paper-plane"></i> Submit New Scores
     </button>
@@ -734,6 +757,10 @@
         <a href="record.html" class="nav-item active"><i class="fa-solid fa-chart-column"></i>Records</a>
         <a href="profile.html" class="nav-item"><i class="fa-solid fa-circle-user"></i>Profile</a>
     </nav>
+
+    <div id="draftIndicator" class="draft-indicator">
+        <i class="fa-solid fa-pen-to-square"></i> <span id="draftText">Draft saved</span>
+    </div>
 
     <div id="customAlertOverlay" class="custom-alert-overlay">
         <div class="custom-alert-box">
@@ -1239,6 +1266,7 @@
 
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
+                clearDraft();
                 
                 document.querySelectorAll('.score-input').forEach(input => {
                     if (input.value.trim() !== "") {
@@ -1266,8 +1294,158 @@
         });
 
         /* ═══════════════════════════════════════════════════════════════
-           PHOTO-TO-RECORD (Upload → AI Vision → Review → Apply)
-           ═══════════════════════════════════════════════════════════════
+           BONUS FEATURES: Grade Preview, Draft Autosave, Auto-Advance,
+           Haptic Feedback
+           ═══════════════════════════════════════════════════════════════ */
+
+        // ── Haptic feedback ──────────────────────────────────────────────
+        function haptic() {
+            if (navigator.vibrate) navigator.vibrate(10);
+        }
+
+        // ── Draft autosave ───────────────────────────────────────────────
+        const DRAFT_KEY = 'record_draft_' + (localStorage.getItem('faci_section') || '');
+
+        function saveDraft() {
+            const rows = {};
+            document.querySelectorAll('.student-data-row').forEach(row => {
+                const uuid = row.dataset.uuid;
+                if (!uuid) return;
+                const vals = {};
+                row.querySelectorAll('.score-input').forEach(inp => {
+                    if (inp.value && !inp.disabled) vals[inp.dataset.field] = inp.value;
+                });
+                if (Object.keys(vals).length) rows[uuid] = vals;
+            });
+            try { localStorage.setItem(DRAFT_KEY, JSON.stringify(rows)); } catch {}
+        }
+
+        function restoreDraft() {
+            try {
+                const raw = localStorage.getItem(DRAFT_KEY);
+                if (!raw) return;
+                const rows = JSON.parse(raw);
+                document.querySelectorAll('.student-data-row').forEach(row => {
+                    const uuid = row.dataset.uuid;
+                    if (!uuid || !rows[uuid]) return;
+                    Object.entries(rows[uuid]).forEach(([field, val]) => {
+                        const inp = row.querySelector(`.score-input[data-field="${field}"]`);
+                        if (inp && !inp.disabled) inp.value = val;
+                    });
+                });
+            } catch {}
+        }
+
+        function clearDraft() {
+            try { localStorage.removeItem(DRAFT_KEY); } catch {}
+        }
+
+        function showDraftSaved() {
+            const el = document.getElementById('draftIndicator');
+            if (!el) return;
+            el.classList.add('show');
+            clearTimeout(el._hide);
+            el._hide = setTimeout(() => el.classList.remove('show'), 1200);
+        }
+
+        let _draftTimer = null;
+        function scheduleDraftSave() {
+            clearTimeout(_draftTimer);
+            _draftTimer = setTimeout(() => { saveDraft(); showDraftSaved(); }, 800);
+        }
+
+        // ── Live grade preview ───────────────────────────────────────────
+        function updateGradePreview() {
+            const bar = document.getElementById('gradePreviewBar');
+            if (!bar) return;
+            const rows = document.querySelectorAll('.student-data-row');
+            if (rows.length === 0) { bar.style.display = 'none'; return; }
+            let totalGrade = 0, count = 0;
+            let maxGrade = 0, minGrade = 100;
+            rows.forEach(row => {
+                let mSum = 0, mCount = 0, aSum = 0, aCount = 0;
+                let at = 0, pt1 = 0, pt2 = 0, qe = 0;
+                row.querySelectorAll('.score-input').forEach(inp => {
+                    const v = parseFloat(inp.value) || 0;
+                    const f = inp.dataset.field;
+                    if (f === 'at') at = v;
+                    else if (f === 'pt_1') pt1 = v;
+                    else if (f === 'pt_2') pt2 = v;
+                    else if (f === 'qe') qe = v;
+                    else if (f.startsWith('module_')) { mSum += v; mCount++; }
+                    else if (f.startsWith('activity_')) { aSum += v; aCount++; }
+                });
+                if (mCount === 0 && aCount === 0 && !at && !pt1 && !pt2 && !qe) return;
+                const ww = mCount > 0 ? (mSum / mCount) : (aCount > 0 ? (aSum / aCount) : 0);
+                const pt = (pt1 + pt2) / 2 || 0;
+                const grade = ww * 0.3 + pt * 0.5 + qe * 0.2;
+                totalGrade += grade;
+                count++;
+                if (grade > maxGrade) maxGrade = grade;
+                if (grade < minGrade) minGrade = grade;
+            });
+            if (count === 0) { bar.style.display = 'none'; return; }
+            const avg = totalGrade / count;
+            bar.style.display = 'flex';
+            bar.innerHTML =
+                '<span class="gp-item">Average: <b class="' + (avg >= 75 ? 'gp-high' : 'gp-low') + '">' + avg.toFixed(1) + '%</b></span>' +
+                '<span class="gp-item">Highest: <b class="gp-high">' + maxGrade.toFixed(1) + '%</b></span>' +
+                '<span class="gp-item">Lowest: <b class="gp-low">' + minGrade.toFixed(1) + '%</b></span>' +
+                '<span class="gp-item">Passing: <b>' + Math.round(count * avg >= 75 ? 1 : 0 / 1) + '/' + count + '</b></span>';
+        }
+
+        // ── Auto-advance score entry ─────────────────────────────────────
+        function attachAdvanceListeners() {
+            document.querySelectorAll('.score-input').forEach(inp => {
+                inp.removeEventListener('keydown', _advanceHandler);
+                inp.addEventListener('keydown', _advanceHandler);
+                inp.removeEventListener('input', _onScoreInput);
+                inp.addEventListener('input', _onScoreInput);
+            });
+        }
+
+        function _advanceHandler(e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                haptic();
+                const inputs = Array.from(document.querySelectorAll('.score-input'));
+                const idx = inputs.indexOf(e.target);
+                const next = inputs[idx + 1];
+                if (next && !next.disabled) {
+                    next.focus();
+                    next.select();
+                    next.classList.add('advance-target');
+                    setTimeout(() => next.classList.remove('advance-target'), 600);
+                }
+            }
+        }
+
+        function _onScoreInput() {
+            scheduleDraftSave();
+            updateGradePreview();
+        }
+
+        // ── Override createInputRow to add change listeners ──────────────
+        const _origCreateInputRow = createInputRow;
+        function createInputRow(student, index, existingRecords) {
+            const tr = _origCreateInputRow(student, index, existingRecords);
+            setTimeout(() => {
+                tr.querySelectorAll('.score-input').forEach(inp => {
+                    inp.removeEventListener('input', _onScoreInput);
+                    inp.addEventListener('input', _onScoreInput);
+                });
+            }, 0);
+            return tr;
+        }
+
+        // ── Override loadClassRecordData to restore draft + preview ──────
+        const _origLoad = loadClassRecordData;
+        async function loadClassRecordData(sectionTitle) {
+            await _origLoad(sectionTitle);
+            restoreDraft();
+            attachAdvanceListeners();
+            updateGradePreview();
+        }
            Same shape as attendance.html: pick photo → downsize to JPEG →
            POST /api/vision-analyze with type="record" → review modal shows
            every extracted score (editable) → Apply fills only the ENABLED

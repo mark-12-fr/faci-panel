@@ -98,6 +98,25 @@
         .search-container:focus-within { transform: translateY(-2px); border-color: var(--accent-blue); }
         .search-container input { border: none; outline: none; width: 100%; font-size: 0.9rem; }
 
+        /* Quick action bar */
+        .quick-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .quick-btn {
+            flex: 1; min-width: 100px; padding: 10px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+            background: var(--panel-bg); font-weight: 700; font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+            color: var(--text-main); box-shadow: var(--premium-shadow);
+        }
+        .quick-btn:active { transform: scale(0.96); }
+        .quick-btn.mark-all { border-color: #22c55e; color: #15803d; }
+        .quick-btn.mark-all:hover { background: #f0fdf4; }
+        .quick-btn.roll-mode { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .quick-btn.roll-mode.active { background: var(--accent-blue); color: #fff; }
+        .quick-btn.roll-mode:hover { background: #eff6ff; }
+        .quick-btn.roll-mode.active:hover { background: #2563eb; }
+
+        /* Auto-advance highlight */
+        .student-card.roll-target { border-left: 4px solid var(--accent-blue); }
+
         /* --- STUDENT CARDS --- */
         .student-card { background: var(--panel-bg); padding: 15px; border-radius: var(--border-radius); box-shadow: var(--premium-shadow); margin-bottom: 12px; position: relative; transition: all 0.3s ease; }
         .student-card:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
@@ -194,6 +213,15 @@
         <div class="mini-card present"><h3 id="statPresent">0</h3><p>Present</p></div>
         <div class="mini-card absent"><h3 id="statAbsent">0</h3><p>Absent</p></div>
         <div class="mini-card late"><h3 id="statLate">0</h3><p>Late</p></div>
+    </div>
+
+    <div class="quick-bar fade-in-up delay-3">
+      <button class="quick-btn mark-all" onclick="markAllPresent()">
+        <i class="fa-solid fa-check-circle"></i> Mark all Present
+      </button>
+      <button class="quick-btn roll-mode" id="rollModeBtn" onclick="toggleRollMode()">
+        <i class="fa-solid fa-forward-step"></i> Roll-Call
+      </button>
     </div>
 
     <div class="search-container fade-in-up delay-3">
@@ -467,6 +495,21 @@
                 attachButtonListeners();
                 updateStats();
 
+                // ── Default Present on load for today ──────────────────────────
+                // When it's today's date and attendance hasn't been submitted yet,
+                // auto-mark all students as Present so the facilitator only needs
+                // to change the exceptions (absent/late).
+                const isToday = checkDate.getTime() === today.getTime();
+                if (!isLocked && isToday) {
+                    document.querySelectorAll('.student-card .opt-btn.present').forEach(btn => {
+                        if (!btn.disabled && !btn.classList.contains('active')) {
+                            btn.closest('.student-card').querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                        }
+                    });
+                    updateStats();
+                }
+
                 const submitBtn = document.getElementById('submitBtn');
                 
                 if (isAlreadySubmitted) {
@@ -557,6 +600,89 @@
             document.querySelectorAll('.student-item').forEach(card => {
                 const name = card.querySelector('.s-name').textContent.toLowerCase();
                 card.style.display = name.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           BONUS FEATURES
+           ═══════════════════════════════════════════════════════════════ */
+
+        // ── Haptic feedback ──────────────────────────────────────────────
+        function haptic() {
+            if (navigator.vibrate) navigator.vibrate(12);
+        }
+
+        // ── Mark all Present ─────────────────────────────────────────────
+        function markAllPresent() {
+            haptic();
+            document.querySelectorAll('.student-card .opt-btn.present').forEach(btn => {
+                if (!btn.disabled) {
+                    const card = btn.closest('.student-card');
+                    card.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+            updateStats();
+            showUpdateToast('All students marked Present');
+        }
+
+        // ── Auto-advance roll-call mode ──────────────────────────────────
+        let _rollMode = false;
+        let _rollIndex = 0;
+
+        function toggleRollMode() {
+            haptic();
+            _rollMode = !_rollMode;
+            const btn = document.getElementById('rollModeBtn');
+            btn.classList.toggle('active', _rollMode);
+            if (_rollMode) {
+                _rollIndex = 0;
+                btn.innerHTML = '<i class="fa-solid fa-forward-step"></i> Roll-Call ON';
+                highlightRollTarget();
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-forward-step"></i> Roll-Call';
+                document.querySelectorAll('.student-card').forEach(c => c.classList.remove('roll-target'));
+            }
+        }
+
+        function highlightRollTarget() {
+            document.querySelectorAll('.student-card').forEach(c => c.classList.remove('roll-target'));
+            const cards = document.querySelectorAll('.student-card:not([style*="none"])');
+            if (!cards.length || !_rollMode) return;
+            if (_rollIndex >= cards.length) {
+                _rollMode = false;
+                document.getElementById('rollModeBtn').classList.remove('active');
+                document.getElementById('rollModeBtn').innerHTML = '<i class="fa-solid fa-forward-step"></i> Roll-Call';
+                showUpdateToast('Roll-call complete!');
+                return;
+            }
+            const target = cards[_rollIndex];
+            target.classList.add('roll-target');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function advanceRoll() {
+            if (!_rollMode) return;
+            _rollIndex++;
+            highlightRollTarget();
+        }
+
+        // Override attachButtonListeners to add auto-advance + haptic
+        const _origAttach = attachButtonListeners;
+        function attachButtonListeners() {
+            document.querySelectorAll('.student-card').forEach(card => {
+                const buttons = card.querySelectorAll('.opt-btn');
+                buttons.forEach(btn => {
+                    if (!btn.disabled) {
+                        btn.addEventListener('click', () => {
+                            haptic();
+                            buttons.forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            updateStats();
+                            advanceRoll();
+                        });
+                    }
+                });
             });
         }
 
