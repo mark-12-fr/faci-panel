@@ -1594,13 +1594,7 @@
                 if (row) row.classList.toggle('selected', e.target.checked);
             }
         });
-           Same shape as attendance.html: pick photo → downsize to JPEG →
-           POST /api/vision-analyze with type="record" → review modal shows
-           every extracted score (editable) → Apply fills only the ENABLED
-           inputs in the table (disabled ones = already-submitted scores,
-           only the teacher can edit those, so we never overwrite them).
-           The facilitator still presses Submit New Scores to save.
-        */
+
 
         const REC_FIELDS = (function () {
             const arr = [];
