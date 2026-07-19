@@ -1,15 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 import { getItem, isLoggedIn } from "@/lib/session";
 import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
+import { haptic } from "@/lib/haptic";
+import { enqueue, isNetworkError, startAutoFlush } from "@/lib/offline-queue";
 import { useAlert } from "@/components/CustomAlert";
 import BottomNav from "@/components/BottomNav";
 import "./attendance.css";
 
 type Status = "Present" | "Absent" | "Late";
+
+// Draft marks survive an accidental close/refresh mid-roll-call (mobile browsers
+// reclaim backgrounded tabs). Keyed by section + date so each day is separate.
+const draftKey = (section: string, date: string) => `faci_att_draft_${section}_${date}`;
+const saveDraftMarks = (section: string, date: string, marks: Record<string, Status>) => {
+  try { localStorage.setItem(draftKey(section, date), JSON.stringify(marks)); } catch {}
+};
+const loadDraftMarks = (section: string, date: string): Record<string, Status> | null => {
+  try { const r = localStorage.getItem(draftKey(section, date)); return r ? JSON.parse(r) : null; } catch { return null; }
+};
+const clearDraftMarks = (section: string, date: string) => {
+  try { localStorage.removeItem(draftKey(section, date)); } catch {}
+};
 
 const toDateInputValue = (d: Date) =>
   d.getFullYear() +
@@ -91,6 +106,14 @@ export default function AttendancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Replay anything queued while offline — now, and whenever the connection returns.
+  useEffect(() => {
+    return startAutoFlush((n) =>
+      showAlert("Back online", `${n} offline submission${n > 1 ? "s" : ""} synced.`, "#10b981")
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function loadAttendance(dv: string, studs: any[]) {
     setLoadState("loading");
     const dStr = toDisplayDate(new Date(dv + "T00:00:00"));
@@ -119,6 +142,17 @@ export default function AttendancePage() {
           nextMarks[s.id] = record.status;
         }
       });
+      // Editable session: restore a saved draft if there is one, otherwise DEFAULT
+      // everyone to Present (the common case) so the faci only taps the few
+      // absent/late. Any server-prefilled mark still wins.
+      if (!isLocked) {
+        const sectionName = getItem("faci_section") || "sec";
+        const draft = loadDraftMarks(sectionName, dv);
+        studs.forEach((s) => {
+          if (nextMarks[s.id]) return;
+          nextMarks[s.id] = (draft && draft[s.id]) || "Present";
+        });
+      }
       setMarks(nextMarks);
       setLocked(isLocked);
       setLockReason(isAlreadySubmitted ? "submitted" : isPastDate ? "past" : null);
@@ -146,9 +180,40 @@ export default function AttendancePage() {
     loadAttendance(newValue, students);
   }
 
+  function persistDraft(next: Record<string, Status>) {
+    saveDraftMarks(getItem("faci_section") || "sec", dateValue, next);
+  }
+
   function mark(studentId: string, status: Status) {
     if (locked) return;
-    setMarks((m) => ({ ...m, [studentId]: status }));
+    haptic(12);
+    setMarks((m) => {
+      const next = { ...m, [studentId]: status };
+      persistDraft(next);
+      return next;
+    });
+  }
+
+  function markAllPresent() {
+    if (locked) return;
+    haptic([10, 30, 10]);
+    setMarks(() => {
+      const next: Record<string, Status> = {};
+      students.forEach((s) => (next[s.id] = "Present"));
+      persistDraft(next);
+      return next;
+    });
+  }
+
+  // Auto-advance: after a mark, bring the next student's card into view so the
+  // faci can keep tapping straight down the roster without scrolling by hand.
+  function advanceTo(nextId?: string) {
+    if (!nextId) return;
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-sid="${nextId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
 
   const stats = useMemo(() => {
@@ -182,24 +247,40 @@ export default function AttendancePage() {
       return;
     }
     setSubmitState("submitting");
-    try {
-      const items = students.map((s) => ({
+    const sectionName = getItem("faci_section") || "sec";
+    const body = {
+      date: dateStr,
+      subject: getItem("faci_subject") || "",
+      quarter,
+      items: students.map((s) => ({
         student_name: s.full_name,
         student_id_no: s.id_no || "",
         status: marks[s.id],
-      }));
-      await apiPost("/api/faci/attendance", {
-        date: dateStr,
-        subject: getItem("faci_subject") || "",
-        quarter,
-        items,
-      });
+      })),
+    };
+    try {
+      await apiPost("/api/faci/attendance", body);
+      clearDraftMarks(sectionName, dateValue);
       setSubmitState("success");
       setLocked(true);
       setLockReason("submitted");
     } catch (e: any) {
-      showAlert("Submission Failed", String(e?.message || "Please try again."), "#ef4444");
-      setSubmitState("idle");
+      // No connection → queue it and let the faci move on; it syncs on its own.
+      if (isNetworkError(e)) {
+        enqueue("/api/faci/attendance", body, `Attendance • ${dateStr}`);
+        clearDraftMarks(sectionName, dateValue);
+        setSubmitState("success");
+        setLocked(true);
+        setLockReason("submitted");
+        showAlert(
+          "Saved offline",
+          "No connection right now — this attendance will submit automatically once you're back online.",
+          "#f59e0b"
+        );
+      } else {
+        showAlert("Submission Failed", String(e?.message || "Please try again."), "#ef4444");
+        setSubmitState("idle");
+      }
     }
   }
 
@@ -322,6 +403,22 @@ export default function AttendancePage() {
         />
       </div>
 
+      {loadState === "ok" && !locked && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "2px 2px 10px" }} className="fade-in-up delay-3">
+          <span style={{ fontSize: "0.76rem", color: "var(--text-sub)" }}>
+            <i className="fa-solid fa-circle-info" style={{ marginRight: 5 }} />
+            Everyone starts <b>Present</b> — just change the absent/late.
+          </span>
+          <button
+            type="button"
+            onClick={markAllPresent}
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: "0.82rem", background: "rgba(16,185,129,0.14)", color: "#059669", whiteSpace: "nowrap" }}
+          >
+            <i className="fa-solid fa-user-check" /> All Present
+          </button>
+        </div>
+      )}
+
       <div className="fade-in-up delay-4">
         {loadState === "loading" && (
           <div style={{ textAlign: "center", padding: 20 }}>
@@ -351,7 +448,10 @@ export default function AttendancePage() {
                 className={`opt-btn ${cls}${current === status ? " active" : ""}`}
                 disabled={locked}
                 style={locked ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
-                onClick={() => mark(s.id, status)}
+                onClick={() => {
+                  mark(s.id, status);
+                  advanceTo(filteredStudents[i + 1]?.id);
+                }}
               >
                 {label}
               </button>
@@ -359,6 +459,7 @@ export default function AttendancePage() {
             return (
               <div
                 className="student-card student-item fade-in-up"
+                data-sid={s.id}
                 style={{ animationDelay: `${delay}s` }}
                 key={s.id}
               >
