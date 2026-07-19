@@ -1127,6 +1127,11 @@
                 submitBtn.style.background = 'var(--accent-blue)';
                 submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit New Scores';
 
+                restoreDraft();
+                attachAdvanceListeners();
+                updateGradePreview();
+                qsUpdateCount();
+
             } catch (error) {
                 console.error("Error loading records:", error);
                 tbody.innerHTML = `<tr><td colspan="41" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
@@ -1199,6 +1204,12 @@
             fields.forEach(f => html += renderInput(f));
 
             tr.innerHTML = html;
+            // Add input listeners for draft autosave + grade preview
+            setTimeout(() => {
+                tr.querySelectorAll('.score-input').forEach(inp => {
+                    inp.addEventListener('input', _onScoreInput);
+                });
+            }, 0);
             return tr;
         }
 
@@ -1512,29 +1523,6 @@
         function _onScoreInput() {
             scheduleDraftSave();
             updateGradePreview();
-        }
-
-        // ── Override createInputRow to add change listeners ──────────────
-        const _origCreateInputRow = createInputRow;
-        function createInputRow(student, index, existingRecords) {
-            const tr = _origCreateInputRow(student, index, existingRecords);
-            setTimeout(() => {
-                tr.querySelectorAll('.score-input').forEach(inp => {
-                    inp.removeEventListener('input', _onScoreInput);
-                    inp.addEventListener('input', _onScoreInput);
-                });
-            }, 0);
-            return tr;
-        }
-
-        // ── Override loadClassRecordData to restore draft + preview ──────
-        const _origLoad = loadClassRecordData;
-        async function loadClassRecordData(sectionTitle) {
-            await _origLoad(sectionTitle);
-            restoreDraft();
-            attachAdvanceListeners();
-            updateGradePreview();
-            qsUpdateCount();
         }
 
         // ── Quick-score presets ──────────────────────────────────────────
