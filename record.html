@@ -118,11 +118,9 @@
         th { background: #f8fafc; color: var(--text-sub); font-size: 0.7rem; text-transform: uppercase; padding: 12px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
         td { padding: 6px 4px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; text-align: center; }
 
-        .sticky-col-1 { position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 32px; }
-        .sticky-col-2 { position: sticky; left: 32px; background: #f8fafc; z-index: 10; width: 108px; text-align: left; }
-        thead .sticky-col-1, thead .sticky-col-2 { z-index: 11; border-bottom: 2px solid #e2e8f0; }
-        .td-sticky-1 { position: sticky; left: 0; background: white; z-index: 5; width: 32px; }
-        .td-sticky-2 { position: sticky; left: 32px; background: white; z-index: 5; text-align: left; padding-left: 8px; width: 108px; max-width: 108px; white-space: normal; line-height: 1.2; }
+        .sticky-col-2 { position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 108px; text-align: left; }
+        thead .sticky-col-2 { z-index: 11; border-bottom: 2px solid #e2e8f0; }
+        .td-sticky-2 { position: sticky; left: 0; background: white; z-index: 5; text-align: left; padding-left: 8px; width: 108px; max-width: 108px; white-space: normal; line-height: 1.2; }
 
 
 
@@ -627,10 +625,7 @@
         }
         .qs-btn:active { transform: scale(0.93); }
         .qs-btn:hover { border-color: var(--accent-blue); background: #eff6ff; }
-        .qs-btn.qs-all { border-color: var(--accent-blue); color: var(--accent-blue); }
-        .qs-btn.qs-none { border-color: #94a3b8; color: #64748b; }
         .qs-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
-        .qs-count { font-size: 0.72rem; color: var(--text-sub); font-weight: 700; margin-left: auto; }
         .qs-field-select {
             border: 1.5px solid var(--accent-blue); border-radius: 8px; padding: 6px 8px;
             font-weight: 800; font-size: 0.82rem; outline: none; font-family: inherit;
@@ -640,10 +635,6 @@
             outline: 2px solid var(--accent-blue); outline-offset: 2px;
         }
         .qs-field-select option { color: #1e293b; }
-
-        /* Row checkbox + selection highlight */
-        .row-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue); }
-        .student-data-row.selected { background: #eff6ff !important; outline: 2px solid var(--accent-blue); }
 
         /* Bulk paste modal */
         .paste-overlay {
@@ -808,8 +799,6 @@
 
     <!-- Quick-score presets bar -->
     <div class="qs-bar fade-in-up delay-2">
-        <span class="qs-count" id="qsCount">Select students</span>
-        <div class="qs-sep"></div>
         <select id="qsFieldSelect" class="qs-field-select" title="Which column the score goes into">
             <option value="">All empty cells</option>
         </select>
@@ -835,9 +824,6 @@
             <option value="46">46</option><option value="47">47</option><option value="48">48</option><option value="49">49</option><option value="50">50</option>
         </select>
         <button class="qs-btn" onclick="qsApplyCustom()" style="border-color:var(--accent-blue);color:var(--accent-blue);">Apply</button>
-        <div class="qs-sep"></div>
-        <button class="qs-btn qs-all" onclick="qsSelectAll()">All</button>
-        <button class="qs-btn qs-none" onclick="qsSelectNone()">None</button>
     </div>
 
     <div class="search-bar fade-in-up delay-2">
@@ -850,7 +836,6 @@
             <table>
                 <thead>
                     <tr>
-                        <th class="sticky-col-1" rowspan="2"><input type="checkbox" class="row-checkbox" id="masterCheck" onchange="qsToggleMaster(this.checked)" title="Select all"></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
                         <th colspan="25" style="background: #f1f5f9;">MODULES</th>
                         <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
@@ -868,7 +853,7 @@
                     </tr>
                 </thead>
                 <tbody id="recordTableBody">
-                    <tr><td colspan="41" style="text-align: center; padding: 30px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color:var(--text-muted);"></i></td></tr>
+                    <tr><td colspan="40" style="text-align: center; padding: 30px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color:var(--text-muted);"></i></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1162,7 +1147,7 @@
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="40" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
                     return;
                 }
 
@@ -1176,12 +1161,11 @@
                 restoreDraft();
                 attachAdvanceListeners();
                 updateGradePreview();
-                qsUpdateCount();
                 _qsPopulateFieldSelect();
 
             } catch (error) {
                 console.error("Error loading records:", error);
-                tbody.innerHTML = `<tr><td colspan="41" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="40" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
             }
         }
 
@@ -1221,7 +1205,6 @@
 
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
-                <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsUpdateCount()"></td>
                 <td class="td-sticky-2 search-target">
                     <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
                         ${student.full_name}
@@ -1654,12 +1637,6 @@
         }
 
         // ── Quick-score presets ──────────────────────────────────────────
-        function qsUpdateCount() {
-            const checked = document.querySelectorAll('.row-checkbox:checked').length;
-            const el = document.getElementById('qsCount');
-            if (el) el.textContent = checked ? checked + ' selected' : 'Select students';
-        }
-
         // Fill the "which column" dropdown once, using the same M1../A1../Other
         // grouping and labels as the AI-scan field picker (openFieldPicker),
         // so a facilitator sees the same names in both places.
@@ -1688,54 +1665,42 @@
             sel.dataset.populated = '1';
         }
 
-        function qsToggleMaster(checked) {
-            document.querySelectorAll('.row-checkbox').forEach(cb => {
-                cb.checked = checked;
-                cb.closest('.student-data-row')?.classList.toggle('selected', checked);
-            });
-            qsUpdateCount();
-        }
-
-        function qsSelectAll() {
-            document.getElementById('masterCheck').checked = true;
-            qsToggleMaster(true);
-        }
-
-        function qsSelectNone() {
-            document.getElementById('masterCheck').checked = false;
-            qsToggleMaster(false);
-        }
-
         function qsApply(score) {
             haptic();
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            if (!checked.length) {
-                showAlert('No students selected', 'Check the box beside each student or tap "All" to select everyone.', '#f59e0b');
-                return;
-            }
-            // Empty = old "fill everything empty" behaviour; a specific field
-            // (e.g. M3) targets ONLY that column, so the facilitator chooses
-            // exactly where a score like 10 goes instead of it landing in
-            // every blank cell.
+            const rows = document.querySelectorAll('.student-data-row');
+            if (!rows.length) return;
+            // Applying is column-driven, not row-driven: pick a column (e.g.
+            // M3) and it fills EVERY student's empty cell in that column —
+            // no need to pick which students first. Empty selection = the
+            // old "fill everything empty" behaviour across all columns.
+            // Cells that already have a value (a manual exception, or an
+            // already-submitted score) are always skipped, so a student who
+            // needs a different score just gets typed in first/after.
             const targetField = document.getElementById('qsFieldSelect')?.value || '';
             let count = 0;
-            checked.forEach(cb => {
-                const row = cb.closest('.student-data-row');
-                if (!row) return;
+            let studentsAffected = 0;
+            rows.forEach(row => {
                 const inputs = targetField
                     ? row.querySelectorAll(`.score-input[data-field="${targetField}"]`)
                     : row.querySelectorAll('.score-input');
+                let touchedThisRow = false;
                 inputs.forEach(inp => {
                     if (!inp.disabled && !inp.value.trim()) {
                         inp.value = score;
                         count++;
+                        touchedThisRow = true;
                     }
                 });
+                if (touchedThisRow) studentsAffected++;
             });
             scheduleDraftSave();
             updateGradePreview();
             const where = targetField ? REC_FIELD_LABEL(targetField) : 'all empty cells';
-            showUpdateToast('Applied ' + score + ' to ' + where + ' for ' + checked.length + ' student(s) (' + count + ' cells)');
+            if (!count) {
+                showUpdateToast('No empty cells to fill in ' + where + ' — already scored.');
+                return;
+            }
+            showUpdateToast('Applied ' + score + ' to ' + where + ' for ' + studentsAffected + ' student(s) (' + count + ' cells)');
         }
 
         function qsApplyCustom() {
@@ -1751,15 +1716,6 @@
         function qsApplyCustomSelect() {
             qsApplyCustom();
         }
-
-        // Add checkbox change listener for row highlighting
-        document.addEventListener('change', function(e) {
-            if (e.target.classList.contains('row-checkbox')) {
-                const row = e.target.closest('.student-data-row');
-                if (row) row.classList.toggle('selected', e.target.checked);
-            }
-        });
-
 
         const REC_FIELDS = (function () {
             const arr = [];
