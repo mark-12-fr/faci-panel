@@ -565,21 +565,6 @@
             </div>`;
         }
 
-        function attachButtonListeners() {
-            document.querySelectorAll('.student-card').forEach(card => {
-                const buttons = card.querySelectorAll('.opt-btn');
-                buttons.forEach(btn => {
-                    if (!btn.disabled) {
-                        btn.addEventListener('click', () => {
-                            buttons.forEach(b => b.classList.remove('active'));
-                            btn.classList.add('active');
-                            updateStats();
-                        });
-                    }
-                });
-            });
-        }
-
         function updateStats() {
             let present = 0, absent = 0, late = 0;
             document.querySelectorAll('.student-card').forEach(card => {
@@ -667,8 +652,6 @@
             highlightRollTarget();
         }
 
-        // Override attachButtonListeners to add auto-advance + haptic
-        const _origAttach = attachButtonListeners;
         function attachButtonListeners() {
             document.querySelectorAll('.student-card').forEach(card => {
                 const buttons = card.querySelectorAll('.opt-btn');
