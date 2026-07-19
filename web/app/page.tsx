@@ -536,6 +536,23 @@ export default function DashboardPage() {
   const statNum = (v: number | string) =>
     ready ? v : <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1rem" }} />;
 
+  // One local reminder per day if attendance isn't done yet and the faci has
+  // already granted notification permission (no nagging, no backend scheduler).
+  useEffect(() => {
+    if (noSection || totalStudents === 0 || attendanceToday.length > 0) return;
+    try {
+      const today = new Date().toDateString();
+      if (localStorage.getItem("faci_att_reminded") === today) return;
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        localStorage.setItem("faci_att_reminded", today);
+        new Notification("AcadTrack — Attendance reminder", {
+          body: "You haven't taken today's attendance yet. Tap to mark it now.",
+          icon: "/logo-192.png",
+        });
+      }
+    } catch {}
+  }, [noSection, totalStudents, attendanceToday]);
+
   return (
     <div className="dashboard-page">
       <div className="dashboard-header fade-in-up">
@@ -556,6 +573,27 @@ export default function DashboardPage() {
           <img src={avatar} alt="Profile Picture" />
         </div>
       </div>
+
+      {!noSection && totalStudents > 0 && attendanceToday.length === 0 && (
+        <div
+          className="fade-in-up"
+          style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", margin: "0 0 14px", borderRadius: 14, background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))", border: "1px solid rgba(245,158,11,0.32)" }}
+        >
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(245,158,11,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <i className="fa-regular fa-bell" style={{ color: "#d97706", fontSize: "1.1rem" }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--text-main)" }}>Attendance not taken yet</div>
+            <div style={{ fontSize: "0.76rem", color: "var(--text-sub)" }}>Mark today&apos;s attendance for your section.</div>
+          </div>
+          <button
+            onClick={() => (window.location.href = "/attendance")}
+            style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 10, padding: "9px 15px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Take Now
+          </button>
+        </div>
+      )}
 
       <div className="stats-grid">
         <div className="stat-card blue fade-in-up delay-1" onClick={() => openDrawer("students")}>
