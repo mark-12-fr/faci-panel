@@ -234,6 +234,32 @@
         .drawer-input-group input:focus { border-color: var(--accent-blue); background: #eff6ff; }
         .drawer-input-group input:disabled { background-color: #f1f5f9; color: #cbd5e1; cursor: not-allowed; border: 1px solid #e2e8f0; }
 
+        /* ── Grade breakdown (top of the drawer): computed grade per quarter ── */
+        .gb-wrap { margin-bottom: 6px; }
+        .gb-sem-title {
+            font-size: 0.75rem; font-weight: 800; color: var(--text-sub);
+            text-transform: uppercase; margin: 14px 0 10px;
+        }
+        .gb-sem-title:first-child { margin-top: 0; }
+        .gb-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .gb-card {
+            background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .gb-card.gb-empty { opacity: 0.6; }
+        .gb-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .gb-head span { font-size: 0.78rem; font-weight: 700; color: var(--text-sub); }
+        .gb-delta { font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+        .gb-delta.gb-up { color: #16a34a; background: rgba(34,197,94,0.14); }
+        .gb-delta.gb-down { color: #dc2626; background: rgba(239,68,68,0.14); }
+        .gb-final { font-size: 1.5rem; font-weight: 800; line-height: 1; margin-bottom: 8px; font-family: 'Inter', sans-serif; }
+        .gb-final.gb-pass { color: #16a34a; }
+        .gb-final.gb-fail { color: #dc2626; }
+        .gb-final.gb-final-empty { color: var(--text-sub); font-size: 0.9rem; font-weight: 600; }
+        .gb-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: var(--text-sub); padding: 2px 0; }
+        .gb-row b { color: var(--text-main); font-weight: 700; }
+        @media (max-width: 380px) { .gb-grid { grid-template-columns: 1fr; } }
+
         .drawer-footer { padding: 15px 20px 25px; border-top: 1px solid #e2e8f0; background: white; }
         .apply-drawer-btn {
             width: 100%; padding: 16px; background: var(--text-main); color: white;
@@ -1015,7 +1041,12 @@
 
         let currentSectionId = null;
         let alertCallback = null;
-        let currentRowIdForDrawer = null; 
+        let currentRowIdForDrawer = null;
+        // Every quarter's raw records for the whole section, cached from the
+        // last loadClassRecordData() so the drawer can show a per-quarter
+        // grade breakdown for whichever student is tapped — the table itself
+        // only ever displays ONE (carried-forward) row per student.
+        let _allRecordsCache = [];
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
             document.getElementById('customAlertTitle').textContent = title;
@@ -1114,6 +1145,7 @@
                     .from('class_records')
                     .select('*')
                     .eq('section_id', currentSectionId);
+                _allRecordsCache = existingRecords || [];
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
@@ -1214,6 +1246,86 @@
             return tr;
         }
 
+        /* ═══════════════════════════════════════════════════════════════
+           GRADE BREAKDOWN (per quarter, shown at the top of the drawer)
+           ═══════════════════════════════════════════════════════════════
+           Same weighting convention as the teacher panel (ww 30% / pt 50% /
+           qe 20%), computed per quarter from _allRecordsCache — never the
+           "live preview" bar's simplified average, so a facilitator sees the
+           SAME number the teacher will eventually see for that quarter. */
+        const GRADE_QUARTERS = [
+            { db: '1', sem: '1st Sem', label: 'Q1' },
+            { db: '2', sem: '1st Sem', label: 'Q2' },
+            { db: '3', sem: '2nd Sem', label: 'Q1' },
+            { db: '4', sem: '2nd Sem', label: 'Q2' },
+        ];
+        const exactQ = (q) => (q === null || q === undefined || q === '') ? null : (String(q).replace(/[^1-4]/g, '') || null);
+        const isFilled = (v) => v !== null && v !== undefined && v !== '';
+
+        function componentScores(rec) {
+            let ww = 0, pt = 0;
+            const qe = Number(rec.qe) || 0;
+            for (const k in rec) {
+                const v = rec[k];
+                if (!isFilled(v)) continue;
+                if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0 || k === 'at') ww += Number(v) || 0;
+                else if (k.indexOf('pt_') === 0) pt += Number(v) || 0;
+            }
+            return {
+                ww: Math.min(ww, 100),
+                pt: Math.min(pt, 100),
+                qe: Math.min((qe / 50) * 100, 100),
+            };
+        }
+
+        function finalGrade(comp) {
+            return Math.round(comp.ww * 0.3 + comp.pt * 0.5 + comp.qe * 0.2);
+        }
+
+        function quarterBreakdown(studentId) {
+            const cards = GRADE_QUARTERS.map(dq => {
+                const rec =
+                    _allRecordsCache.find(r => r.student_id === studentId && exactQ(r.quarter) === dq.db) ||
+                    (dq.db === '1' ? _allRecordsCache.find(r => r.student_id === studentId && exactQ(r.quarter) === null) : undefined);
+                const scoreFields = Object.keys(rec || {}).filter(k => k.indexOf('module_') === 0 || k.indexOf('activity_') === 0 || k === 'at' || k.indexOf('pt_') === 0 || k === 'qe');
+                const hasData = !!rec && scoreFields.some(f => isFilled(rec[f]));
+                if (!hasData) return { ...dq, hasData: false, grade: null, comp: null, delta: null };
+                const comp = componentScores(rec);
+                return { ...dq, hasData: true, grade: finalGrade(comp), comp, delta: null };
+            });
+            let prevGrade = null;
+            cards.forEach(c => {
+                if (!c.hasData) return;
+                if (prevGrade !== null) c.delta = c.grade - prevGrade;
+                prevGrade = c.grade;
+            });
+            return cards;
+        }
+
+        function renderGradeBreakdown(studentId) {
+            const cards = quarterBreakdown(studentId);
+            const passMark = 75;
+            const semBlock = (sem) => {
+                const semCards = cards.filter(c => c.sem === sem).map(c => {
+                    if (!c.hasData) {
+                        return `<div class="gb-card gb-empty"><div class="gb-head"><span>${c.label}</span></div><div class="gb-final gb-final-empty">No data yet</div></div>`;
+                    }
+                    const deltaHtml = c.delta === null ? '' :
+                        `<span class="gb-delta ${c.delta >= 0 ? 'gb-up' : 'gb-down'}">${c.delta >= 0 ? '▲' : '▼'} ${Math.abs(c.delta)}</span>`;
+                    return `
+                        <div class="gb-card">
+                            <div class="gb-head"><span>${c.label}</span>${deltaHtml}</div>
+                            <div class="gb-final ${c.grade >= passMark ? 'gb-pass' : 'gb-fail'}">${c.grade}</div>
+                            <div class="gb-row"><span>Written Works</span><b>${Math.round(c.comp.ww)}</b></div>
+                            <div class="gb-row"><span>Perf. Task</span><b>${Math.round(c.comp.pt)}</b></div>
+                            <div class="gb-row"><span>Quarterly Exam</span><b>${Math.round(c.comp.qe)}</b></div>
+                        </div>`;
+                }).join('');
+                return `<div class="gb-sem-title">${sem}</div><div class="gb-grid">${semCards}</div>`;
+            };
+            return `<div class="gb-wrap">${semBlock('1st Sem')}${semBlock('2nd Sem')}</div>`;
+        }
+
         function openDrawer(studentId, studentName) {
             currentRowIdForDrawer = studentId;
             document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
@@ -1246,7 +1358,8 @@
                 return html;
             }
 
-            let finalHtml = createGrid(modules, 'Modules');
+            let finalHtml = renderGradeBreakdown(studentId);
+            finalHtml += createGrid(modules, 'Modules');
             finalHtml += createGrid(activities, 'Activities');
             finalHtml += createGrid(others, 'Assessments');
 
