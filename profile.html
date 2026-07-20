@@ -177,6 +177,15 @@
         .logout-btn:hover { background: #fca5a5; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2); }
         .logout-btn:active { transform: scale(0.98); }
 
+        .reset-btn {
+            width: 100%; padding: 16px; background: #fef3c7; color: #d97706; border: none;
+            border-radius: 12px; font-size: 1rem; font-weight: bold; margin-top: 10px;
+            cursor: pointer; transition: all 0.2s ease; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .reset-btn:hover { background: #fde68a; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(217, 119, 6, 0.2); }
+        .reset-btn:active { transform: scale(0.98); }
+
         /* --- Fixed Bottom Nav --- */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-align: center; text-decoration: none; color: var(--text-sub); font-size: 0.7rem; transition: color 0.2s ease, transform 0.2s ease; }
@@ -239,6 +248,10 @@
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading partners...
             </div>
         </div>
+
+        <button class="reset-btn fade-in-up delay-3" onclick="resetLocalData()">
+            <i class="fa-solid fa-rotate"></i> Reset Local Data
+        </button>
 
         <button class="logout-btn fade-in-up delay-3" onclick="faciLogout()">
             <i class="fa-solid fa-arrow-right-from-bracket"></i> Log out
@@ -461,6 +474,14 @@
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+
+        // 🌟 RESET LOCAL DATA FUNCTION 🌟
+        function resetLocalData() {
+            if(confirm("Clear all local data and refresh the page?")) {
+                localStorage.clear();
+                window.location.reload();
+            }
         }
 
         // 🌟 SAFE LOGOUT FUNCTION 🌟
