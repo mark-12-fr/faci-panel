@@ -858,20 +858,19 @@
             // what makes the ranking here match the teacher panel's ranking.
             const recs = cachedRecords.filter(r => r.student_id === student.id)
                 .sort((a, b) => Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0));
-            if (!recs.length) return { grade: 0, ww: 0, pt: 0, qe: 0 };
+            if (!recs.length) return { grade: 0, ww: 0, pt: 0, qe: 0, total: 0 };
             const merged = recs.reduce((acc, curr) => {
                 Object.keys(curr).forEach(k => {
                     if (curr[k] !== null && curr[k] !== undefined && curr[k] !== "") acc[k] = curr[k];
                 });
                 return acc;
             }, {});
-            // Dynamic per-subject weights (shared with the teacher panel via
-            // grading.js). Attendance only counts when this subject weights it (>0).
             const sc = window.MJR_componentScores(merged);
             const attScore = (window.FACI_ATT_RATE && window.FACI_ATT_RATE[student.id] != null)
                 ? window.FACI_ATT_RATE[student.id] : 100;
             const grade = window.MJR_finalGrade(merged, window.FACI_SUBJECT, attScore);
-            return { grade: grade, ww: sc.rawWW, pt: sc.rawPT, qe: sc.rawQE };
+            const total = sc.rawWW + sc.rawPT + sc.rawQE;
+            return { grade: grade, ww: sc.rawWW, pt: sc.rawPT, qe: sc.rawQE, total };
         }
 
         function renderPerformance() {
@@ -889,31 +888,19 @@
             }
 
             const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }));
-            const total = scored.reduce((a, b) => a + b.grade, 0);
-            const avg = Math.round(total / scored.length);
-            const _pass = window.MJR_passingFor(window.FACI_SUBJECT);
-            const passing = scored.filter(s => s.grade >= _pass).length;
-            const passingPct = Math.round((passing / scored.length) * 100);
-            const highest = scored.reduce((m, s) => s.grade > m ? s.grade : m, 0);
-            // Lowest is meaningful only among students who actually have a
-            // grade (>0); a student with no records shouldn't drag Lowest
-            // to 0 and mislead the facilitator. Fall back to 0 when
-            // nobody has a real grade yet.
-            const graded = scored.filter(s => s.grade > 0);
+            const highest = scored.reduce((m, s) => s.total > m ? s.total : m, 0);
+            const graded = scored.filter(s => s.total > 0);
             const lowest = graded.length
-                ? graded.reduce((m, s) => s.grade < m ? s.grade : m, Infinity)
+                ? graded.reduce((m, s) => s.total < m ? s.total : m, Infinity)
                 : 0;
 
-            setStat('perfAverage', avg);
-            setStat('perfPassing', passingPct + '%');
             setStat('perfHighest', highest);
             setStat('perfLowest', lowest);
 
             const ranked = [...scored].sort((a, b) =>
-                (b.grade - a.grade)
-                || ((b.ww + b.pt + b.qe) - (a.ww + a.pt + a.qe))
+                (b.total - a.total)
                 || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
-            if (!ranked.length || ranked.every(t => t.grade === 0)) {
+            if (!ranked.length || ranked.every(t => t.total === 0)) {
                 list.innerHTML = '<div class="perf-empty">Scores will appear once they\'re entered.</div>';
                 return;
             }
@@ -923,7 +910,7 @@
                     <div class="perf-row">
                         <div class="perf-rank ${cls}">${i + 1}</div>
                         <div class="perf-name">${escapeHtml(t.student.full_name || 'Unknown')}</div>
-                        <div class="perf-grade">${t.grade}</div>
+                        <div class="perf-grade">${t.total}</div>
                     </div>`;
             }).join('');
         }
@@ -1079,10 +1066,9 @@
                 title = 'Top Students';
                 const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }))
                                               .sort((a, b) =>
-                                                  (b.grade - a.grade)
-                                                  || ((b.ww + b.pt + b.qe) - (a.ww + a.pt + a.qe))
+                                                  (b.total - a.total)
                                                   || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
-                if (!scored.length || scored.every(s => s.grade === 0)) {
+                if (!scored.length || scored.every(s => s.total === 0)) {
                     html = '<div class="drawer-empty">Top performers will appear once scores are entered.</div>';
                 } else {
                     html = scored.map((r, i) => `
@@ -1090,9 +1076,9 @@
                             <div class="avatar">#${i + 1}</div>
                             <div class="info">
                                 <div class="name">${escapeHtml(r.student.full_name)}</div>
-                                <div class="sub">WW ${r.ww} · PT ${r.pt} · QE ${r.qe}</div>
+                                <div class="sub">Total ${r.total}</div>
                             </div>
-                            <span class="badge badge-score">${r.grade}</span>
+                            <span class="badge badge-score">${r.total}</span>
                         </div>`).join('');
                 }
             } else if (type === 'missing') {
