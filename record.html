@@ -267,17 +267,6 @@
         }
         .apply-drawer-btn:active { transform: scale(0.98); }
 
-        /* Grade preview row */
-        .grade-preview-bar {
-            display: flex; gap: 12px; padding: 10px 12px; background: #f0fdf4;
-            border: 1px solid #bbf7d0; border-radius: 10px; margin-bottom: 12px;
-            flex-wrap: wrap; align-items: center;
-        }
-        .grade-preview-bar .gp-item { font-size: 0.82rem; font-weight: 700; color: #166534; }
-        .grade-preview-bar .gp-item span { color: var(--text-sub); font-weight: 400; }
-        .gp-high { color: #15803d; font-weight: 800; }
-        .gp-low { color: #b91c1c; font-weight: 800; }
-
         /* Draft autosave indicator */
         .draft-indicator {
             position: fixed; bottom: 80px; right: 16px; z-index: 999;
@@ -447,8 +436,6 @@
             </table>
         </div>
     </div>
-
-    <div id="gradePreviewBar" class="grade-preview-bar fade-in-up delay-4" style="display:none;"></div>
 
     <button class="submit-btn fade-in-up delay-4" id="submitBtn">
         <i class="fa-solid fa-paper-plane"></i> Submit New Scores
@@ -676,7 +663,6 @@
 
                 restoreDraft();
                 attachAdvanceListeners();
-                updateGradePreview();
                 _qsPopulateFieldSelect();
                 qsSyncChecks();
 
@@ -1083,46 +1069,6 @@
             _draftTimer = setTimeout(() => { saveDraft(); showDraftSaved(); }, 800);
         }
 
-        // ── Live grade preview ───────────────────────────────────────────
-        function updateGradePreview() {
-            const bar = document.getElementById('gradePreviewBar');
-            if (!bar) return;
-            const rows = document.querySelectorAll('.student-data-row');
-            if (rows.length === 0) { bar.style.display = 'none'; return; }
-            let totalGrade = 0, count = 0;
-            let maxGrade = 0, minGrade = 100;
-            rows.forEach(row => {
-                let mSum = 0, mCount = 0, aSum = 0, aCount = 0;
-                let at = 0, pt1 = 0, pt2 = 0, qe = 0;
-                row.querySelectorAll('.score-input').forEach(inp => {
-                    const v = parseFloat(inp.value) || 0;
-                    const f = inp.dataset.field;
-                    if (f === 'at') at = v;
-                    else if (f === 'pt_1') pt1 = v;
-                    else if (f === 'pt_2') pt2 = v;
-                    else if (f === 'qe') qe = v;
-                    else if (f.startsWith('module_')) { mSum += v; mCount++; }
-                    else if (f.startsWith('activity_')) { aSum += v; aCount++; }
-                });
-                if (mCount === 0 && aCount === 0 && !at && !pt1 && !pt2 && !qe) return;
-                const ww = mCount > 0 ? (mSum / mCount) : (aCount > 0 ? (aSum / aCount) : 0);
-                const pt = (pt1 + pt2) / 2 || 0;
-                const grade = ww * 0.3 + pt * 0.5 + qe * 0.2;
-                totalGrade += grade;
-                count++;
-                if (grade > maxGrade) maxGrade = grade;
-                if (grade < minGrade) minGrade = grade;
-            });
-            if (count === 0) { bar.style.display = 'none'; return; }
-            const avg = totalGrade / count;
-            bar.style.display = 'flex';
-            bar.innerHTML =
-                '<span class="gp-item">Average: <b class="' + (avg >= 75 ? 'gp-high' : 'gp-low') + '">' + avg.toFixed(1) + '%</b></span>' +
-                '<span class="gp-item">Highest: <b class="gp-high">' + maxGrade.toFixed(1) + '%</b></span>' +
-                '<span class="gp-item">Lowest: <b class="gp-low">' + minGrade.toFixed(1) + '%</b></span>' +
-                '<span class="gp-item">Passing: <b>' + Math.round(count * avg >= 75 ? 1 : 0 / 1) + '/' + count + '</b></span>';
-        }
-
         // ── Auto-advance score entry ─────────────────────────────────────
         function attachAdvanceListeners() {
             document.querySelectorAll('.score-input').forEach(inp => {
@@ -1151,7 +1097,6 @@
 
         function _onScoreInput(e) {
             scheduleDraftSave();
-            updateGradePreview();
             // Keep a row's tickbox honest if the facilitator types straight
             // into a cell of the currently-picked column.
             const inp = e && e.target;
@@ -1231,7 +1176,6 @@
                 row.classList.remove('selected');
             }
             scheduleDraftSave();
-            updateGradePreview();
         }
 
         // Make every row's tickbox mirror the picked column: ticked = the
