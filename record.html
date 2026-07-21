@@ -801,13 +801,13 @@
 
     <!-- Quick-score bar: pick a column + a score, then tick the students who got that score -->
     <div class="qs-bar fade-in-up delay-2">
-        <span class="qs-help"><b>Paghatag score:</b> (1) pili column&nbsp;→ (2) pili score&nbsp;→ (3) i-check ang mga estudyante nga may amo sina nga score</span>
+        <span class="qs-help"><b>Add a score:</b> (1) pick a column&nbsp;→ (2) pick a score&nbsp;→ (3) tick the students who got that score</span>
         <div class="qs-controls">
-            <select id="qsFieldSelect" class="qs-field-select" title="Diin nga column ibutang ang score" onchange="qsSyncChecks()">
-                <option value="">Pili column…</option>
+            <select id="qsFieldSelect" class="qs-field-select" title="Which column the score goes into" onchange="qsSyncChecks()">
+                <option value="">Pick column…</option>
             </select>
-            <select id="qsScoreSelect" class="qs-score-select" title="Ano nga score ang ibutang" onchange="qsSyncChecks()">
-                <option value="">Pili score…</option>
+            <select id="qsScoreSelect" class="qs-score-select" title="What score to give" onchange="qsSyncChecks()">
+                <option value="">Pick score…</option>
                 <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
                 <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
                 <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
@@ -832,7 +832,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th class="sticky-col-1" rowspan="2" title="I-check kon may score ang estudyante sa napili nga column"><i class="fa-solid fa-square-check" style="color:var(--text-muted);"></i></th>
+                        <th class="sticky-col-1" rowspan="2" title="Tick the students who got the score in the selected column"><i class="fa-solid fa-square-check" style="color:var(--text-muted);"></i></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
                         <th colspan="25" style="background: #f1f5f9;">MODULES</th>
                         <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
@@ -1203,7 +1203,7 @@
 
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
-                <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsStampStudent(this)" disabled title="Pili anay column sa taas"></td>
+                <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsStampStudent(this)" disabled title="Pick a column first"></td>
                 <td class="td-sticky-2 search-target">
                     <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
                         ${student.full_name}
@@ -1688,7 +1688,7 @@
             if (!row) return;
             if (!col) {
                 cb.checked = false;
-                showAlert('Pili anay column', 'Pilia anay sa taas kon diin nga column (halimbawa Module 5) ibutang ang score.', '#f59e0b');
+                showAlert('Pick a column first', 'Choose which column (e.g. Module 5) the score goes into, using the dropdown above.', '#f59e0b');
                 return;
             }
             const input = row.querySelector(`.score-input[data-field="${col}"]`);
@@ -1701,7 +1701,7 @@
             if (cb.checked) {
                 if (!score) {
                     cb.checked = false;
-                    showAlert('Pili anay score', 'Pilia anay sa taas ang score (halimbawa 10) antes mag-check.', '#f59e0b');
+                    showAlert('Pick a score first', 'Choose the score (e.g. 10) in the dropdown above before ticking a student.', '#f59e0b');
                     return;
                 }
                 haptic();
@@ -1729,7 +1729,7 @@
                 if (!col) {
                     cb.checked = false;
                     cb.disabled = true;
-                    cb.title = 'Pili anay column sa taas';
+                    cb.title = 'Pick a column first';
                     row.classList.remove('selected');
                     return;
                 }
@@ -1740,8 +1740,8 @@
                 cb.checked = hasVal;
                 cb.disabled = input.disabled;
                 cb.title = input.disabled
-                    ? 'Na-submit na ukon halin sa una nga quarter — ang teacher lang ang makabag-o'
-                    : 'I-check kon may ' + (score || 'score') + ' ini nga estudyante sa ' + REC_FIELD_LABEL(col);
+                    ? 'Already submitted, or carried over from a previous quarter — only the Teacher can change it.'
+                    : 'Tick if this student got ' + (score || 'the score') + ' in ' + REC_FIELD_LABEL(col);
                 row.classList.toggle('selected', hasVal && !input.disabled);
             });
         }
