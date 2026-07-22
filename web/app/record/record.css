@@ -137,16 +137,21 @@
         .nav-item:hover i { transform: translateY(-2px); }
         .nav-item:active i { background: rgba(59, 130, 246, 0.28); transform: scale(0.9); }
 
-        /* --- TOASTS --- */
+        /* ── Professional Toast Notification ── */
 .toast-notification {
-            visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
-            text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
-            right: 20px; top: 20px; font-size: 0.85rem; font-weight: bold;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-20px);
-            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            visibility: hidden; min-width: 300px; max-width: 420px;
+            background: #fff; color: #111827;
+            border-radius: 10px; padding: 14px 18px;
+            position: fixed; z-index: 10000;
+            right: 24px; top: 24px; font-size: 0.85rem; font-weight: 500;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+            opacity: 0; transform: translateY(-8px) scale(0.98);
+            transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1), visibility 0.25s;
             display: flex; align-items: center; gap: 12px;
+            border-left: 4px solid var(--accent-blue);
         }
-        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
+        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0) scale(1); }
+        .toast-notification i { color: var(--accent-blue); font-size: 1.1rem; }
 
         /* --- ✨ DRAWER STYLES --- */
         .clickable-name { 

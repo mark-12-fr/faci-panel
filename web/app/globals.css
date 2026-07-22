@@ -48,22 +48,19 @@ body {
   }
 }
 
-/* ── Shared custom alert popup (used across every page) ───────────────────── */
+/* ── Professional custom alert popup (used across every page) ──────────────── */
 .custom-alert-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(5px);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 200000;
   opacity: 0;
   pointer-events: none;
-  transition: 0.3s ease;
+  transition: opacity 0.25s ease;
 }
 .custom-alert-overlay.show {
   opacity: 1;
@@ -71,49 +68,64 @@ body {
 }
 .custom-alert-box {
   background: #ffffff;
-  padding: 25px 20px;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  width: 90%;
-  max-width: 340px;
+  padding: 0;
+  border-radius: 14px;
+  box-shadow: 0 25px 60px -12px rgba(0,0,0,0.3);
+  width: 88%;
+  max-width: 360px;
   text-align: center;
-  transform: translateY(-20px);
-  transition: 0.3s ease;
-  border: 1px solid #e5e7eb;
+  transform: translateY(-12px) scale(0.97);
+  transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+  overflow: hidden;
 }
 .custom-alert-overlay.show .custom-alert-box {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+.custom-alert-topbar {
+  height: 4px;
+  width: 100%;
+  background: #3b82f6;
+}
+.custom-alert-body {
+  padding: 28px 24px 20px;
 }
 .custom-alert-icon {
-  font-size: 3rem;
-  margin-bottom: 15px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+  background: rgba(59,130,246,0.1);
 }
 .custom-alert-title {
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: #111827;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .custom-alert-msg {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #6b7280;
-  margin-bottom: 25px;
-  line-height: 1.5;
+  margin-bottom: 24px;
+  line-height: 1.6;
   white-space: pre-line;
 }
 .custom-alert-btn {
-  background: #3b82f6;
+  background: #111827;
   color: white;
   border: none;
-  padding: 12px 20px;
+  padding: 11px 20px;
   border-radius: 10px;
-  font-weight: bold;
+  font-weight: 600;
   width: 100%;
   cursor: pointer;
-  transition: 0.2s;
+  transition: background 0.2s;
   font-size: 0.9rem;
   font-family: "Inter", sans-serif;
 }
 .custom-alert-btn:hover {
-  background: #2563eb;
+  background: #1e293b;
 }

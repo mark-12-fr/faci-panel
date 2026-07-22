@@ -147,38 +147,69 @@
         .nav-item:hover i { transform: translateY(-2px); }
         .nav-item:active i { background: rgba(59, 130, 246, 0.28); transform: scale(0.9); }
 
-        /* CUSTOM ALERTS */
+        /* ── Professional Alert Modal ── */
         .custom-alert-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
+            position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
             display: flex; justify-content: center; align-items: center;
-            z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+            z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
         }
         .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
         .custom-alert-box {
-            background: var(--panel-bg); padding: 25px 20px; border-radius: 16px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
-            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid #e2e8f0;
+            background: #fff; padding: 0; border-radius: 14px;
+            box-shadow: 0 25px 60px -12px rgba(0,0,0,0.3);
+            width: 88%; max-width: 360px; text-align: center;
+            transform: translateY(-12px) scale(0.97);
+            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+            overflow: hidden;
         }
-        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
-        .custom-alert-icon { font-size: 3rem; color: var(--accent-blue); margin-bottom: 15px; }
-        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
-        .custom-alert-msg { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 25px; line-height: 1.5; white-space: pre-line; word-break: break-word; }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0) scale(1); }
+        .custom-alert-topbar {
+            height: 4px; width: 100%;
+            background: var(--accent-blue);
+        }
+        .custom-alert-body {
+            padding: 28px 24px 20px;
+        }
+        .custom-alert-icon {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; margin-bottom: 16px;
+            background: rgba(59,130,246,0.1);
+        }
+        .custom-alert-title {
+            font-size: 1.1rem; font-weight: 700;
+            color: #111827; margin-bottom: 8px;
+        }
+        .custom-alert-msg {
+            font-size: 0.85rem; color: #6b7280;
+            margin-bottom: 24px; line-height: 1.6;
+            white-space: pre-line; word-break: break-word;
+        }
         .custom-alert-btn {
-            background: var(--text-main); color: white; border: none; padding: 12px 20px;
-            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+            background: #111827; color: #fff; border: none;
+            padding: 11px 20px; border-radius: 10px;
+            font-weight: 600; width: 100%; cursor: pointer;
+            transition: background 0.2s; font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
         }
-        .custom-alert-btn:hover { background: #334155; }
+        .custom-alert-btn:hover { background: #1e293b; }
 
+        /* ── Professional Toast Notification ── */
         .toast-notification {
-            visibility: hidden; min-width: 280px; background-color: var(--accent-blue); color: #fff;
-            text-align: left; border-radius: 8px; padding: 14px 20px; position: fixed; z-index: 10000;
-            right: 20px; top: 20px; font-size: 0.85rem; font-weight: bold;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-20px);
-            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            visibility: hidden; min-width: 300px; max-width: 420px;
+            background: #fff; color: #111827;
+            border-radius: 10px; padding: 14px 18px;
+            position: fixed; z-index: 10000;
+            right: 24px; top: 24px; font-size: 0.85rem; font-weight: 500;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+            opacity: 0; transform: translateY(-8px) scale(0.98);
+            transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1), visibility 0.25s;
             display: flex; align-items: center; gap: 12px;
+            border-left: 4px solid var(--accent-blue);
         }
-        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0); }
+        .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0) scale(1); }
+        .toast-notification i { color: var(--accent-blue); font-size: 1.1rem; }
     </style>
 </head>
 <body>
@@ -249,10 +280,13 @@
 
     <div id="customAlertOverlay" class="custom-alert-overlay">
         <div class="custom-alert-box">
-            <i class="fa-solid fa-circle-exclamation custom-alert-icon"></i>
-            <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
-            <p id="customAlertMessage" class="custom-alert-msg"></p>
-            <button onclick="closeAlert()" class="custom-alert-btn">Understood</button>
+            <div class="custom-alert-topbar"></div>
+            <div class="custom-alert-body">
+                <div class="custom-alert-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                <h3 class="custom-alert-title" id="customAlertTitle">Notice</h3>
+                <p id="customAlertMessage" class="custom-alert-msg"></p>
+                <button onclick="closeAlert()" class="custom-alert-btn">Understood</button>
+            </div>
         </div>
     </div>
 
@@ -327,7 +361,11 @@
         function showAlert(title, message, iconColor = 'var(--accent-blue)') {
             document.getElementById('customAlertTitle').textContent = title;
             document.getElementById('customAlertMessage').textContent = message;
-            document.querySelector('.custom-alert-icon').style.color = iconColor;
+            const icon = document.querySelector('.custom-alert-icon');
+            icon.style.color = iconColor;
+            icon.style.background = 'color-mix(in srgb, ' + iconColor + ', transparent 85%)';
+            const tb = document.querySelector('.custom-alert-topbar');
+            if (tb) tb.style.background = iconColor;
             document.getElementById('customAlertOverlay').classList.add('show');
         }
 

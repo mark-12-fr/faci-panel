@@ -1,6 +1,4 @@
 "use client";
-// Shared alert popup + hook. Mirrors the per-page `showAlert(...)` used across
-// the legacy pages. Signature: showAlert(title, message, color?, iconClass?).
 
 import { useCallback, useState } from "react";
 
@@ -40,12 +38,17 @@ export function useAlert() {
       }}
     >
       <div className="custom-alert-box">
-        <i className={`fa-solid ${state.icon} custom-alert-icon`} style={{ color: state.color }} />
-        <h3 className="custom-alert-title">{state.title}</h3>
-        <p className="custom-alert-msg">{state.message}</p>
-        <button onClick={closeAlert} className="custom-alert-btn">
-          Okay
-        </button>
+        <div className="custom-alert-topbar" style={{ background: state.color }} />
+        <div className="custom-alert-body">
+          <div className="custom-alert-icon" style={{ background: `${state.color}1a` }}>
+            <i className={`fa-solid ${state.icon}`} style={{ color: state.color }} />
+          </div>
+          <h3 className="custom-alert-title">{state.title}</h3>
+          <p className="custom-alert-msg">{state.message}</p>
+          <button onClick={closeAlert} className="custom-alert-btn">
+            Okay
+          </button>
+        </div>
       </div>
     </div>
   );
