@@ -269,27 +269,37 @@
 
         /* --- CUSTOM ALERT POPUP --- */
         .custom-alert-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(5px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 200000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+            position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+            display: flex; justify-content: center; align-items: center; padding: 20px;
+            z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
         }
         .custom-alert-overlay.show { opacity: 1; pointer-events: auto; }
         .custom-alert-box {
-            background: var(--card-bg); padding: 25px 20px; border-radius: 16px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); width: 90%; max-width: 340px;
-            text-align: center; transform: translateY(-20px); transition: 0.3s ease; border: 1px solid var(--border-color);
+            background: var(--panel-bg); padding: 28px 26px 22px; border-radius: 20px;
+            box-shadow: 0 24px 60px -12px rgba(2, 6, 23, 0.45), 0 0 0 1px rgba(148, 163, 184, 0.14);
+            width: 100%; max-width: 360px; text-align: center;
+            transform: translateY(12px) scale(0.96); opacity: 0;
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease;
         }
-        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0); }
-        .custom-alert-icon { font-size: 3rem; margin-bottom: 15px; }
-        .custom-alert-title { font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; }
-        .custom-alert-msg { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.5; }
+        .custom-alert-overlay.show .custom-alert-box { transform: translateY(0) scale(1); opacity: 1; }
+        .custom-alert-icon {
+            width: 66px; height: 66px; margin: 0 auto 18px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 1.8rem; border-radius: 50%; color: var(--accent-blue);
+            background: color-mix(in srgb, currentColor 15%, transparent);
+        }
+        .custom-alert-title { font-size: 1.18rem; font-weight: 800; letter-spacing: -0.01em; color: var(--text-main); margin-bottom: 8px; }
+        .custom-alert-msg { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px; line-height: 1.55; white-space: pre-line; word-break: break-word; }
+        .custom-alert-actions { display: flex; gap: 10px; }
         .custom-alert-btn {
-            background: var(--accent-blue); color: white; border: none; padding: 12px 20px;
-            border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
-            font-family: 'Inter', sans-serif;
+            background: var(--accent-blue); color: #fff; border: none; padding: 13px 20px;
+            border-radius: 12px; font-weight: 700; width: 100%; cursor: pointer; font-size: 0.92rem;
+            font-family: 'Inter', sans-serif; box-shadow: 0 10px 20px -8px rgba(59, 130, 246, 0.55);
+            transition: transform 0.15s ease, filter 0.15s ease;
         }
-        .custom-alert-btn:hover { background: var(--accent-hover); }
+        .custom-alert-btn:hover { filter: brightness(1.06); }
     </style>
 </head>
 <body>
