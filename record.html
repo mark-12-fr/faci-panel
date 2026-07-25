@@ -928,8 +928,9 @@
                 return html;
             }
 
-            let finalHtml = renderGradeBreakdown(studentId);
-            finalHtml += createGrid(modules, 'Modules');
+            // Facilitators enter scores only — the computed grade summary is
+            // intentionally hidden from them (grades live in the teacher panel).
+            let finalHtml = createGrid(modules, 'Modules');
             finalHtml += createGrid(activities, 'Activities');
             finalHtml += createGrid(others, 'Assessments');
 
