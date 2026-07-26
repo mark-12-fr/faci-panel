@@ -61,7 +61,7 @@
  *      (instant load); they aren't navigations, so the restriction can't bite.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v7';
+var CACHE_NAME = 'acadtrack-faci-shell-v8';
 
 // Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
 // a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
@@ -105,8 +105,20 @@ var VENDOR_URLS = [
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
     'https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js',
     'https://unpkg.com/@supabase/supabase-js@2',
-    'https://unpkg.com/lucide@latest'
+    'https://unpkg.com/lucide@latest',
+    // Font Awesome powers the bottom-nav + button icons. Precache the stylesheet
+    // and its solid/regular webfonts; the FONT_AWESOME_PREFIX rule in fetch()
+    // also catches any other glyph file the CSS pulls, so icons render offline.
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-regular-400.woff2'
 ];
+
+// Font Awesome (CSS + its webfont files) all live under this cdnjs prefix.
+// Matching by prefix — not exact URL — means the stylesheet AND every glyph
+// file it requests are cached the first time they load online, so the icons
+// keep rendering with no network.
+var FONT_AWESOME_PREFIX = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/';
 
 var OFFLINE_FALLBACK_HTML =
     '<!doctype html><html><head><meta charset="utf-8">' +
@@ -189,11 +201,12 @@ self.addEventListener('fetch', function (event) {
     } catch (e) {
         return;
     }
-    var isVendor = VENDOR_URLS.indexOf(request.url) !== -1;
+    var isVendor = VENDOR_URLS.indexOf(request.url) !== -1
+        || request.url.indexOf(FONT_AWESOME_PREFIX) === 0;
 
-    // Cross-origin: only the fixed vendor allowlist is ever intercepted. Every
-    // other cross-origin call (Supabase / Render / Gemini) goes straight to
-    // the network, untouched.
+    // Cross-origin: only the fixed vendor allowlist (plus Font Awesome, matched
+    // by prefix) is ever intercepted. Every other cross-origin call (Supabase /
+    // Render / Gemini) goes straight to the network, untouched.
     if (url.origin !== self.location.origin) {
         if (!isVendor) return;
         event.respondWith(cacheFirst(request.url, { mode: 'cors', cache: 'reload' }, event));
