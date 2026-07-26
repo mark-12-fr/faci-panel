@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
+    <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="offlineSyncUtility.js" defer></script>
     
@@ -698,7 +700,7 @@
                 setLoad(35);
                 let students = [];
                 if (currentSectionId) {
-                    const { data: fetchedStudents } = await supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true });
+                    const { data: fetchedStudents } = await MJR_cachedQuery('students_' + currentSectionId, supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true }));
                     students = fetchedStudents || [];
                 }
                 document.getElementById('infoTotal').textContent = students.length;
@@ -708,10 +710,10 @@
                 // current quarter's value when present, otherwise carries
                 // over the previous quarter's value so scores never look
                 // wiped after the section's quarter changes.
-                const { data: existingRecords } = await supabaseClient
+                const { data: existingRecords } = await MJR_cachedQuery('records_' + currentSectionId, supabaseClient
                     .from('class_records')
                     .select('*')
-                    .eq('section_id', currentSectionId);
+                    .eq('section_id', currentSectionId));
                 _allRecordsCache = existingRecords || [];
                 setLoad(90);
 

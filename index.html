@@ -14,6 +14,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Offline read-cache fallback: mjr-offline.js defines the REAL caching versions and
+         overwrites these when it loads fresh. This inline copy ships with the (always-fresh)
+         HTML so the page can't break if the SW briefly serves a stale mjr-offline.js post-deploy. -->
+    <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="grading.js"></script>
 
@@ -671,11 +675,11 @@
 
             // 1. FETCH LIVE PROFILE DATA 
             try {
-                const { data: profile, error } = await supabaseClient
+                const { data: profile, error } = await MJR_cachedQuery('profile_' + faciId, supabaseClient
                     .from('facilitators')
-                    .select('*') 
+                    .select('*')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
-                    .single();
+                    .single());
 
                 if (error) throw error;
 
@@ -735,15 +739,15 @@
                 document.getElementById('faciSemesterOverview').textContent = (sectionData.semester || '1st Sem').replace(/\s*sem(ester)?\.?\s*$/i, '').trim() || '1st';
                 document.getElementById('faciQuarterOverview').textContent = sectionData.quarter || '1';
 
-                const { data: students } = await supabaseClient
-                    .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true });
+                const { data: students } = await MJR_cachedQuery('students_' + sectionData.id, supabaseClient
+                    .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true }));
                 cachedStudents = students || [];
                 const totalStudents = cachedStudents.length;
 
                 document.getElementById('dashTotalStudents').textContent = totalStudents;
                 document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
 
-                const { data: recordsData } = await supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id);
+                const { data: recordsData } = await MJR_cachedQuery('records_' + sectionData.id, supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id));
                 cachedRecords = recordsData || [];
 
                 // Dynamic grading: load THIS subject's weights (set by the teacher
@@ -754,8 +758,8 @@
                 const _fw = window.MJR_weightsFor(window.FACI_SUBJECT);
                 if (_fw.att > 0) {
                     try {
-                        const { data: allAtt } = await supabaseClient.from('attendance')
-                            .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id);
+                        const { data: allAtt } = await MJR_cachedQuery('attall_' + section, supabaseClient.from('attendance')
+                            .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id));
                         const agg = {};
                         (allAtt || []).forEach(a => {
                             const k = a.student_id_no ? 'id:' + String(a.student_id_no).trim()
@@ -800,12 +804,12 @@
                 // faci sees the exact same rankings + grades her teacher does.
                 renderPerformance();
 
-                const { data: attendanceToday } = await supabaseClient
+                const { data: attendanceToday } = await MJR_cachedQuery('atttoday_' + section + '_' + exactTodayDate, supabaseClient
                     .from('attendance')
                     .select('student_id_no, student_name, status, remarks')
                     .eq('section', section)
                     .eq('teacher_id', sectionData.teacher_id)
-                    .eq('date', exactTodayDate);
+                    .eq('date', exactTodayDate));
                 cachedAttendanceToday = attendanceToday || [];
 
                 let present = 0, absentLate = 0;

@@ -55,3 +55,55 @@
         navigator.storage.persist().catch(function () {});
     }
 })();
+
+/*
+ * Offline READ cache — the companion to offlineSyncUtility.js (which queues
+ * WRITES). The service worker caches the app shell (HTML/JS) but deliberately
+ * never touches the Supabase/Render data calls, so without this a page opens
+ * offline but shows nothing (empty student list, "..." semester). This wraps a
+ * Supabase read: online it returns fresh rows AND snapshots them to
+ * localStorage; offline (or if the request fails) it replays the last snapshot
+ * so records / attendance / students / the section still render. Cache-on-
+ * success keeps the copy fresh on every online visit.
+ */
+(function () {
+    var PREFIX = 'faci_cache_';
+
+    window.MJR_cacheGet = function (key) {
+        try {
+            var raw = localStorage.getItem(PREFIX + key);
+            return raw == null ? undefined : JSON.parse(raw);
+        } catch (e) { return undefined; }
+    };
+
+    window.MJR_cacheSet = function (key, val) {
+        try { localStorage.setItem(PREFIX + key, JSON.stringify(val == null ? null : val)); } catch (e) {}
+    };
+
+    // key: a stable string (include section/date so snapshots don't collide).
+    // thenable: a Supabase query builder (or any promise resolving to {data,error}).
+    // Always resolves to a Supabase-shaped { data, error } object.
+    window.MJR_cachedQuery = async function (key, thenable) {
+        if (navigator.onLine) {
+            try {
+                var res = await thenable;
+                if (res && !res.error) {
+                    window.MJR_cacheSet(key, res.data == null ? null : res.data);
+                    return res;
+                }
+                // Query returned an error — prefer a cached snapshot if we have one.
+                var onErr = window.MJR_cacheGet(key);
+                if (onErr !== undefined) return { data: onErr, error: null, fromCache: true };
+                return res;
+            } catch (e) {
+                var onThrow = window.MJR_cacheGet(key);
+                if (onThrow !== undefined) return { data: onThrow, error: null, fromCache: true };
+                return { data: null, error: { message: String((e && e.message) || e) } };
+            }
+        }
+        // Offline: skip the network entirely and serve the last snapshot.
+        var offline = window.MJR_cacheGet(key);
+        if (offline !== undefined) return { data: offline, error: null, fromCache: true };
+        return { data: null, error: { message: 'offline: no cached data for ' + key } };
+    };
+})();

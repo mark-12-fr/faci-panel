@@ -10,6 +10,8 @@
     <meta name="theme-color" content="#3b82f6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
+    <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
@@ -349,11 +351,11 @@
             // 🌟 FETCH CURRENT FACILITATOR DATA 🌟
             let myTeacherId = localStorage.getItem('faci_teacher_id');
             try {
-                const { data: faciData } = await supabaseClient
+                const { data: faciData } = await MJR_cachedQuery('profilemini_' + faciId, supabaseClient
                     .from('facilitators')
                     .select('full_name, avatar_url, teacher_id')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
-                    .single();
+                    .single());
 
                 if (faciData) {
                     fullName = faciData.full_name;
@@ -391,7 +393,7 @@
                     .eq('section', section)
                     .eq('teacher_id', coTid || '00000000-0000-0000-0000-000000000000');
 
-                const { data: coFacis, error: coFaciErr } = await coFaciQuery;
+                const { data: coFacis, error: coFaciErr } = await MJR_cachedQuery('cofacis_' + section, coFaciQuery);
 
                 if (coFaciErr) throw coFaciErr;
 
