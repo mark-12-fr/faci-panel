@@ -9,6 +9,8 @@
     <link rel="apple-touch-icon" href="logo.jpg">
     <meta name="theme-color" content="#3b82f6">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
+    <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="offlineSyncUtility.js" defer></script>
     <style>
@@ -492,8 +494,8 @@
                 currentSectionQuarter = sectionRow.quarter ? String(sectionRow.quarter) : '1';
                 document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • Q${currentSectionQuarter}`;
 
-                const { data: students } = await supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name');
-                
+                const { data: students } = await MJR_cachedQuery('students_' + sectionId, supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name'));
+
                 if (!students || students.length === 0) {
                     container.innerHTML = '<div style="text-align:center; padding: 20px;">No students assigned yet to this section.</div>';
                     document.getElementById('statTotal').textContent = "0";
@@ -503,12 +505,12 @@
                 document.getElementById('statTotal').textContent = students.length;
 
                 const dateStr = getCurrentDateStr();
-                const { data: attendanceData } = await supabaseClient
+                const { data: attendanceData } = await MJR_cachedQuery('attendance_' + sectionTitle + '_' + dateStr, supabaseClient
                     .from('attendance')
                     .select('*')
                     .eq('section', sectionTitle)
                     .eq('teacher_id', sectionRow.teacher_id)
-                    .eq('date', dateStr);
+                    .eq('date', dateStr));
 
                 let today = new Date();
                 today.setHours(0,0,0,0);

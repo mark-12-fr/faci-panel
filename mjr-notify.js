@@ -188,6 +188,13 @@
     async function resolveFaciSection(sb, title, columns) {
         if (!sb || !title) return null;
         const cols = columns || 'id, semester, quarter, teacher_id';
+        const cacheKey = 'section_' + title;
+        // Offline: replay the last known section row (id / semester / quarter /
+        // teacher_id) so every page still resolves its section without a network.
+        if (!navigator.onLine && window.MJR_cacheGet) {
+            const cachedOffline = window.MJR_cacheGet(cacheKey);
+            if (cachedOffline) return cachedOffline;
+        }
         try {
             // Always scope to the facilitator's OWN teacher_id when known.
             // Never fall back to an arbitrary row — that points the faci at
@@ -197,14 +204,20 @@
             if (teacherId) q = q.eq('teacher_id', teacherId);
             const { data } = await q;
             const rows = data || [];
-            if (rows.length === 1) return rows[0];
-            if (rows.length === 0) return null;
-            if (teacherId) {
+            let result = null;
+            if (rows.length === 1) result = rows[0];
+            else if (rows.length && teacherId) {
                 const mine = rows.find(r => String(r.teacher_id) === String(teacherId));
-                if (mine) return mine;
+                if (mine) result = mine;
             }
-            return null;
+            if (result && window.MJR_cacheSet) window.MJR_cacheSet(cacheKey, result);
+            return result;
         } catch (err) {
+            // Network failed — fall back to the cached section row if we have one.
+            if (window.MJR_cacheGet) {
+                const cachedErr = window.MJR_cacheGet(cacheKey);
+                if (cachedErr) return cachedErr;
+            }
             console.error('resolveFaciSection failed', err);
             return null;
         }
