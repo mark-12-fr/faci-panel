@@ -163,7 +163,7 @@
             display: inline-block;
             opacity: 0;
             transform: translateY(26px);
-            animation: letterIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation: letterIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #ffffff 100%);
             -webkit-background-clip: text;
             background-clip: text;
@@ -501,11 +501,11 @@
             const activeFaciId = localStorage.getItem('faci_id');
             if (activeFaciId) {
                 document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
-                startFill(700); // reaches full just before the 800ms redirect
+                startFill(1400); // reaches full just before the 1500ms redirect
 
                 setTimeout(() => {
                     window.location.href = 'index.html';
-                }, 800);
+                }, 1500);
                 return;
             }
 
@@ -531,7 +531,7 @@
                     var s = document.createElement('span');
                     s.className = 'splash-letter';
                     s.textContent = text[i] === ' ' ? '\u00A0' : text[i];
-                    s.style.animationDelay = (0.3 + i * 0.07) + 's';
+                    s.style.animationDelay = (0.25 + i * 0.055) + 's';
                     titleEl.appendChild(s);
                 }
             }
