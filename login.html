@@ -133,7 +133,11 @@
             opacity: 0;
             transform: translateY(22px);
             animation: letterIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            color: #ffffff;
+            background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #ffffff 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: none;
             will-change: opacity, transform;
         }
         @keyframes letterIn {
