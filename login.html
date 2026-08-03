@@ -46,70 +46,20 @@
             overflow: hidden; /* Prevent scrollbar during splash */
         }
 
-        /* ── PROFESSIONAL ANIMATED SPLASH ── */
+        /* ── PROFESSIONAL SPLASH ── */
         .splash-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100vh;
-            background:
-                radial-gradient(1200px 600px at 80% -10%, rgba(37, 99, 235, 0.35), transparent 60%),
-                radial-gradient(900px 500px at 10% 110%, rgba(59, 130, 246, 0.22), transparent 60%),
-                radial-gradient(700px 700px at 50% 50%, rgba(30, 58, 138, 0.45), transparent 70%),
-                linear-gradient(135deg, #020617 0%, #0b1220 40%, #16255c 100%);
+            background: linear-gradient(135deg, #0b1220 0%, #16255c 55%, #1e3a8a 100%);
             z-index: 99999;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s ease-in-out;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s ease-in-out;
             overflow: hidden;
-        }
-
-        /* Subtle grain texture for depth */
-        .splash-screen::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1.4px);
-            background-size: 26px 26px;
-            pointer-events: none;
-            animation: grainShift 14s linear infinite;
-        }
-        @keyframes grainShift {
-            from { background-position: 0 0; }
-            to { background-position: 260px 260px; }
-        }
-
-        /* Floating light orbs for depth */
-        .splash-orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(70px);
-            pointer-events: none;
-            will-change: transform;
-        }
-        .splash-orb.o1 {
-            width: 340px; height: 340px;
-            background: rgba(59, 130, 246, 0.4);
-            top: -100px; right: -90px;
-            animation: orbDrift 8s ease-in-out infinite;
-        }
-        .splash-orb.o2 {
-            width: 300px; height: 300px;
-            background: rgba(147, 197, 253, 0.2);
-            bottom: -90px; left: -80px;
-            animation: orbDrift 10s ease-in-out infinite reverse;
-        }
-        .splash-orb.o3 {
-            width: 220px; height: 220px;
-            background: rgba(251, 191, 36, 0.14);
-            top: 38%; left: -70px;
-            animation: orbDrift 12s ease-in-out infinite;
-        }
-        @keyframes orbDrift {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(-34px, 24px) scale(1.12); }
         }
 
         .splash-content {
@@ -119,54 +69,33 @@
             z-index: 1;
         }
 
-        /* Logo with breathing glow + rotating ring */
+        /* Logo with elegant static ring */
         .splash-logo-wrap {
             position: relative;
-            width: 112px;
-            height: 112px;
-            margin: 0 auto 30px;
+            width: 108px;
+            height: 108px;
+            margin: 0 auto 28px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .splash-logo-glow {
-            position: absolute;
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.45), transparent 65%);
-            animation: glowBreath 2.6s ease-in-out infinite;
-        }
-        @keyframes glowBreath {
-            0%, 100% { transform: scale(0.85); opacity: 0.7; }
-            50% { transform: scale(1.15); opacity: 1; }
-        }
         .splash-logo-ring {
             position: absolute;
-            inset: 0;
-            border-radius: 30px;
-            border: 2px solid rgba(96, 165, 250, 0.5);
-            animation: ringPulse 2.4s ease-in-out infinite;
-        }
-        .splash-logo-ring::after {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            border-radius: 38px;
-            border: 2px solid transparent;
-            border-top-color: rgba(251, 191, 36, 0.75);
-            border-right-color: rgba(147, 197, 253, 0.45);
-            animation: ringSpin 1.6s linear infinite;
+            inset: -6px;
+            border-radius: 26px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            opacity: 0;
+            animation: ringIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) 0.2s forwards;
         }
         .splash-logo-container {
             width: 96px;
             height: 96px;
             background: white;
-            border-radius: 24px;
+            border-radius: 22px;
             overflow: hidden;
-            box-shadow: 0 0 45px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
             opacity: 0;
-            animation: logoIn 0.8s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+            animation: logoIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
         }
         .splash-logo-container img {
             width: 100%;
@@ -174,89 +103,49 @@
             object-fit: cover;
         }
         @keyframes logoIn {
-            0% { opacity: 0; transform: scale(0.4) rotate(-14deg) translateY(10px); filter: blur(6px); }
-            60% { filter: blur(0); }
-            100% { opacity: 1; transform: scale(1) rotate(0deg) translateY(0); }
+            0% { opacity: 0; transform: scale(0.6) translateY(8px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
         }
-        @keyframes ringPulse {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.16); opacity: 0.35; }
-        }
-        @keyframes ringSpin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        @keyframes ringIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
-        /* Letter-by-letter AcadTrack - silky spring with blur-in */
+        /* AcadTrack - clean letter entrance */
         .splash-title {
             font-size: 2.6rem;
             font-weight: 800;
             letter-spacing: 3px;
-            margin-bottom: 8px;
             display: flex;
             justify-content: center;
         }
         .splash-letter {
             display: inline-block;
             opacity: 0;
-            transform: translateY(26px);
-            filter: blur(8px);
-            animation: letterIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
-            background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #ffffff 100%);
-            background-size: 100% 130%;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-shadow: none;
+            transform: translateY(18px);
+            animation: letterIn 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) forwards;
+            color: #ffffff;
         }
         @keyframes letterIn {
-            0% { opacity: 0; transform: translateY(26px) scale(1.25); filter: blur(8px); }
-            55% { filter: blur(0); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+            0% { opacity: 0; transform: translateY(18px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
-        .splash-subtitle {
-            font-size: 0.95rem;
-            opacity: 0;
-            letter-spacing: 6px;
-            text-transform: uppercase;
-            font-weight: 500;
-            animation: subtitleIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.95s forwards;
-        }
-        @keyframes subtitleIn {
-            from { opacity: 0; letter-spacing: 9px; filter: blur(4px); }
-            to { opacity: 0.85; letter-spacing: 3px; filter: blur(0); }
-        }
-
-        /* Premium app-open progress bar (driven by JS) with shimmer sweep */
+        /* Slim progress bar */
         .splash-loader {
             width: 210px;
-            height: 5px;
-            margin: 32px auto 0;
-            background: rgba(255, 255, 255, 0.13);
+            height: 3px;
+            margin: 26px auto 0;
+            background: rgba(255, 255, 255, 0.16);
             border-radius: 999px;
             overflow: hidden;
-            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
         }
         .splash-loader-fill {
-            position: relative;
             height: 100%;
             width: 0;
-            background: linear-gradient(90deg, #f59e0b, #fbbf24, #60a5fa, #93c5fd);
+            background: linear-gradient(90deg, #60a5fa, #93c5fd);
             border-radius: 999px;
-            box-shadow: 0 0 14px rgba(251, 191, 36, 0.65);
-            overflow: hidden;
-        }
-        .splash-loader-fill::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
-            animation: shimmer 1.4s linear infinite;
-        }
-        @keyframes shimmer {
-            from { transform: translateX(-110%); }
-            to { transform: translateX(110%); }
+            box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
         }
 
         /* Clean White Card */
@@ -449,19 +338,14 @@
     </div>
 
     <div id="splashScreen" class="splash-screen">
-        <div class="splash-orb o1"></div>
-        <div class="splash-orb o2"></div>
-        <div class="splash-orb o3"></div>
         <div class="splash-content">
             <div class="splash-logo-wrap">
-                <div class="splash-logo-glow"></div>
                 <div class="splash-logo-ring"></div>
                 <div class="splash-logo-container">
                     <img src="logo.jpg" alt="Logo">
                 </div>
             </div>
             <h1 class="splash-title" id="splashTitle">AcadTrack</h1>
-            <p class="splash-subtitle" id="splashSubtitle">MJR Vertex</p>
             <div class="splash-loader"><div class="splash-loader-fill" id="splashProgressFill"></div></div>
         </div>
     </div>
@@ -550,7 +434,6 @@
             };
             const activeFaciId = localStorage.getItem('faci_id');
             if (activeFaciId) {
-                document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
                 startFill(1600); // reaches full just before the 1750ms redirect
 
                 setTimeout(() => {
