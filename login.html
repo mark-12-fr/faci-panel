@@ -53,37 +53,60 @@
             left: 0;
             width: 100%;
             height: 100vh;
-            background: linear-gradient(135deg, #020617 0%, #0f172a 45%, #1e3a8a 100%);
+            background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(37, 99, 235, 0.35), transparent 60%),
+                radial-gradient(900px 500px at 10% 110%, rgba(59, 130, 246, 0.22), transparent 60%),
+                radial-gradient(700px 700px at 50% 50%, rgba(30, 58, 138, 0.45), transparent 70%),
+                linear-gradient(135deg, #020617 0%, #0b1220 40%, #16255c 100%);
             z-index: 99999;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s ease-in-out;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s ease-in-out;
             overflow: hidden;
         }
 
-        /* Floating light orbs for depth */
-        .splash-screen::before,
-        .splash-screen::after {
+        /* Subtle grain texture for depth */
+        .splash-screen::before {
             content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1.4px);
+            background-size: 26px 26px;
+            pointer-events: none;
+            animation: grainShift 14s linear infinite;
+        }
+        @keyframes grainShift {
+            from { background-position: 0 0; }
+            to { background-position: 260px 260px; }
+        }
+
+        /* Floating light orbs for depth */
+        .splash-orb {
             position: absolute;
             border-radius: 50%;
             filter: blur(70px);
             pointer-events: none;
+            will-change: transform;
         }
-        .splash-screen::before {
-            width: 320px; height: 320px;
-            background: rgba(59, 130, 246, 0.35);
-            top: -90px; right: -90px;
-            animation: orbDrift 7s ease-in-out infinite;
+        .splash-orb.o1 {
+            width: 340px; height: 340px;
+            background: rgba(59, 130, 246, 0.4);
+            top: -100px; right: -90px;
+            animation: orbDrift 8s ease-in-out infinite;
         }
-        .splash-screen::after {
-            width: 280px; height: 280px;
-            background: rgba(147, 197, 253, 0.18);
-            bottom: -80px; left: -80px;
-            animation: orbDrift 9s ease-in-out infinite reverse;
+        .splash-orb.o2 {
+            width: 300px; height: 300px;
+            background: rgba(147, 197, 253, 0.2);
+            bottom: -90px; left: -80px;
+            animation: orbDrift 10s ease-in-out infinite reverse;
         }
-
+        .splash-orb.o3 {
+            width: 220px; height: 220px;
+            background: rgba(251, 191, 36, 0.14);
+            top: 38%; left: -70px;
+            animation: orbDrift 12s ease-in-out infinite;
+        }
         @keyframes orbDrift {
             0%, 100% { transform: translate(0, 0) scale(1); }
             50% { transform: translate(-34px, 24px) scale(1.12); }
@@ -96,7 +119,7 @@
             z-index: 1;
         }
 
-        /* Logo with rotating glow ring */
+        /* Logo with breathing glow + rotating ring */
         .splash-logo-wrap {
             position: relative;
             width: 112px;
@@ -106,20 +129,34 @@
             align-items: center;
             justify-content: center;
         }
+        .splash-logo-glow {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.45), transparent 65%);
+            animation: glowBreath 2.6s ease-in-out infinite;
+        }
+        @keyframes glowBreath {
+            0%, 100% { transform: scale(0.85); opacity: 0.7; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
         .splash-logo-ring {
             position: absolute;
             inset: 0;
             border-radius: 30px;
-            border: 2px solid rgba(96, 165, 250, 0.45);
-            animation: ringPulse 2.2s ease-in-out infinite;
+            border: 2px solid rgba(96, 165, 250, 0.5);
+            animation: ringPulse 2.4s ease-in-out infinite;
         }
         .splash-logo-ring::after {
             content: '';
             position: absolute;
-            inset: -7px;
-            border-radius: 37px;
-            border: 2px dashed rgba(251, 191, 36, 0.35);
-            animation: ringSpin 14s linear infinite;
+            inset: -8px;
+            border-radius: 38px;
+            border: 2px solid transparent;
+            border-top-color: rgba(251, 191, 36, 0.75);
+            border-right-color: rgba(147, 197, 253, 0.45);
+            animation: ringSpin 1.6s linear infinite;
         }
         .splash-logo-container {
             width: 96px;
@@ -129,28 +166,28 @@
             overflow: hidden;
             box-shadow: 0 0 45px rgba(59, 130, 246, 0.5);
             opacity: 0;
-            animation: logoIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation: logoIn 0.8s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
         }
         .splash-logo-container img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-
         @keyframes logoIn {
-            0% { opacity: 0; transform: scale(0.4) rotate(-14deg); }
-            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+            0% { opacity: 0; transform: scale(0.4) rotate(-14deg) translateY(10px); filter: blur(6px); }
+            60% { filter: blur(0); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg) translateY(0); }
         }
         @keyframes ringPulse {
             0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.14); opacity: 0.35; }
+            50% { transform: scale(1.16); opacity: 0.35; }
         }
         @keyframes ringSpin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
 
-        /* Letter-by-letter AcadTrack */
+        /* Letter-by-letter AcadTrack - silky spring with blur-in */
         .splash-title {
             font-size: 2.6rem;
             font-weight: 800;
@@ -163,54 +200,63 @@
             display: inline-block;
             opacity: 0;
             transform: translateY(26px);
-            animation: letterIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            filter: blur(8px);
+            animation: letterIn 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
             background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #ffffff 100%);
+            background-size: 100% 130%;
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
             text-shadow: none;
         }
         @keyframes letterIn {
-            0% { opacity: 0; transform: translateY(26px) scale(1.3); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
+            0% { opacity: 0; transform: translateY(26px) scale(1.25); filter: blur(8px); }
+            55% { filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
 
         .splash-subtitle {
             font-size: 0.95rem;
             opacity: 0;
-            letter-spacing: 3px;
+            letter-spacing: 6px;
             text-transform: uppercase;
             font-weight: 500;
-            animation: subtitleIn 0.6s ease-out 1s forwards;
+            animation: subtitleIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.95s forwards;
         }
         @keyframes subtitleIn {
-            from { opacity: 0; letter-spacing: 6px; }
-            to { opacity: 0.85; letter-spacing: 3px; }
+            from { opacity: 0; letter-spacing: 9px; filter: blur(4px); }
+            to { opacity: 0.85; letter-spacing: 3px; filter: blur(0); }
         }
 
-
-        /* Premium app-open progress bar (driven by JS to match splash timing) */
+        /* Premium app-open progress bar (driven by JS) with shimmer sweep */
         .splash-loader {
-            width: 200px;
-            height: 4px;
-            margin: 30px auto 0;
-            background: rgba(255, 255, 255, 0.14);
+            width: 210px;
+            height: 5px;
+            margin: 32px auto 0;
+            background: rgba(255, 255, 255, 0.13);
             border-radius: 999px;
             overflow: hidden;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
         }
         .splash-loader-fill {
+            position: relative;
             height: 100%;
             width: 0;
             background: linear-gradient(90deg, #f59e0b, #fbbf24, #60a5fa, #93c5fd);
             border-radius: 999px;
-            box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.65);
+            overflow: hidden;
         }
-    }
+        .splash-loader-fill::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
+            animation: shimmer 1.4s linear infinite;
         }
-
-        @keyframes spinLoader {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes shimmer {
+            from { transform: translateX(-110%); }
+            to { transform: translateX(110%); }
         }
 
         /* Clean White Card */
@@ -347,7 +393,7 @@
             transform: scale(0.98);
         }
 
-        /* ── Professional Alert Modal ── */
+        /* â”€â”€ Professional Alert Modal â”€â”€ */
         .custom-alert-overlay {
             position: fixed; inset: 0;
             background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
@@ -399,12 +445,16 @@
 <body>
 
     <div id="offlineStatusBar" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#fff;text-align:center;padding:8px 12px;font-size:13px;z-index:100000;font-family:'Inter',sans-serif;">
-        <i class="fa-solid fa-wifi-slash"></i> You are offline — <span id="offlineQueueCount">0</span> pending submission(s)
+        <i class="fa-solid fa-wifi-slash"></i> You are offline â€” <span id="offlineQueueCount">0</span> pending submission(s)
     </div>
 
     <div id="splashScreen" class="splash-screen">
+        <div class="splash-orb o1"></div>
+        <div class="splash-orb o2"></div>
+        <div class="splash-orb o3"></div>
         <div class="splash-content">
             <div class="splash-logo-wrap">
+                <div class="splash-logo-glow"></div>
                 <div class="splash-logo-ring"></div>
                 <div class="splash-logo-container">
                     <img src="logo.jpg" alt="Logo">
@@ -467,7 +517,7 @@
             ? 'http://127.0.0.1:5000'
             : 'https://teacher-panel-d1kw.onrender.com';
 
-        // 🌟 CUSTOM ALERT FUNCTIONS 🌟
+        // ðŸŒŸ CUSTOM ALERT FUNCTIONS ðŸŒŸ
         function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
             document.getElementById('customAlertTitle').textContent = title;
             document.getElementById('customAlertMessage').textContent = message;
@@ -488,7 +538,7 @@
             document.getElementById('customAlertOverlay').classList.remove('show');
         }
 
-        // 🌟 INSTANT AUTO-LOGIN CHECK 🌟
+        // ðŸŒŸ INSTANT AUTO-LOGIN CHECK ðŸŒŸ
         window.addEventListener('DOMContentLoaded', () => {
             const fill = document.getElementById('splashProgressFill');
             // Animate the progress bar to full over `ms`, then the splash
@@ -501,16 +551,16 @@
             const activeFaciId = localStorage.getItem('faci_id');
             if (activeFaciId) {
                 document.getElementById('splashSubtitle').textContent = 'Loading your workspace...';
-                startFill(1400); // reaches full just before the 1500ms redirect
+                startFill(1600); // reaches full just before the 1750ms redirect
 
                 setTimeout(() => {
                     window.location.href = 'index.html';
-                }, 1500);
+                }, 1750);
                 return;
             }
 
-            // Not logged in: fill over the splash's ~1.8s, then it fades to the form.
-            startFill(1700);
+            // Not logged in: fill over the splash's ~2s, then it fades to the form.
+            startFill(1900);
 
             // Check if Faci ID was remembered
             const rememberedId = localStorage.getItem('remembered_faci_id');
@@ -520,7 +570,7 @@
             }
         });
 
-        // 🌟 SPLASH SCREEN LOGIC 🌟
+        // ðŸŒŸ SPLASH SCREEN LOGIC ðŸŒŸ
         // Split "AcadTrack" into letter spans for the staggered entrance.
         (function () {
             var titleEl = document.getElementById('splashTitle');
@@ -544,7 +594,7 @@
                     splashScreen.style.opacity = '0';
                     splashScreen.style.visibility = 'hidden';
                     document.body.style.overflow = 'auto';
-                }, 1800); /* Adjusted to 1800ms to allow the new animation to play nicely */
+                }, 2000); /* full animation ~1.75s + fade, so letters + subtitle complete before hiding */
             }
         });
 
@@ -588,7 +638,7 @@
             this.classList.toggle('fa-eye-slash');
         });
 
-        // 🔥 DIRECT SUPABASE LOGIN LOGIC 🔥
+        // ðŸ”¥ DIRECT SUPABASE LOGIN LOGIC ðŸ”¥
         document.getElementById('faciLoginForm').addEventListener('submit', async function(e) {
             e.preventDefault(); 
 
