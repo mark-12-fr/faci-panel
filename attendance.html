@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <link rel="preconnect" href="https://njzvuwkepaasnsvuujgx.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <title>Facilitator Attendance</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -516,7 +521,18 @@
                 currentSchoolLevel = sectionRow.school_level || 'senior_high';
                 document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • ${quarterLabel()}`;
 
-                const { data: students } = await MJR_cachedQuery('students_' + sectionId, supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name'));
+                const dateStr = getCurrentDateStr();
+                const [sRes, attRes] = await Promise.all([
+                    MJR_cachedQuery('students_' + sectionId, supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name')),
+                    MJR_cachedQuery('attendance_' + sectionTitle + '_' + dateStr, supabaseClient
+                        .from('attendance')
+                        .select('*')
+                        .eq('section', sectionTitle)
+                        .eq('teacher_id', sectionRow.teacher_id)
+                        .eq('date', dateStr))
+                ]);
+                const students = (sRes && sRes.data) || [];
+                const attendanceData = (attRes && attRes.data) || [];
 
                 if (!students || students.length === 0) {
                     container.innerHTML = '<div style="text-align:center; padding: 20px;">No students assigned yet to this section.</div>';
@@ -525,14 +541,6 @@
                 }
 
                 document.getElementById('statTotal').textContent = students.length;
-
-                const dateStr = getCurrentDateStr();
-                const { data: attendanceData } = await MJR_cachedQuery('attendance_' + sectionTitle + '_' + dateStr, supabaseClient
-                    .from('attendance')
-                    .select('*')
-                    .eq('section', sectionTitle)
-                    .eq('teacher_id', sectionRow.teacher_id)
-                    .eq('date', dateStr));
 
                 let today = new Date();
                 today.setHours(0,0,0,0);
@@ -792,6 +800,10 @@
             // Offline check — queue to IndexedDB if no connection
             if (!navigator.onLine && window.__offlineSync) {
                 await window.__offlineSync.queue('attendance', attendanceData);
+                if (window.MJR_cacheInvalidate) {
+                    window.MJR_cacheInvalidate('attendance_' + section + '_' + dateStr);
+                    window.MJR_cacheInvalidate('attall_' + section);
+                }
                 btn.style.background = '#d97706';
                 btn.innerHTML = '<i class="fa-solid fa-clock"></i> Saved Offline!';
                 setTimeout(async () => {
@@ -828,6 +840,12 @@
                 if (window.MJR_markLocalSave) window.MJR_markLocalSave();
 
                 if (!error) {
+                    // Snapshot is outdated — drop it so the reload below and the
+                    // dashboard's next visit read fresh from Supabase.
+                    if (window.MJR_cacheInvalidate) {
+                        window.MJR_cacheInvalidate('attendance_' + section + '_' + dateStr);
+                        window.MJR_cacheInvalidate('attall_' + section);
+                    }
                     btn.style.background = '#10b981';
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
                     

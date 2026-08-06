@@ -65,6 +65,13 @@
  * localStorage; offline (or if the request fails) it replays the last snapshot
  * so records / attendance / students / the section still render. Cache-on-
  * success keeps the copy fresh on every online visit.
+ *
+ * Stale-while-revalidate: when a snapshot already exists it is returned
+ * IMMEDIATELY (no network wait — this is what makes every repeat load fast,
+ * online or offline) while the network request refreshes the snapshot in the
+ * background for the next load. Freshness is not lost: pages invalidate their
+ * cache key right after a successful write (see the save handlers), so a
+ * follow-up load always re-reads from Supabase.
  */
 (function () {
     var PREFIX = 'faci_cache_';
@@ -80,10 +87,27 @@
         try { localStorage.setItem(PREFIX + key, JSON.stringify(val == null ? null : val)); } catch (e) {}
     };
 
+    window.MJR_cacheInvalidate = function (key) {
+        try { localStorage.removeItem(PREFIX + key); } catch (e) {}
+    };
+
     // key: a stable string (include section/date so snapshots don't collide).
     // thenable: a Supabase query builder (or any promise resolving to {data,error}).
     // Always resolves to a Supabase-shaped { data, error } object.
     window.MJR_cachedQuery = async function (key, thenable) {
+        var cached = window.MJR_cacheGet(key);
+        if (cached !== undefined) {
+            // Snapshot exists — render it right away, then refresh the copy in
+            // the background so the NEXT load is both instant and fresh.
+            if (navigator.onLine) {
+                Promise.resolve(thenable).then(function (res) {
+                    if (res && !res.error) {
+                        window.MJR_cacheSet(key, res.data == null ? null : res.data);
+                    }
+                }).catch(function () {});
+            }
+            return { data: cached, error: null, fromCache: true };
+        }
         if (navigator.onLine) {
             try {
                 var res = await thenable;

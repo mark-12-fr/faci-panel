@@ -4,6 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <link rel="preconnect" href="https://njzvuwkepaasnsvuujgx.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <title>Facilitator Dashboard</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -760,16 +765,12 @@
                     : 'Q' + qNum;
                 document.getElementById('faciQuarterOverview').textContent = termLabel;
 
-                const { data: students } = await MJR_cachedQuery('students_' + sectionData.id, supabaseClient
+                // Fire every data query at once — cached snapshots render
+                // instantly (stale-while-revalidate) and the first-ever load
+                // waits for all round-trips in parallel instead of one at a time.
+                const pStudents = MJR_cachedQuery('students_' + sectionData.id, supabaseClient
                     .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true }));
-                cachedStudents = students || [];
-                const totalStudents = cachedStudents.length;
-
-                document.getElementById('dashTotalStudents').textContent = totalStudents;
-                document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
-
-                const { data: recordsData } = await MJR_cachedQuery('records_' + sectionData.id, supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id));
-                cachedRecords = recordsData || [];
+                const pRecords = MJR_cachedQuery('records_' + sectionData.id, supabaseClient.from('class_records').select('*').eq('section_id', sectionData.id));
 
                 // Dynamic grading: load THIS subject's weights (set by the teacher
                 // in the Grading System) so the faci's grades match the teacher's.
@@ -777,10 +778,29 @@
                 await window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id);
                 window.FACI_ATT_RATE = {};
                 const _fw = window.MJR_weightsFor(window.FACI_SUBJECT);
+
+                const pAttAll = (_fw.att > 0) ? MJR_cachedQuery('attall_' + section, supabaseClient.from('attendance')
+                    .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id)) : Promise.resolve(null);
+                const pAttToday = MJR_cachedQuery('atttoday_' + section + '_' + exactTodayDate, supabaseClient
+                    .from('attendance')
+                    .select('student_id_no, student_name, status, remarks')
+                    .eq('section', section)
+                    .eq('teacher_id', sectionData.teacher_id)
+                    .eq('date', exactTodayDate));
+
+                const { data: students } = await pStudents;
+                cachedStudents = students || [];
+                const totalStudents = cachedStudents.length;
+
+                document.getElementById('dashTotalStudents').textContent = totalStudents;
+                document.getElementById('faciTotalStudentsOverview').textContent = totalStudents;
+
+                const { data: recordsData } = await pRecords;
+                cachedRecords = recordsData || [];
+
                 if (_fw.att > 0) {
                     try {
-                        const { data: allAtt } = await MJR_cachedQuery('attall_' + section, supabaseClient.from('attendance')
-                            .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id));
+                        const { data: allAtt } = await pAttAll;
                         const agg = {};
                         (allAtt || []).forEach(a => {
                             const k = a.student_id_no ? 'id:' + String(a.student_id_no).trim()
@@ -825,12 +845,7 @@
                 // faci sees the exact same rankings + grades her teacher does.
                 renderPerformance();
 
-                const { data: attendanceToday } = await MJR_cachedQuery('atttoday_' + section + '_' + exactTodayDate, supabaseClient
-                    .from('attendance')
-                    .select('student_id_no, student_name, status, remarks')
-                    .eq('section', section)
-                    .eq('teacher_id', sectionData.teacher_id)
-                    .eq('date', exactTodayDate));
+                const { data: attendanceToday } = await pAttToday;
                 cachedAttendanceToday = attendanceToday || [];
 
                 let present = 0, absentLate = 0;

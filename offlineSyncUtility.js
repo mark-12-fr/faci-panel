@@ -169,6 +169,17 @@
 
     var FLUSHING = false;
 
+    function clearDataCaches() {
+        try {
+            var keys = [];
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf('faci_cache_') === 0) keys.push(k);
+            }
+            keys.forEach(function (k) { localStorage.removeItem(k); });
+        } catch (e) {}
+    }
+
     function flush() {
         if (FLUSHING) return Promise.resolve();
         FLUSHING = true;
@@ -181,6 +192,10 @@
                 if (index >= items.length) {
                     FLUSHING = false;
                     notifyChange();
+                    // Queued writes are now on the server — any cached
+                    // snapshots were taken BEFORE those writes, so drop them
+                    // all and let the next page load refetch fresh data.
+                    clearDataCaches();
                     return;
                 }
 

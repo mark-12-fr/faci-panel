@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <link rel="preconnect" href="https://njzvuwkepaasnsvuujgx.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <title>Class Record</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -784,9 +789,20 @@
 
                 setLoad(35);
                 let students = [];
+                let existingRecords = [];
                 if (currentSectionId) {
-                    const { data: fetchedStudents } = await MJR_cachedQuery('students_' + currentSectionId, supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true }));
-                    students = fetchedStudents || [];
+                    // Fire both queries at once — cached keys resolve instantly
+                    // (stale-while-revalidate), first-ever loads wait for both
+                    // in parallel instead of two round-trips in a row.
+                    const [sRes, rRes] = await Promise.all([
+                        MJR_cachedQuery('students_' + currentSectionId, supabaseClient.from('students').select('*').eq('section_id', currentSectionId).order('full_name', { ascending: true })),
+                        MJR_cachedQuery('records_' + currentSectionId, supabaseClient
+                            .from('class_records')
+                            .select('*')
+                            .eq('section_id', currentSectionId))
+                    ]);
+                    students = (sRes && sRes.data) || [];
+                    existingRecords = (rRes && rRes.data) || [];
                 }
                 document.getElementById('infoTotal').textContent = students.length;
                 setLoad(65);
@@ -795,11 +811,7 @@
                 // current quarter's value when present, otherwise carries
                 // over the previous quarter's value so scores never look
                 // wiped after the section's quarter changes.
-                const { data: existingRecords } = await MJR_cachedQuery('records_' + currentSectionId, supabaseClient
-                    .from('class_records')
-                    .select('*')
-                    .eq('section_id', currentSectionId));
-                _allRecordsCache = existingRecords || [];
+                _allRecordsCache = existingRecords;
                 setLoad(90);
 
                 tbody.innerHTML = '';
@@ -1120,6 +1132,7 @@
             // Offline check — queue to IndexedDB if no connection
             if (!navigator.onLine && window.__offlineSync) {
                 await window.__offlineSync.queue('class_record', recordData);
+                if (window.MJR_cacheInvalidate) window.MJR_cacheInvalidate('records_' + currentSectionId);
                 btn.style.background = '#d97706';
                 btn.innerHTML = '<i class="fa-solid fa-clock"></i> Saved Offline!';
                 setTimeout(async () => {
@@ -1139,6 +1152,9 @@
             try {
                 const { error: saveError } = await supabaseClient.from('class_records').upsert(recordData);
                 if (saveError) throw saveError;
+                // The snapshot we just rendered is now outdated — drop it so
+                // the reload below (and the next visit) reads fresh from Supabase.
+                if (window.MJR_cacheInvalidate) window.MJR_cacheInvalidate('records_' + currentSectionId);
 
                 btn.style.background = '#10b981';
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Submitted Successfully!';
