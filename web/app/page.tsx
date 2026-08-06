@@ -636,7 +636,7 @@ export default function DashboardPage() {
         </div>
         <div className="overview-item">
           <h3>{quarter}</h3>
-          <p>Quarter</p>
+          <p>{quarter === "Prelim" || quarter === "Midterm" || quarter === "Final" ? "Term" : "Quarter"}</p>
         </div>
         <div className="overview-item">
           <h3>{totalStudents}</h3>

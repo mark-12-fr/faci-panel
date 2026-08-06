@@ -176,7 +176,13 @@ export default function RecordPage() {
         setInfoSemester(section.semester || "1st Sem");
         sectionIdRef.current = String(section.id);
         currentQuarterRef.current = section.quarter ? String(section.quarter) : "1";
-        setInfoQuarter("Q" + currentQuarterRef.current);
+        setInfoQuarter(
+          currentQuarterRef.current === "Prelim" ||
+            currentQuarterRef.current === "Midterm" ||
+            currentQuarterRef.current === "Final"
+            ? currentQuarterRef.current
+            : "Q" + currentQuarterRef.current
+        );
       }
       if (!sectionIdRef.current) {
         setRows([]);

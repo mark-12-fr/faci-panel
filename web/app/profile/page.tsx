@@ -7,6 +7,7 @@ import { API_BASE } from "@/lib/config";
 import { getToken } from "@/lib/session";
 import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
+import { useAlert } from "@/components/CustomAlert";
 import BottomNav from "@/components/BottomNav";
 import "./profile.css";
 
@@ -17,6 +18,7 @@ interface CoFaci {
 
 export default function ProfilePage() {
   useFaciSession();
+  const { alert, showAlert } = useAlert();
 
   const [name, setName] = useState("Loading...");
   const [avatar, setAvatar] = useState("");
@@ -26,6 +28,7 @@ export default function ProfilePage() {
   const [coFacis, setCoFacis] = useState<CoFaci[] | null>(null);
   const [coError, setCoError] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -113,28 +116,27 @@ export default function ProfilePage() {
           await apiPatch("/api/faci/me", { avatar_url: compressed });
           setAvatar(compressed);
           setItem("faci_img_url", compressed);
-          window.alert("Profile picture updated successfully!");
+          showAlert("Profile updated", "Profile picture updated successfully!", "#10b981", "fa-circle-check");
         } catch {
-          window.alert("Failed to update profile picture. Please check your connection.");
+          showAlert("Update failed", "Failed to update profile picture. Please check your connection.", "#ef4444", "fa-circle-xmark");
         } finally {
           setUploading(false);
         }
       };
       img.onerror = () => {
         setUploading(false);
-        window.alert("That image couldn't be loaded. Please try a different file.");
+        showAlert("Invalid image", "That image couldn't be loaded. Please try a different file.", "#f59e0b", "fa-triangle-exclamation");
       };
       img.src = ev.target?.result as string;
     };
     reader.onerror = () => {
       setUploading(false);
-      window.alert("Couldn't read that image file. Please try again.");
+      showAlert("Read error", "Couldn't read that image file. Please try again.", "#f59e0b", "fa-triangle-exclamation");
     };
     reader.readAsDataURL(file);
   }
 
   async function faciLogout() {
-    if (!window.confirm("Are you sure you want to sign out?")) return;
     // Best-effort presence → Inactive before clearing (keepalive-safe).
     try {
       const token = getToken();
@@ -257,12 +259,33 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <button className="logout-btn fade-in-up delay-3" onClick={faciLogout}>
+        <button className="logout-btn fade-in-up delay-3" onClick={() => setConfirmLogout(true)}>
           <i className="fa-solid fa-arrow-right-from-bracket" /> Log out
         </button>
       </div>
 
+      {confirmLogout && (
+        <div className="logout-confirm-overlay" onClick={() => setConfirmLogout(false)}>
+          <div className="logout-confirm-box" onClick={(e) => e.stopPropagation()}>
+            <div className="logout-confirm-icon">
+              <i className="fa-solid fa-right-from-bracket" />
+            </div>
+            <h4>Are you sure you want to log out?</h4>
+            <p>You will be signed out of your account.</p>
+            <div className="logout-confirm-actions">
+              <button type="button" className="lca-cancel" onClick={() => setConfirmLogout(false)}>
+                Cancel
+              </button>
+              <button type="button" className="lca-confirm" onClick={faciLogout}>
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav active="profile" />
+      {alert}
     </div>
   );
 }

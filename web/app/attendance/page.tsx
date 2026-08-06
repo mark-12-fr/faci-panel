@@ -89,7 +89,8 @@ export default function AttendancePage() {
         const q = section.quarter ? String(section.quarter) : "1";
         setQuarter(q);
         const semester = section.semester || "1st Sem";
-        setHeaderDetails(`${semester} • ${getItem("faci_section")} • Q${q}`);
+        const term = q === "Prelim" || q === "Midterm" || q === "Final";
+        setHeaderDetails(`${semester} • ${getItem("faci_section")} • ${term ? q : "Q" + q}`);
 
         const studs = studentsResp.students || [];
         setStudents(studs);
@@ -366,10 +367,10 @@ export default function AttendancePage() {
               height: "100%",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "center",
             }}
           >
-            <span>{subjectDisplay}</span> <i className="fa-solid fa-chevron-down" />
+            <span>{subjectDisplay}</span>
           </div>
         </div>
       </div>

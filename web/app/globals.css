@@ -129,3 +129,53 @@ body {
 .custom-alert-btn:hover {
   background: #1e293b;
 }
+
+/* ── Smooth tap layer: no flashy tap highlight + springy press feedback ──────
+   Applied app-wide (kept identical to the teacher panel's feel). Interactive
+   elements scale down gently on press and spring back on release. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+[role="button"],
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 1px;
+}
+button {
+  touch-action: manipulation;
+}
+
+/* Springy active-state preset — elements add `tap-feedback` or we patch the
+   shared classes below; never fights existing :active rules. */
+.tap-feedback {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tap-feedback:active {
+  transform: scale(0.95);
+}
+
+/* Bottom nav: active icon springs in with a soft pop; press shrinks it. */
+.bottom-nav .nav-item {
+  position: relative;
+}
+.bottom-nav .nav-item i {
+  transition: background 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+}
+.bottom-nav .nav-item.active i {
+  animation: navIconPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes navIconPop {
+  0% { transform: scale(0.6); }
+  55% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.bottom-nav .nav-item:active i {
+  transform: scale(0.82) !important;
+}
+

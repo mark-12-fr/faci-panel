@@ -1,6 +1,10 @@
-// Fixed bottom navigation shared by every page. Uses plain <a> (full reload)
-// to match the original multi-page navigation and keep each route's scoped CSS
-// clean. Styled by each page's own `.bottom-nav` / `.nav-item` rules.
+"use client";
+
+// Fixed bottom navigation shared by every page. Uses next/link for smooth
+// client-side navigation (no full page reload flash) while keeping the active
+// item's icon spring and a press (tap) scale on every nav icon.
+
+import Link from "next/link";
 
 export type NavKey = "home" | "attendance" | "records" | "profile";
 
@@ -15,14 +19,14 @@ export default function BottomNav({ active }: { active: NavKey }) {
   return (
     <nav className="bottom-nav">
       {ITEMS.map((item) => (
-        <a
+        <Link
           key={item.key}
           href={item.href}
           className={`nav-item${active === item.key ? " active" : ""}`}
         >
           <i className={`fa-solid ${item.icon}`} />
           {item.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );
