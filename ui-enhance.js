@@ -27,7 +27,8 @@
     ".skeleton-row td{padding:9px 4px;}",
     ".skeleton-row .sk-bar{width:80%;margin:0 auto;}",
     ".skeleton-row td:first-child .sk-bar,.skeleton-row td:nth-child(2) .sk-bar{width:90%;margin-left:6px;}",
-    ".sk-inline{display:inline-block;vertical-align:middle;}"
+    ".sk-inline{display:inline-block;vertical-align:middle;}",
+    "html,body{touch-action:manipulation;}"
   ].join("\n");
 
   var styleEl = document.createElement("style");
@@ -181,4 +182,11 @@
   });
 
   document.addEventListener("DOMContentLoaded", renderBadge);
+
+  /* ── Zoom lock (pinch + double-tap) ──────────────────────────────────── */
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturechange", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
 })();

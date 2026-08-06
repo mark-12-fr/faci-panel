@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <title>Facilitator Login | Management System</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -15,6 +15,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
     <script src="offlineSyncUtility.js" defer></script>
     <script src="mjr-offline.js" defer></script>
+    <script>
+        document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+        document.addEventListener("gesturechange", function (e) { e.preventDefault(); });
+        document.addEventListener("touchmove", function (e) {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+    </script>
     
     <style>
         :root {
