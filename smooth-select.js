@@ -98,6 +98,7 @@
             native.value = opt.value;
             native.dispatchEvent(new Event("change", { bubbles: true }));
           }
+          refreshLabel();
           close();
           trigger.focus();
         });
@@ -173,6 +174,9 @@
         refreshLabel();
       }).observe(native, { childList: true, subtree: true });
     }
+
+    // Any other code changing the value should update the trigger label too.
+    native.addEventListener("change", refreshLabel);
 
     refreshLabel();
   }
