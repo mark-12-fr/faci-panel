@@ -68,6 +68,7 @@ class Section(Base):
     semester = Column(Text, nullable=True)
     school_year = Column(String, nullable=True)
     quarter = Column(Text, nullable=True)
+    school_level = Column(Text, nullable=True)  # 'JHS' | 'SHS' | 'College'
     created_at = Column(TIMESTAMP(timezone=True))
 
 
