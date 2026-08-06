@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
+    <script src="ui-enhance.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="offlineSyncUtility.js" defer></script>
     <style>
@@ -268,12 +269,7 @@
         <input type="text" id="searchInput" placeholder="Search student name..." onkeyup="filterStudents()">
     </div>
 
-    <div id="studentListContainer" class="fade-in-up delay-4">
-        <div style="text-align:center; padding: 30px; color: var(--text-sub);">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 10px;"></i>
-            <p>Loading students from database...</p>
-        </div>
-    </div>
+    <div id="studentListContainer" class="fade-in-up delay-4" data-skeleton-blocks="5"></div>
 
     <button class="submit-btn fade-in-up delay-5" id="submitBtn" data-locked="false">
         <i class="fa-solid fa-paper-plane"></i> Submit Attendance
@@ -504,7 +500,7 @@
 
         async function loadDynamicStudents(sectionTitle) {
             const container = document.getElementById('studentListContainer');
-            container.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i></div>';
+            container.innerHTML = '<div class="sk-block" style="height:64px"></div><div class="sk-block" style="height:64px"></div><div class="sk-block" style="height:64px"></div><div class="sk-block" style="height:64px"></div><div class="sk-block" style="height:64px"></div>';
 
             try {
                 const sectionRow = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id');
@@ -860,6 +856,9 @@
                 btn.disabled = false;
             }
         });
+
+        // Pull-to-refresh hook (ui-enhance.js calls this on release)
+        window.MJR_pullRefresh = () => loadDynamicStudents(localStorage.getItem('faci_section'));
 
     </script>
     <script>

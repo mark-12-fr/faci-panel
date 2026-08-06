@@ -18,6 +18,7 @@
          overwrites these when it loads fresh. This inline copy ships with the (always-fresh)
          HTML so the page can't break if the SW briefly serves a stale mjr-offline.js post-deploy. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
+    <script src="ui-enhance.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="grading.js"></script>
 
@@ -469,7 +470,7 @@
             <h1 id="faciGreeting">Good day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
             <div class="tag-row">
                 <span class="tag tag-primary" id="faciSectionTag">Section</span>
-                <span class="tag tag-secondary" id="faciSubjectTag"><i class="fa-solid fa-spinner fa-spin"></i></span>
+                <span class="tag tag-secondary" id="faciSubjectTag" data-skeleton-bar="84px"></span>
             </div>
         </div>
         <div class="profile-avatar">
@@ -479,23 +480,23 @@
 
     <div class="stats-grid">
         <div class="stat-card blue fade-in-up delay-1" onclick="openDrawer('students')">
-            <h2 id="dashTotalStudents"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+            <h2 id="dashTotalStudents" data-skeleton-bar="48px"></h2>
             <p class="stat-label">My Students</p>
             <p class="stat-sub" id="faciSectionStat">Section</p>
         </div>
         <div class="stat-card green fade-in-up delay-1" onclick="openDrawer('attendance')">
-            <h2 id="dashPresent"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+            <h2 id="dashPresent" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Present Today</p>
             <p class="absent" id="dashAbsent">0 absent/late</p>
         </div>
 
         <div class="stat-card yellow fade-in-up delay-2" onclick="openDrawer('modules')">
-            <h2 id="dashModules"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+            <h2 id="dashModules" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Modules Done</p>
             <p class="pending" id="dashModulesSub">Calculating...</p>
         </div>
         <div class="stat-card purple fade-in-up delay-2" onclick="openDrawer('activities')">
-            <h2 id="dashActivities"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1rem;"></i></h2>
+            <h2 id="dashActivities" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Activities</p>
             <p class="done" id="dashActivitiesSub">Waiting</p>
         </div>
@@ -561,9 +562,7 @@
                 <span class="perf-label">Lowest</span>
             </div>
         </div>
-        <div class="perf-top" id="perfTopList">
-            <div class="perf-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading ranking...</div>
-        </div>
+        <div class="perf-top" id="perfTopList" data-skeleton-blocks="4"></div>
     </div>
 
     <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>

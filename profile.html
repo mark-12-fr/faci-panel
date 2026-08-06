@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
+    <script src="ui-enhance.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
@@ -288,11 +289,7 @@
         </div>
 
         <h3 class="section-title fade-in-up delay-2">Co-Facilitators</h3>
-        <div class="info-card fade-in-up delay-2" id="coFaciContainer">
-            <div style="text-align:center; padding: 15px; color: var(--text-sub); font-size: 0.8rem;">
-                <i class="fa-solid fa-spinner fa-spin"></i> Loading partners...
-            </div>
-        </div>
+        <div class="info-card fade-in-up delay-2" id="coFaciContainer" data-skeleton-blocks="4"></div>
 
         <button class="reset-btn fade-in-up delay-3" onclick="resetLocalData()">
             <i class="fa-solid fa-rotate"></i> Reset Local Data

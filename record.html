@@ -13,6 +13,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
+    <script src="ui-enhance.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="offlineSyncUtility.js" defer></script>
     
@@ -114,8 +115,19 @@
         }
         .table-scroll-container:hover { box-shadow: var(--hover-shadow); }
 
-        .horizontal-scroll { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+        .horizontal-scroll { overflow-x: auto; overflow-y: auto; width: 100%; -webkit-overflow-scrolling: touch; max-height: calc(100vh - 250px); min-height: 120px; }
         table { border-collapse: collapse; width: 100%; white-space: nowrap; min-width: 2200px; }
+        
+        /* Sticky totals row: always visible while scrolling the table */
+        tfoot td {
+            position: sticky; bottom: 0; background: #f8fafc;
+            font-size: 0.72rem; font-weight: 800; color: var(--text-main);
+            border-top: 2px solid var(--accent-blue); padding: 7px 4px;
+        }
+        tfoot .tfoot-sticky { z-index: 12; }
+        tfoot .sticky-col-1 { left: 0; }
+        tfoot .sticky-col-2 { left: 32px; }
+        .totals-cell { color: var(--accent-blue); }
         
         th { background: #f8fafc; color: var(--text-sub); font-size: 0.7rem; text-transform: uppercase; padding: 12px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
         td { padding: 6px 4px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; text-align: center; }
@@ -472,9 +484,52 @@
                         <th style="background: #f0f9ff;">6</th><th style="background: #f0f9ff;">7</th><th style="background: #f0f9ff;">8</th><th style="background: #f0f9ff;">9</th><th style="background: #f0f9ff;">10</th>
                     </tr>
                 </thead>
-                <tbody id="recordTableBody">
-                    <tr><td colspan="41" style="text-align: center; padding: 30px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color:var(--text-muted);"></i></td></tr>
-                </tbody>
+                <tbody id="recordTableBody" data-skeleton-rows="6" data-skeleton-cols="41"></tbody>
+                <tfoot id="totalsRow" style="display:none;">
+                    <tr>
+                        <td class="sticky-col-1 tfoot-sticky" title="Column totals"><i class="fa-solid fa-sigma"></i></td>
+                        <td class="sticky-col-2 tfoot-sticky">TOTAL</td>
+                        <td class="totals-cell" data-field="module_1">&ndash;</td>
+                        <td class="totals-cell" data-field="module_2">&ndash;</td>
+                        <td class="totals-cell" data-field="module_3">&ndash;</td>
+                        <td class="totals-cell" data-field="module_4">&ndash;</td>
+                        <td class="totals-cell" data-field="module_5">&ndash;</td>
+                        <td class="totals-cell" data-field="module_6">&ndash;</td>
+                        <td class="totals-cell" data-field="module_7">&ndash;</td>
+                        <td class="totals-cell" data-field="module_8">&ndash;</td>
+                        <td class="totals-cell" data-field="module_9">&ndash;</td>
+                        <td class="totals-cell" data-field="module_10">&ndash;</td>
+                        <td class="totals-cell" data-field="module_11">&ndash;</td>
+                        <td class="totals-cell" data-field="module_12">&ndash;</td>
+                        <td class="totals-cell" data-field="module_13">&ndash;</td>
+                        <td class="totals-cell" data-field="module_14">&ndash;</td>
+                        <td class="totals-cell" data-field="module_15">&ndash;</td>
+                        <td class="totals-cell" data-field="module_16">&ndash;</td>
+                        <td class="totals-cell" data-field="module_17">&ndash;</td>
+                        <td class="totals-cell" data-field="module_18">&ndash;</td>
+                        <td class="totals-cell" data-field="module_19">&ndash;</td>
+                        <td class="totals-cell" data-field="module_20">&ndash;</td>
+                        <td class="totals-cell" data-field="module_21">&ndash;</td>
+                        <td class="totals-cell" data-field="module_22">&ndash;</td>
+                        <td class="totals-cell" data-field="module_23">&ndash;</td>
+                        <td class="totals-cell" data-field="module_24">&ndash;</td>
+                        <td class="totals-cell" data-field="module_25">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_1">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_2">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_3">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_4">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_5">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_6">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_7">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_8">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_9">&ndash;</td>
+                        <td class="totals-cell" data-field="activity_10">&ndash;</td>
+                        <td class="totals-cell" data-field="at">&ndash;</td>
+                        <td class="totals-cell" data-field="pt_1">&ndash;</td>
+                        <td class="totals-cell" data-field="pt_2">&ndash;</td>
+                        <td class="totals-cell" data-field="qe">&ndash;</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -748,10 +803,13 @@
                 setLoad(90);
 
                 tbody.innerHTML = '';
+                const totalsRow = document.getElementById('totalsRow');
                 if (students.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    if (totalsRow) totalsRow.style.display = 'none';
                     return;
                 }
+                if (totalsRow) totalsRow.style.display = '';
 
                 let rowCount = 1;
                 students.forEach(stud => tbody.appendChild(createInputRow(stud, rowCount++, existingRecords)));
@@ -764,6 +822,7 @@
                 attachAdvanceListeners();
                 _qsPopulateFieldSelect();
                 qsSyncChecks();
+                refreshTotals();
 
             } catch (error) {
                 console.error("Error loading records:", error);
@@ -1278,7 +1337,41 @@
                 row.classList.remove('selected');
             }
             scheduleDraftSave();
+            refreshTotals();
         }
+
+        // ── Sticky totals row ────────────────────────────────────────────
+        // Sums every score column (current-quarter values only — carried-over
+        // cells from previous quarters are excluded).
+        const TOTALS_FIELDS = Array.from({ length: 25 }, (_, i) => 'module_' + (i + 1))
+            .concat(Array.from({ length: 10 }, (_, i) => 'activity_' + (i + 1)))
+            .concat(['at', 'pt_1', 'pt_2', 'qe']);
+
+        function refreshTotals() {
+            const foot = document.getElementById('totalsRow');
+            if (!foot || foot.style.display === 'none') return;
+            TOTALS_FIELDS.forEach(field => {
+                const cell = foot.querySelector(`.totals-cell[data-field="${field}"]`);
+                if (!cell) return;
+                let sum = 0, count = 0;
+                document.querySelectorAll(`.score-input[data-field="${field}"]:not([data-carried="1"])`).forEach(inp => {
+                    const v = parseFloat(inp.value);
+                    if (!isNaN(v)) { sum += v; count++; }
+                });
+                cell.textContent = count ? (sum % 1 === 0 ? sum.toFixed(0) : sum.toFixed(1)) : '–';
+            });
+        }
+
+        // Live updates as the facilitator types or stamps scores
+        document.addEventListener('DOMContentLoaded', () => {
+            const tb = document.getElementById('recordTableBody');
+            if (tb) tb.addEventListener('input', (e) => {
+                if (e.target.classList && e.target.classList.contains('score-input')) refreshTotals();
+            });
+        });
+
+        // Pull-to-refresh hook (ui-enhance.js calls this on release)
+        window.MJR_pullRefresh = () => loadClassRecordData(localStorage.getItem('faci_section'));
 
         // Make every row's tickbox mirror the picked column: ticked = the
         // student already has a value there; disabled = locked, or (when no
