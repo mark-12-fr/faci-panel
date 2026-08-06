@@ -316,6 +316,10 @@
             display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
             align-items: center; background: var(--panel-bg); padding: 10px 12px;
             border-radius: 10px; box-shadow: var(--premium-shadow);
+            /* The .fade-in-up animation leaves a transform behind, which traps
+               the dropdown list's z-index inside this bar's stacking context —
+               an explicit z-index keeps the pop-open list above the search bar. */
+            position: relative; z-index: 100;
         }
         .qs-help { font-size: 0.78rem; color: var(--text-sub); font-weight: 600; line-height: 1.4; flex: 1 1 200px; }
         .qs-help b { color: var(--accent-blue); font-weight: 800; }
