@@ -371,6 +371,12 @@
             pointer-events: none; white-space: nowrap;
         }
         .quick-input-badge.show { opacity: 0.9; }
+
+        /* Smooth taps: kill the flashy default highlight, add a springy press */
+        * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .tap-feedback, button, .row-checkbox, .ss-trigger { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease; }
+        .tap-feedback:active { transform: scale(0.97); }
+        .tap-feedback:active i { transform: scale(0.9); }
     </style>
 </head>
 <body>
@@ -416,10 +422,10 @@
     <div class="qs-bar fade-in-up delay-2">
         <span class="qs-help"><b>Add a score:</b> (1) pick a column&nbsp;→ (2) pick a score&nbsp;→ (3) tick the students who got that score</span>
         <div class="qs-controls">
-            <select id="qsFieldSelect" class="qs-field-select" title="Which column the score goes into" onchange="qsSyncChecks()">
+            <select id="qsFieldSelect" class="qs-field-select" title="Which column the score goes into" onchange="qsSyncChecks()" data-smooth-select>
                 <option value="">Pick column…</option>
             </select>
-            <select id="qsScoreSelect" class="qs-score-select" title="What score to give" onchange="qsSyncChecks()">
+            <select id="qsScoreSelect" class="qs-score-select" title="What score to give" onchange="qsSyncChecks()" data-smooth-select>
                 <option value="">Pick score…</option>
                 <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
                 <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
@@ -652,9 +658,27 @@
 
         // Quarter is read straight from the teacher's sections row.
         let currentQuarter = '1';
+        let currentSchoolLevel = 'senior_high';
+        let currentSemester = '1st Sem';
 
         function getCurrentQuarter() {
             return currentQuarter;
+        }
+
+        // College sections store numeric quarters (1-4), which map to the
+        // Prelim / Midterm / Final terms; SHS keeps plain Q1-Q4.
+        function collegeTermFor(q) {
+            if (!currentSemester || !currentSemester.startsWith('2')) {
+                const map = { '1': 'Prelim', '2': 'Midterm', '3': 'Final', '4': 'Final' };
+                return map[q] || 'Term ' + q;
+            }
+            const map = { '1': 'Final', '2': 'Final', '3': 'Prelim', '4': 'Midterm' };
+            return map[q] || 'Term ' + q;
+        }
+
+        function quarterLabel() {
+            if (currentSchoolLevel === 'college') return collegeTermFor(currentQuarter);
+            return 'Q' + currentQuarter;
         }
 
         // Thin top loading bar — "pure real progress": width is set at each real
@@ -688,13 +712,15 @@
             setLoad(8);
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, teacher_id');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id');
                 if(sectionData) {
-                    document.getElementById('infoSemester').textContent = sectionData.semester || '1st Sem';
+                    currentSemester = sectionData.semester || '1st Sem';
+                    document.getElementById('infoSemester').textContent = currentSemester;
                     currentSectionId = sectionData.id;
                     currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
+                    currentSchoolLevel = sectionData.school_level || 'senior_high';
                     const qBadge = document.getElementById('infoQuarter');
-                    if (qBadge) qBadge.textContent = 'Q' + currentQuarter;
+                    if (qBadge) qBadge.textContent = quarterLabel();
                 }
 
                 setLoad(35);
@@ -1331,6 +1357,7 @@
             });
         });
     </script>
+    <script src="smooth-select.js" defer></script>
     <script src="mjr-notify.js" defer></script>
     <script src="mjr-guard.js" defer></script>
     <script src="mjr-offline.js" defer></script>

@@ -452,6 +452,12 @@
         .nav-item:hover i { transform: translateY(-2px); }
         .nav-item:active i { background: rgba(59, 130, 246, 0.28); transform: scale(0.9); }
 
+        /* Smooth taps: kill the flashy default highlight, add a springy press */
+        * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .tap-feedback, .nav-item, button, .overview-item, .mini-card { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease; }
+        .tap-feedback:active { transform: scale(0.97); }
+        .tap-feedback:active i { transform: scale(0.9); }
+
     </style>
 </head>
 
@@ -653,6 +659,17 @@
             const cachedName = localStorage.getItem('faci_name') || 'User';
             const cachedImg = localStorage.getItem('faci_img_url');
 
+            // College sections store numeric quarters (1-4) that map to the
+            // Prelim / Midterm / Final terms; SHS keeps plain Q1-Q4.
+            function collegeTermFor(semester, q) {
+                if (!semester || !semester.startsWith('2')) {
+                    const map = { '1': 'Prelim', '2': 'Midterm', '3': 'Final', '4': 'Final' };
+                    return map[q] || 'Term ' + q;
+                }
+                const map = { '1': 'Final', '2': 'Final', '3': 'Prelim', '4': 'Midterm' };
+                return map[q] || 'Term ' + q;
+            }
+
             // Subscribe this device to Web Push so the facilitator gets
             // OS notifications when the teacher edits attendance or scores.
             if (window.MJR_setupPush && faciId) window.MJR_setupPush('faci', faciId);
@@ -708,7 +725,7 @@
             }
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, quarter, teacher_id');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, quarter, school_level, teacher_id');
 
                 if (!sectionData) {
                     document.getElementById('dashTotalStudents').textContent = '0';
@@ -737,7 +754,12 @@
                 }
 
                 document.getElementById('faciSemesterOverview').textContent = (sectionData.semester || '1st Sem').replace(/\s*sem(ester)?\.?\s*$/i, '').trim() || '1st';
-                document.getElementById('faciQuarterOverview').textContent = sectionData.quarter || '1';
+                const isCollege = (sectionData.school_level || 'senior_high') === 'college';
+                const qNum = String(sectionData.quarter || '1');
+                const termLabel = isCollege
+                    ? (collegeTermFor(sectionData.semester || '1st Sem', qNum))
+                    : 'Q' + qNum;
+                document.getElementById('faciQuarterOverview').textContent = termLabel;
 
                 const { data: students } = await MJR_cachedQuery('students_' + sectionData.id, supabaseClient
                     .from('students').select('*').eq('section_id', sectionData.id).order('full_name', { ascending: true }));

@@ -197,6 +197,49 @@
         .nav-item:hover { color: var(--accent-blue); }
         .nav-item:hover i { transform: translateY(-2px); }
         .nav-item:active i { background: rgba(59, 130, 246, 0.28); transform: scale(0.9); }
+
+        /* --- Styled confirmation modal (replaces window.confirm) --- */
+        .confirm-overlay {
+            position: fixed; inset: 0; z-index: 3200; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(3px);
+        }
+        .confirm-overlay.show { display: flex; }
+        .confirm-card {
+            width: 100%; max-width: 330px; background: #fff; border-radius: 16px;
+            padding: 22px 20px 18px; text-align: center;
+            box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.4);
+            animation: confirmPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+        @keyframes confirmPop { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .confirm-card .confirm-icon {
+            width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%;
+            background: #fee2e2; color: #dc2626; font-size: 1.5rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .confirm-card h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--text-main); }
+        .confirm-card p { margin: 0 0 18px; font-size: 0.85rem; color: var(--text-sub); line-height: 1.45; }
+        .confirm-actions { display: flex; gap: 10px; }
+        .confirm-actions button {
+            flex: 1; padding: 11px 0; border: none; border-radius: 10px;
+            font-weight: 800; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        }
+        .confirm-actions button:active { transform: scale(0.95); }
+        .confirm-cancel { background: #f1f5f9; color: #475569; }
+        .confirm-cancel:active { background: #e2e8f0; }
+        .confirm-danger { background: #dc2626; color: #fff; }
+        .confirm-danger:active { background: #b91c1c; }
+        .confirm-warn { background: #d97706; color: #fff; }
+        .confirm-warn:active { background: #b45309; }
+
+        /* Smooth taps: kill the flashy default highlight, add a springy press */
+        * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .tap-feedback, .nav-item, button { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease; }
+        .tap-feedback:active { transform: scale(0.97); }
+        .tap-feedback:active i { transform: scale(0.9); }
     </style>
 </head>
 <body>
@@ -259,6 +302,18 @@
             <i class="fa-solid fa-arrow-right-from-bracket"></i> Log out
         </button>
 
+    </div>
+
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-card">
+            <div class="confirm-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <h3 id="confirmTitle">Are you sure?</h3>
+            <p id="confirmMessage">...</p>
+            <div class="confirm-actions">
+                <button class="confirm-cancel" id="confirmCancelBtn">Cancel</button>
+                <button class="confirm-danger" id="confirmOkBtn">Yes, continue</button>
+            </div>
+        </div>
     </div>
 
     <nav class="bottom-nav">
@@ -478,9 +533,35 @@
             reader.readAsDataURL(file);
         }
 
+        // 🌟 STYLED CONFIRM MODAL (replaces window.confirm) 🌟
+        function MJR_confirm(message, okLabel, danger) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('confirmOverlay');
+                const title = document.getElementById('confirmTitle');
+                const msg = document.getElementById('confirmMessage');
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+                msg.textContent = message;
+                if (okLabel) okBtn.textContent = okLabel;
+                okBtn.className = danger ? 'confirm-danger' : 'confirm-warn';
+                const cleanup = (result) => {
+                    overlay.classList.remove('show');
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    overlay.onclick = null;
+                    resolve(result);
+                };
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+                overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
+                overlay.classList.add('show');
+            });
+        }
+
         // 🌟 RESET LOCAL DATA FUNCTION 🌟
-        function resetLocalData() {
-            if(confirm("Clear all local data and refresh the page?")) {
+        async function resetLocalData() {
+            const yes = await MJR_confirm('Clear all local data and refresh the page?', 'Clear it', true);
+            if (yes) {
                 localStorage.clear();
                 window.location.reload();
             }
@@ -488,7 +569,8 @@
 
         // 🌟 SAFE LOGOUT FUNCTION 🌟
         async function faciLogout() {
-            if(confirm("Are you sure you want to sign out?")) {
+            const yes = await MJR_confirm('Are you sure you want to sign out?', 'Sign out', true);
+            if (yes) {
                 stopPresenceHeartbeat();
                 await sendPresenceHeartbeat(false);
                 localStorage.removeItem('faci_id');

@@ -212,6 +212,12 @@
         }
         .toast-notification.show { visibility: visible; opacity: 1; transform: translateY(0) scale(1); }
         .toast-notification i { color: var(--accent-blue); font-size: 1.1rem; }
+
+        /* Smooth taps: kill the flashy default highlight, add a springy press */
+        * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .tap-feedback, button, .subject-select { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease; }
+        .tap-feedback:active { transform: scale(0.97); }
+        .tap-feedback:active i { transform: scale(0.9); }
     </style>
 </head>
 <body>
@@ -236,7 +242,7 @@
 
         <div class="subject-select">
             <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-blue); height: 100%; display: flex; align-items: center; justify-content: space-between;">
-                <span id="subjectDisplay">...</span> <i class="fa-solid fa-chevron-down"></i>
+                <span id="subjectDisplay">...</span>
             </div>
         </div>
     </div>
@@ -310,6 +316,24 @@
         // 🔥 ENHANCED PRESENCE LOGIC (Direct Supabase + Tab Close Handling) 🔥
         let presenceHeartbeatTimer = null;
         let currentSectionQuarter = '1';
+        let currentSchoolLevel = 'senior_high';
+        let currentSemester = '1st Sem';
+
+        // College sections store numeric quarters (1-4), which map to the
+        // Prelim / Midterm / Final terms; SHS keeps plain Q1-Q4.
+        function collegeTermFor(q) {
+            if (!currentSemester || !currentSemester.startsWith('2')) {
+                const map = { '1': 'Prelim', '2': 'Midterm', '3': 'Final', '4': 'Final' };
+                return map[q] || 'Term ' + q;
+            }
+            const map = { '1': 'Final', '2': 'Final', '3': 'Prelim', '4': 'Midterm' };
+            return map[q] || 'Term ' + q;
+        }
+
+        function quarterLabel() {
+            if (currentSchoolLevel === 'college') return collegeTermFor(currentSectionQuarter);
+            return 'Q' + currentSectionQuarter;
+        }
 
         async function sendPresenceHeartbeat(online = true) {
             const faciId = localStorage.getItem('faci_id');
@@ -483,7 +507,7 @@
             container.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i></div>';
 
             try {
-                const sectionRow = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, teacher_id');
+                const sectionRow = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id');
 
                 if (!sectionRow) {
                     container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">Error: Section not found or restricted.</div>';
@@ -491,8 +515,10 @@
                 }
                 const sectionId = sectionRow.id;
                 const semester = sectionRow.semester || '1st Sem';
+                currentSemester = semester;
                 currentSectionQuarter = sectionRow.quarter ? String(sectionRow.quarter) : '1';
-                document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • Q${currentSectionQuarter}`;
+                currentSchoolLevel = sectionRow.school_level || 'senior_high';
+                document.getElementById('headerDetails').textContent = `${semester} • ${sectionTitle} • ${quarterLabel()}`;
 
                 const { data: students } = await MJR_cachedQuery('students_' + sectionId, supabaseClient.from('students').select('*').eq('section_id', sectionId).order('full_name'));
 
