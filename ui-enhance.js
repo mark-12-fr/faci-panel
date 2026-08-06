@@ -1,95 +1,15 @@
 /* ui-enhance.js — shared UX layer for the static faci-panel pages.
- *   1. Dark mode toggle (persisted per-device, injected before first paint)
- *   2. Offline / pending-sync badge (uses window.__offlineSync when present)
- *   3. Pull-to-refresh on touch devices (window.MJR_pullRefresh override)
- *   4. Skeleton loaders ([data-skeleton-rows], [data-skeleton-blocks], [data-skeleton-bar])
- * Must run BEFORE first paint to set the theme without a flash, so it is
- * loaded in <head> without defer. */
+ *   1. Offline / pending-sync badge (uses window.__offlineSync when present)
+ *   2. Pull-to-refresh on touch devices (window.MJR_pullRefresh override)
+ *   3. Skeleton loaders ([data-skeleton-rows], [data-skeleton-blocks], [data-skeleton-bar])
+ * Loaded in <head> without defer. */
 (function () {
   "use strict";
 
   if (window.__uiEnhanceLoaded) return;
   window.__uiEnhanceLoaded = true;
 
-  var THEME_KEY = "faci_theme";
-  var theme = null;
-  try { theme = localStorage.getItem(THEME_KEY); } catch (e) { theme = null; }
-  if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
-
   var CSS = [
-    /* ── Dark theme (slate palette) ────────────────────────────────────── */
-    "html[data-theme=dark]{color-scheme:dark;}",
-    "html[data-theme=dark] body{background:#0f172a;color:#e2e8f0;}",
-    "html[data-theme=dark]{--panel-bg:#1e293b;--text-main:#f1f5f9;--text-sub:#94a3b8;--premium-shadow:0 10px 15px -3px rgba(0,0,0,.4),0 4px 6px -2px rgba(0,0,0,.3);--hover-shadow:0 12px 22px -8px rgba(0,0,0,.5);}",
-    "html[data-theme=dark] .info-card,html[data-theme=dark] .overview-panel,html[data-theme=dark] .performance-panel,html[data-theme=dark] .stat-card,html[data-theme=dark] .mini-card,html[data-theme=dark] .qs-bar,html[data-theme=dark] .search-bar,html[data-theme=dark] .table-scroll-container,html[data-theme=dark] .action-card,html[data-theme=dark] .student-card,html[data-theme=dark] .student-item,html[data-theme=dark] .info-box,html[data-theme=dark] .profile-avatar-container,html[data-theme=dark] .subject-select,html[data-theme=dark] .date-input,html[data-theme=dark] .quick-bar,html[data-theme=dark] .roll-mode,html[data-theme=dark] .opt-btn,html[data-theme=dark] .mark-all,html[data-theme=dark] .badge-container,html[data-theme=dark] .gb-card,html[data-theme=dark] .perf-row{background:#1e293b;border-color:#334155;}",
-    "html[data-theme=dark] .search-bar input,html[data-theme=dark] .date-input input,html[data-theme=dark] .score-input{color:#e2e8f0;background:#0f172a;border-color:#334155;}",
-    "html[data-theme=dark] .score-input:focus{background:#172238;border-color:var(--accent-blue);}",
-    "html[data-theme=dark] .score-input:disabled{background-color:#1a2537;color:#64748b;border-color:#334155;}",
-    "html[data-theme=dark] table th{background:#1a2537 !important;color:#94a3b8;border-color:#334155;}",
-    "html[data-theme=dark] table td{border-color:#263141;color:#e2e8f0;}",
-    "html[data-theme=dark] .sticky-col-1,html[data-theme=dark] .sticky-col-2,html[data-theme=dark] .td-sticky-1,html[data-theme=dark] .td-sticky-2{background:#16203a;}",
-    "html[data-theme=dark] thead .sticky-col-1,html[data-theme=dark] thead .sticky-col-2,html[data-theme=dark] tfoot .sticky-col-1,html[data-theme=dark] tfoot .sticky-col-2,html[data-theme=dark] tfoot td{background:#1a2537;}",
-    "html[data-theme=dark] .qs-field-select,html[data-theme=dark] .qs-score-select,html[data-theme=dark] .ss-trigger{background:#172238;color:#60a5fa;border-color:#3b82f6;}",
-    "html[data-theme=dark] .ss-chevron{color:#60a5fa;}",
-    "html[data-theme=dark] .ss-list{background:#1e293b;border-color:#334155;}",
-    "html[data-theme=dark] .ss-option{color:#e2e8f0;}",
-    "html[data-theme=dark] .ss-option:hover{background:#223250;}",
-    "html[data-theme=dark] .ss-option.ss-selected{background:#1e3a5f;color:#93c5fd;}",
-    "html[data-theme=dark] .bottom-nav{background:#0f172a;border-top-color:#1e293b;}",
-    "html[data-theme=dark] .nav-item{color:#94a3b8;}",
-    "html[data-theme=dark] .nav-item.active i,html[data-theme=dark] .nav-item:active i{background:rgba(59,130,246,.25);}",
-    "html[data-theme=dark] .confirm-card,html[data-theme=dark] .custom-alert-box,html[data-theme=dark] .drawer,html[data-theme=dark] .paste-box{background:#1e293b;color:#e2e8f0;}",
-    "html[data-theme=dark] .drawer-header,html[data-theme=dark] .drawer-footer,html[data-theme=dark] .drawer-input-group,html[data-theme=dark] .drawer-row,html[data-theme=dark] .perf-row,html[data-theme=dark] .perf-stat{background:#1a2537;}",
-    "html[data-theme=dark] .drawer-close,html[data-theme=dark] .close-drawer-btn{background:#273449;color:#e2e8f0;}",
-    "html[data-theme=dark] .paste-box textarea,html[data-theme=dark] .drawer-input-group input,html[data-theme=dark] .drawer-input-group select{background:#0f172a;color:#e2e8f0;border-color:#334155;}",
-    "html[data-theme=dark] .confirm-card h3,html[data-theme=dark] .custom-alert-title,html[data-theme=dark] .drawer-header{color:#f1f5f9;}",
-    "html[data-theme=dark] .confirm-card p,html[data-theme=dark] .custom-alert-msg,html[data-theme=dark] .drawer-body{color:#94a3b8;}",
-    "html[data-theme=dark] .confirm-cancel{background:#273449;color:#cbd5e1;}",
-    "html[data-theme=dark] .confirm-cancel:active{background:#334155;}",
-    "html[data-theme=dark] .toast-notification,html[data-theme=dark] .quick-input-badge{background:#1e293b;color:#e2e8f0;}",
-    "html[data-theme=dark] .draft-indicator{color:#fff;}",
-    "html[data-theme=dark] .info-label,html[data-theme=dark] .info-value,html[data-theme=dark] .student-name,html[data-theme=dark] .s-name,html[data-theme=dark] .s-id,html[data-theme=dark] .profile-name,html[data-theme=dark] .profile-role{color:#f1f5f9;}",
-    "html[data-theme=dark] .clickable-name{color:#60a5fa;}",
-    "html[data-theme=dark] .sk-bar,html[data-theme=dark] .sk-block{background:#263141;}",
-    "html[data-theme=dark] .badge-score,html[data-theme=dark] .gb-final{background:#1a2537;}",
-    "html[data-theme=dark] .badge-score{color:#93c5fd;}",
-    "html[data-theme=dark] .status-lock{background:#334155;color:#e2e8f0;border-color:#475569;}",
-    "html[data-theme=dark] .apply-drawer-btn{background:#2563eb;color:#fff;}",
-    "html[data-theme=dark] .submit-btn{background:#2563eb;}",
-    "html[data-theme=dark] .mini-card.present h3,html[data-theme=dark] .quick-btn.mark-all{color:#22c55e;}",
-    "html[data-theme=dark] .mini-card.absent h3{color:#f87171;}",
-    "html[data-theme=dark] .mini-card.late h3{color:#fbbf24;}",
-    "html[data-theme=dark] .mini-card.total h3{color:#f1f5f9;}",
-    "html[data-theme=dark] .quick-btn.roll-mode,html[data-theme=dark] #subjectDisplay,html[data-theme=dark] .quarter-badge,html[data-theme=dark] .qs-help b{color:#60a5fa;border-color:#3b82f6;}",
-    "html[data-theme=dark] .section-tag,html[data-theme=dark] .tag-primary{background:#172238;color:#60a5fa;}",
-    "html[data-theme=dark] .tag-secondary{background:#2b1b3d;color:#c4b5fd;}",
-    "html[data-theme=dark] .co-faci-role-text{background:#172238;color:#60a5fa;}",
-    "html[data-theme=dark] .s-name span{color:#60a5fa !important;opacity:1 !important;}",
-    "html[data-theme=dark] .opt-btn.present.active{background:#15803d;border-color:#15803d;}",
-    "html[data-theme=dark] .opt-btn.absent.active{background:#991b1b;border-color:#991b1b;}",
-    "html[data-theme=dark] .opt-btn.late.active{background:#92400e;border-color:#92400e;}",
-    "html[data-theme=dark] .submit-btn{background:#2563eb !important;}",
-    "html[data-theme=dark] .perf-rank{background:#1d4ed8;}",
-    "html[data-theme=dark] .perf-rank.gold{background:#92400e;}",
-    "html[data-theme=dark] .perf-rank.silver{background:#64748b;}",
-    "html[data-theme=dark] .perf-rank.bronze{background:#78350f;}",
-    "html[data-theme=dark] .perf-grade{color:#60a5fa;}",
-    "html[data-theme=dark] #dashTotalStudents{color:#93c5fd;}",
-    "html[data-theme=dark] #dashPresent{color:#4ade80;}",
-    "html[data-theme=dark] #dashModules{color:#fbbf24;}",
-    "html[data-theme=dark] #dashActivities{color:#c4b5fd;}",
-    "html[data-theme=dark] p#dashAbsent{color:#f87171 !important;}",
-    "html[data-theme=dark] p#dashModulesSub{color:#fbbf24 !important;}",
-    "html[data-theme=dark] p#dashActivitiesSub{color:#4ade80 !important;}",
-    "html[data-theme=dark] .badge-blue{background:#172238;color:#60a5fa;}",
-    "html[data-theme=dark] .badge-purple{background:#2b1b3d;color:#c4b5fd;}",
-    "html[data-theme=dark] .reset-btn{background:#451a03;color:#fbbf24;border-color:#78350f;}",
-    "html[data-theme=dark] .logout-btn{background:#450a0a;color:#fca5a5;border-color:#7f1d1d;}",
-    "html[data-theme=dark] .perf-empty,html[data-theme=dark] .drawer-empty,html[data-theme=dark] .gb-empty{color:#94a3b8;}",
-    /* ── Theme toggle button ────────────────────────────────────────────── */
-    "#uiThemeBtn{position:fixed;top:12px;right:12px;z-index:950;width:42px;height:42px;border-radius:50%;border:1px solid #e2e8f0;background:#fff;color:#334155;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px -4px rgba(15,23,42,.25);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .18s cubic-bezier(.34,1.56,.64,1);}",
-    "#uiThemeBtn:active{transform:scale(.9);}",
-    "html[data-theme=dark] #uiThemeBtn{background:#1e293b;border-color:#334155;color:#fbbf24;}",
     /* ── Offline / pending-sync badge ───────────────────────────────────── */
     "#uiStatusBadge{position:fixed;left:50%;bottom:72px;transform:translateX(-50%) translateY(8px);z-index:960;display:none;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;font-size:.72rem;font-weight:800;box-shadow:0 8px 18px -6px rgba(15,23,42,.35);opacity:0;transition:opacity .2s ease,transform .2s cubic-bezier(.34,1.56,.64,1);-webkit-tap-highlight-color:transparent;}",
     "#uiStatusBadge.show{display:flex;opacity:1;transform:translateX(-50%) translateY(0);}",
@@ -114,36 +34,6 @@
   styleEl.id = "uiEnhanceStyle";
   styleEl.textContent = CSS;
   document.head.appendChild(styleEl);
-
-  /* ── Theme toggle ────────────────────────────────────────────────────── */
-  function setTheme(t) {
-    var el = document.documentElement;
-    if (t === "dark") {
-      el.setAttribute("data-theme", "dark");
-      btn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-      btn.title = "Switch to light mode";
-    } else {
-      el.removeAttribute("data-theme");
-      btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-      btn.title = "Switch to dark mode";
-    }
-    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
-  }
-
-  var btn = document.createElement("button");
-  btn.id = "uiThemeBtn";
-  btn.type = "button";
-  btn.setAttribute("aria-label", "Toggle dark mode");
-  document.addEventListener("DOMContentLoaded", function () {
-    document.body.appendChild(btn);
-    var cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    if (cur === "dark") btn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-    else btn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-    btn.addEventListener("click", function () {
-      var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      setTheme(next);
-    });
-  });
 
   /* ── Offline / pending-sync badge ────────────────────────────────────── */
   var badge = document.createElement("div");
