@@ -1,7 +1,7 @@
 /* ui-enhance.js — shared UX layer for the static faci-panel pages.
- *   1. Offline / pending-sync badge (uses window.__offlineSync when present)
- *   2. Pull-to-refresh on touch devices (window.MJR_pullRefresh override)
- *   3. Skeleton loaders ([data-skeleton-rows], [data-skeleton-blocks], [data-skeleton-bar])
+ *   1. Pull-to-refresh on touch devices (window.MJR_pullRefresh override)
+ *   2. Skeleton loaders ([data-skeleton-rows], [data-skeleton-blocks], [data-skeleton-bar])
+ *   3. Zoom lock (pinch + double-tap)
  * Loaded in <head> without defer. */
 (function () {
   "use strict";
@@ -10,11 +10,6 @@
   window.__uiEnhanceLoaded = true;
 
   var CSS = [
-    /* ── Offline / pending-sync badge ───────────────────────────────────── */
-    "#uiStatusBadge{position:fixed;left:50%;bottom:72px;transform:translateX(-50%) translateY(8px);z-index:960;display:none;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;font-size:.72rem;font-weight:800;box-shadow:0 8px 18px -6px rgba(15,23,42,.35);opacity:0;transition:opacity .2s ease,transform .2s cubic-bezier(.34,1.56,.64,1);-webkit-tap-highlight-color:transparent;}",
-    "#uiStatusBadge.show{display:flex;opacity:1;transform:translateX(-50%) translateY(0);}",
-    "#uiStatusBadge.offline{background:#dc2626;color:#fff;}",
-    "#uiStatusBadge.pending{background:#d97706;color:#fff;}",
     /* ── Pull-to-refresh indicator ──────────────────────────────────────── */
     "#uiPull{position:fixed;top:0;left:50%;z-index:970;width:44px;height:44px;border-radius:50%;background:#fff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 8px 18px -6px rgba(15,23,42,.3);transform:translate(-50%,-60px);transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .2s ease;opacity:0;}",
     "#uiPull.spin{animation:uiPullSpin .8s linear infinite;}",
@@ -35,39 +30,6 @@
   styleEl.id = "uiEnhanceStyle";
   styleEl.textContent = CSS;
   document.head.appendChild(styleEl);
-
-  /* ── Offline / pending-sync badge ────────────────────────────────────── */
-  var badge = document.createElement("div");
-  badge.id = "uiStatusBadge";
-  document.addEventListener("DOMContentLoaded", function () {
-    document.body.appendChild(badge);
-  });
-
-  function renderBadge() {
-    var online = navigator.onLine !== false;
-    if (!online) {
-      badge.className = "offline show";
-      badge.innerHTML = '<i class="fa-solid fa-wifi"></i> Offline — changes queued';
-      return;
-    }
-    if (window.__offlineSync && window.__offlineSync.pendingCount) {
-      window.__offlineSync.pendingCount().then(function (n) {
-        if (n > 0) {
-          badge.className = "pending show";
-          badge.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> ' + n + ' pending to sync';
-        } else {
-          badge.className = "";
-          badge.innerHTML = "";
-        }
-      }).catch(function () {});
-      return;
-    }
-    badge.className = "";
-    badge.innerHTML = "";
-  }
-
-  window.addEventListener("online", renderBadge);
-  window.addEventListener("offline", renderBadge);
 
   /* ── Pull-to-refresh (touch devices only) ────────────────────────────── */
   var pullEl = document.createElement("div");
@@ -180,8 +142,6 @@
       el.innerHTML = '<span class="sk-bar sk-inline" style="width:' + (el.getAttribute("data-skeleton-bar") || "72px") + '"></span>';
     });
   });
-
-  document.addEventListener("DOMContentLoaded", renderBadge);
 
   /* ── Zoom lock (pinch + double-tap) ──────────────────────────────────── */
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
