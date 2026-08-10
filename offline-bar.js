@@ -52,7 +52,7 @@
             '.mjr-ob-icon{flex:0 0 auto;position:relative;display:flex;align-items:center;justify-content:center;' +
             'width:28px;height:28px;border-radius:50%;color:#fff}' +
             '.mjr-ob-icon svg{width:15px;height:15px;display:block}' +
-            '.mjr-ob-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+            '.mjr-ob-text{white-space:normal;overflow:visible;line-height:1.35}' +
             '.mjr-ob-spinner{width:15px;height:15px;border-radius:50%;' +
             'border:2px solid rgba(255,255,255,.35);border-top-color:#fff;' +
             'animation:mjr-ob-spin .8s linear infinite}' +

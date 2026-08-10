@@ -794,21 +794,15 @@
                 return;
             }
 
-            // Offline check — queue to IndexedDB if no connection
+            // Offline check — queue to IndexedDB if no connection. The pill on
+            // top (offline-bar.js) reflects the queued count — no duplicate
+            // button message needed.
             if (!navigator.onLine && window.__offlineSync) {
                 await window.__offlineSync.queue('attendance', attendanceData);
                 if (window.MJR_cacheInvalidate) {
                     window.MJR_cacheInvalidate('attendance_' + section + '_' + dateStr);
                     window.MJR_cacheInvalidate('attall_' + section);
                 }
-                btn.style.background = '#d97706';
-                btn.innerHTML = '<i class="fa-solid fa-clock"></i> Saved Offline!';
-                setTimeout(async () => {
-                    await loadDynamicStudents(section);
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Attendance';
-                    btn.style.background = 'var(--accent-blue)';
-                }, 2000);
                 return;
             }
 

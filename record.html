@@ -1126,18 +1126,12 @@
                 return;
             }
 
-            // Offline check — queue to IndexedDB if no connection
+            // Offline check — queue to IndexedDB if no connection. The pill on
+            // top (offline-bar.js) reflects the queued count — no duplicate
+            // button message needed.
             if (!navigator.onLine && window.__offlineSync) {
                 await window.__offlineSync.queue('class_record', recordData);
                 if (window.MJR_cacheInvalidate) window.MJR_cacheInvalidate('records_' + currentSectionId);
-                btn.style.background = '#d97706';
-                btn.innerHTML = '<i class="fa-solid fa-clock"></i> Saved Offline!';
-                setTimeout(async () => {
-                    await loadClassRecordData(sectionTitle);
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit New Scores';
-                    btn.style.background = 'var(--accent-blue)';
-                }, 2000);
                 return;
             }
 
