@@ -61,7 +61,7 @@
  *      (instant load); they aren't navigations, so the restriction can't bite.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v16';
+var CACHE_NAME = 'acadtrack-faci-shell-v17';
 
 // Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
 // a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
@@ -80,6 +80,7 @@ var SHELL_URLS = [
     '/mjr-notify.js',
     '/mjr-guard.js',
     '/mjr-offline.js',
+    '/offline-bar.js',
     '/offlineSyncUtility.js',
     '/smooth-select.js',
     '/ui-enhance.js',

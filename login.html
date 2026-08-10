@@ -19,6 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
     <script src="offlineSyncUtility.js" defer></script>
+    <script src="offline-bar.js" defer></script>
     <script src="mjr-offline.js" defer></script>
     <script>
         document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
@@ -320,10 +321,6 @@
 </head>
 <body>
 
-    <div id="offlineStatusBar" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#fff;text-align:center;padding:8px 12px;font-size:13px;z-index:100000;font-family:'Inter',sans-serif;">
-        <i class="fa-solid fa-wifi-slash"></i> You are offline — <span id="offlineQueueCount">0</span> pending submission(s)
-    </div>
-
     <div id="splashScreen" class="splash-screen">
         <div class="splash-content">
             <h1 class="splash-title" id="splashTitle">AcadTrack</h1>
@@ -380,7 +377,7 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
             ? 'http://127.0.0.1:5000'
-            : 'https://teacher-panel-d1kw.onrender.com';
+            : 'https://faci-panel-api-production.up.railway.app';
 
         // 🌿 CUSTOM ALERT FUNCTIONS 🌿
         function showAlert(title, message, iconClass = 'fa-circle-xmark', iconColor = '#ef4444') {
@@ -459,34 +456,6 @@
                     splashScreen.style.visibility = 'hidden';
                     document.body.style.overflow = 'auto';
                 }, 2000); /* full animation ~1.75s + fade, so letters + subtitle complete before hiding */
-            }
-        });
-
-        // Offline Status Bar
-        window.addEventListener('load', function () {
-            if (window.__offlineSync) {
-                window.__offlineSync.onchange = function (items) {
-                    var bar = document.getElementById('offlineStatusBar');
-                    var count = document.getElementById('offlineQueueCount');
-                    if (bar && count) {
-                        if (!window.__offlineSync.isOnline || items.length > 0) {
-                            bar.style.display = 'block';
-                            count.textContent = items.length;
-                        } else {
-                            bar.style.display = 'none';
-                        }
-                    }
-                };
-                window.__offlineSync.pendingCount().then(function (count) {
-                    var bar = document.getElementById('offlineStatusBar');
-                    var countEl = document.getElementById('offlineQueueCount');
-                    if (bar && countEl) {
-                        if (!navigator.onLine || count > 0) {
-                            bar.style.display = 'block';
-                            countEl.textContent = count;
-                        }
-                    }
-                });
             }
         });
 
