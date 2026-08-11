@@ -1,7 +1,7 @@
 (function () {
     if (window.MJR_notify) return;
 
-    const VAPID_PUBLIC_KEY = 'BFtf7OOJhwgFropnI9-gshc0TgwbPjy2-AEjdqs1s2kBLig70bcsTK_xsYY1P6f1eLxztvH_Fc0VUkMhbVHIp0g';
+    const VAPID_PUBLIC_KEY = 'BD3FAzw-ThA6BXtFVg2-89BgAHIDcHeX4e0jzNWJAPc9Qs4tZFhcUQ9f2EbcFJtlFAbaKpqcXGGa27BreRJu3kU';
 
     const hasNotificationAPI = (typeof Notification !== 'undefined');
     let permissionGranted = hasNotificationAPI && Notification.permission === 'granted';
