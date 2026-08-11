@@ -159,7 +159,9 @@
             iconEl.className = 'mjr-ob-icon';
             textEl.textContent = state.queued > 0
                 ? state.queued + ' ' + plural(state.queued) + ' saved \u2014 will sync when you\u2019re back online'
-                : 'You\u2019re offline \u2014 changes will sync when you\u2019re back';
+                : window.__offlineSync
+                    ? 'You\u2019re offline \u2014 changes will sync when you\u2019re back'
+                    : 'You\u2019re offline \u2014 showing saved data';
             el.className = 'mjr-ob-show mjr-ob-mode-offline';
         }
     }
