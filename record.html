@@ -126,11 +126,15 @@
         table { border-collapse: collapse; width: 100%; white-space: nowrap; min-width: 2200px; }
         
         th { background: #f8fafc; color: var(--text-sub); font-size: 0.7rem; text-transform: uppercase; padding: 12px 10px; text-align: center; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+
+        /* Sticky header: MODULES / ACTIVITIES / AT / PT / QE stay pinned while scrolling down */
+        thead { position: sticky; top: 0; z-index: 12; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12); }
+        thead .sticky-col-1, thead .sticky-col-2 { z-index: 13; }
         td { padding: 6px 4px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; text-align: center; }
 
         .sticky-col-1 { position: sticky; left: 0; background: #f8fafc; z-index: 10; width: 32px; }
         .sticky-col-2 { position: sticky; left: 32px; background: #f8fafc; z-index: 10; width: 108px; text-align: left; }
-        thead .sticky-col-1, thead .sticky-col-2 { z-index: 11; border-bottom: 2px solid #e2e8f0; }
+        thead .sticky-col-1, thead .sticky-col-2 { z-index: 13; border-bottom: 2px solid #e2e8f0; }
         .td-sticky-1 { position: sticky; left: 0; background: white; z-index: 5; width: 32px; }
         .td-sticky-2 { position: sticky; left: 32px; background: white; z-index: 5; text-align: left; padding-left: 8px; width: 108px; max-width: 108px; white-space: normal; line-height: 1.2; }
 
