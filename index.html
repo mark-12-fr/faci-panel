@@ -382,6 +382,23 @@
         .drawer-empty {
             text-align: center; color: var(--text-sub); padding: 22px 12px; font-size: 0.85rem;
         }
+        .drawer-search {
+            display: flex; align-items: center; gap: 8px;
+            background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 10px 12px; margin-bottom: 10px;
+        }
+        .drawer-search:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+        .drawer-search i { color: var(--text-sub); font-size: 0.85rem; }
+        .drawer-search input {
+            border: none; outline: none; flex: 1; min-width: 0;
+            font-size: 0.88rem; font-family: 'Inter', sans-serif; color: var(--text-main); background: transparent;
+        }
+        .drawer-search .clear-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: #f1f5f9; border: none; width: 22px; height: 22px; border-radius: 50%;
+            color: var(--text-sub); font-size: 0.7rem; cursor: pointer; flex-shrink: 0;
+        }
+        .drawer-search .clear-btn:active { background: #e2e8f0; }
 
         /* Professional, readable detail rows (Modules / Activities / PT & Exam) */
         .meta-line { display: flex; align-items: center; gap: 6px; margin-top: 3px; line-height: 1.3; font-size: 0.75rem; color: var(--text-sub); }
@@ -964,18 +981,69 @@
             return (name || '?').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2);
         }
 
+        let drawerType = null;
+        let drawerQuery = '';
+
         function openDrawer(type) {
+            drawerType = type;
+            drawerQuery = '';
+            renderDrawer(true);
+        }
+
+        function searchableDrawer(type) {
+            return type === 'students' || type === 'attendance' || type === 'modules' ||
+                   type === 'activities' || type === 'exams' || type === 'top' || type === 'missing';
+        }
+
+        function noMatchHtml() {
+            return `<div class="drawer-empty">No students match &ldquo;${escapeHtml(drawerQuery.trim())}&rdquo;.</div>`;
+        }
+
+        function filterStudents(list) {
+            const q = drawerQuery.trim().toLowerCase();
+            if (!q) return list;
+            return list.filter(s =>
+                (s.full_name || '').toLowerCase().includes(q) || (s.id_no || '').toLowerCase().includes(q));
+        }
+
+        function updateClearBtn() {
+            const btn = document.querySelector('#drawerSearchWrap .clear-btn');
+            if (btn) btn.style.display = drawerQuery ? 'inline-flex' : 'none';
+        }
+
+        function renderDrawer(fresh) {
+            const type = drawerType;
             const titleEl = document.getElementById('drawerTitle');
             const bodyEl = document.getElementById('drawerBody');
             let title = 'Details';
             let html = '';
 
+            if (fresh) {
+                bodyEl.innerHTML = '';
+                const wrap = document.createElement('div');
+                wrap.id = 'drawerSearchWrap';
+                if (searchableDrawer(type)) {
+                    wrap.innerHTML = `
+                        <div class="drawer-search">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="search" placeholder="Search student..." autocomplete="off" oninput="window.filterDrawer(this.value)">
+                            <button class="clear-btn" style="display:none" onclick="window.clearDrawerSearch()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>`;
+                }
+                const list = document.createElement('div');
+                list.id = 'drawerList';
+                bodyEl.appendChild(wrap);
+                bodyEl.appendChild(list);
+                updateClearBtn();
+            }
+
             if (type === 'students') {
                 title = 'My Students';
-                if (!cachedStudents.length) {
-                    html = '<div class="drawer-empty">No students assigned yet.</div>';
+                const list = filterStudents(cachedStudents);
+                if (!list.length) {
+                    html = drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">No students assigned yet.</div>';
                 } else {
-                    html = cachedStudents.map(s => `
+                    html = list.map(s => `
                         <div class="drawer-row">
                             <div class="avatar">${escapeHtml(initials(s.full_name))}</div>
                             <div class="info">
@@ -992,7 +1060,7 @@
                     byKey[key] = r;
                 });
                 const groups = { Present: [], Late: [], Absent: [], Excused: [], Unmarked: [] };
-                cachedStudents.forEach(s => {
+                filterStudents(cachedStudents).forEach(s => {
                     const k1 = (s.id_no || '').trim();
                     const k2 = 'name:' + (s.full_name || '').trim().toLowerCase();
                     const r = byKey[k1] || byKey[k2];
@@ -1027,13 +1095,13 @@
                                 </div>
                             </div>`).join('');
                 }
-                if (!html) html = '<div class="drawer-empty">No attendance recorded today yet.</div>';
+                if (!html) html = drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">No attendance recorded today yet.</div>';
             } else if (type === 'modules' || type === 'activities') {
                 const isMod = type === 'modules';
                 title = isMod ? 'Modules' : 'Activities';
                 const count = isMod ? 25 : 10;
                 const prefix = isMod ? 'module_' : 'activity_';
-                const rows = cachedStudents.map(s => {
+                const rows = filterStudents(cachedStudents).map(s => {
                     const rec = studentRecord(s.id);
                     if (!rec) return { student: s, done: 0, lastIndex: 0, nextIndex: 1, score: null };
                     let done = 0, lastIndex = 0;
@@ -1081,10 +1149,10 @@
                                 <span class="badge badge-absent">0/${count}</span>
                             </div>`).join('');
                 }
-                if (!html) html = '<div class="drawer-empty">No data yet.</div>';
+                if (!html) html = drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">No data yet.</div>';
             } else if (type === 'exams') {
                 title = 'Performance Tasks & Exam';
-                const rows = cachedStudents.map(s => {
+                const rows = filterStudents(cachedStudents).map(s => {
                     const rec = studentRecord(s.id) || {};
                     return {
                         student: s,
@@ -1102,15 +1170,15 @@
                                 <div class="name">${escapeHtml(r.student.full_name)}</div>
                                 <div class="chips">${ptChip('PT1', r.pt1)}${ptChip('PT2', r.pt2)}${ptChip('QE', r.qe)}${ptChip('AT', r.at)}</div>
                             </div>
-                        </div>`).join('') || '<div class="drawer-empty">No data yet.</div>';
+                        </div>`).join('') || (drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">No data yet.</div>');
             } else if (type === 'top') {
                 title = 'Top Students';
-                const scored = cachedStudents.map(s => ({ student: s, ...gradeFor(s) }))
+                const scored = filterStudents(cachedStudents).map(s => ({ student: s, ...gradeFor(s) }))
                                               .sort((a, b) =>
                                                   (b.total - a.total)
                                                   || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
                 if (!scored.length || scored.every(s => s.total === 0)) {
-                    html = '<div class="drawer-empty">Top performers will appear once scores are entered.</div>';
+                    html = drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">Top performers will appear once scores are entered.</div>';
                 } else {
                     html = scored.map((r, i) => `
                         <div class="drawer-row">
@@ -1136,7 +1204,7 @@
                 // score for it — so unused modules/activities aren't flagged.
                 const activeFields = fields.filter(f => cachedStudents.some(s => has(recOf(s), f.key)));
 
-                const rows = cachedStudents.map(s => {
+                const rows = filterStudents(cachedStudents).map(s => {
                     const rec = recOf(s);
                     const missing = activeFields.filter(f => !has(rec, f.key));
                     return { student: s, missing };
@@ -1146,7 +1214,7 @@
                 if (!activeFields.length) {
                     html = '<div class="drawer-empty">No scores entered yet.</div>';
                 } else if (!rows.length) {
-                    html = '<div class="drawer-empty">All students are complete — no missing scores. 🎉</div>';
+                    html = drawerQuery.trim() ? noMatchHtml() : '<div class="drawer-empty">All students are complete — no missing scores. 🎉</div>';
                 } else {
                     html = rows.map(r => {
                         const labs = r.missing.map(f => f.label);
@@ -1165,10 +1233,23 @@
             }
 
             titleEl.textContent = title;
-            bodyEl.innerHTML = html;
+            const listEl = document.getElementById('drawerList');
+            if (listEl) listEl.innerHTML = html;
             document.getElementById('drawerBackdrop').classList.add('show');
             document.getElementById('dashDrawer').classList.add('show');
             document.body.style.overflow = 'hidden';
+        }
+
+        function filterDrawer(q) {
+            drawerQuery = q || '';
+            updateClearBtn();
+            if (drawerType) renderDrawer(false);
+        }
+
+        function clearDrawerSearch() {
+            drawerQuery = '';
+            updateClearBtn();
+            if (drawerType) renderDrawer(false);
         }
 
         function closeDrawer() {
@@ -1179,6 +1260,8 @@
 
         window.openDrawer = openDrawer;
         window.closeDrawer = closeDrawer;
+        window.filterDrawer = filterDrawer;
+        window.clearDrawerSearch = clearDrawerSearch;
 
         // 🔥 2. INSTANT INACTIVE LOGIC (PAG-LOGOUT) 🔥
         async function faciLogout() {
