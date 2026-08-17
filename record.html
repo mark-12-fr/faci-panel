@@ -25,6 +25,10 @@
     <script src="offline-bar.js" defer></script>
     
     <style>
+        /* College sections have no Achievement Test / Performance Task / Quarterly
+           Exam. Hide those columns (grid header + body cells) when the section is
+           college; the drawer + quick-add "Other" group are skipped in JS. */
+        body.hide-tail .tail-col { display: none; }
         :root {
             --primary-bg: #f8fafc;
             --panel-bg: #ffffff;
@@ -467,10 +471,10 @@
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
                         <th colspan="25" style="background: #f1f5f9;">MODULES</th>
                         <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
-                        <th rowspan="2" style="background: #f8fafc;">AT</th>
-                        <th rowspan="2" style="background: #f8fafc;">PT 1</th>
-                        <th rowspan="2" style="background: #f8fafc;">PT 2</th>
-                        <th rowspan="2" style="background: #f8fafc;">QE</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">AT</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 1</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 2</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">QE</th>
                     </tr>
                     <tr style="font-size: 0.6rem;">
                         <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
@@ -729,6 +733,8 @@
                     currentSectionId = sectionData.id;
                     currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
                     currentSchoolLevel = sectionData.school_level || 'senior_high';
+                    // College has no AT/PT/QE — hide those columns for college sections.
+                    document.body.classList.toggle('hide-tail', currentSchoolLevel === 'college');
                     const qBadge = document.getElementById('infoQuarter');
                     if (qBadge) qBadge.textContent = quarterLabel();
                 }
@@ -843,7 +849,8 @@
                         ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
                         : '');
 
-                return `<td><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
+                const tdCls = (field === 'at' || field.indexOf('pt_') === 0 || field === 'qe') ? ' class="tail-col"' : '';
+                return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
             };
 
             for(let i=1; i<=25; i++) html += renderInput(`module_${i}`);
@@ -977,7 +984,7 @@
             // intentionally hidden from them (grades live in the teacher panel).
             let finalHtml = createGrid(modules, 'Modules');
             finalHtml += createGrid(activities, 'Activities');
-            finalHtml += createGrid(others, 'Assessments');
+            if (currentSchoolLevel !== 'college') finalHtml += createGrid(others, 'Assessments');
 
             drawerBody.innerHTML = finalHtml;
 
@@ -1249,7 +1256,7 @@
             const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));
-            sel.appendChild(group('Other', others));
+            if (currentSchoolLevel !== 'college') sel.appendChild(group('Other', others));
             sel.dataset.populated = '1';
         }
 
