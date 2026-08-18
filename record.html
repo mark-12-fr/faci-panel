@@ -674,6 +674,7 @@
         let currentQuarter = '1';
         let currentSchoolLevel = 'senior_high';
         let currentSemester = '1st Sem';
+        let currentSubject = ''; // the section's subject — picks the grade weights
 
         function getCurrentQuarter() {
             return currentQuarter;
@@ -726,13 +727,19 @@
             setLoad(8);
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject');
                 if(sectionData) {
                     currentSemester = sectionData.semester || '1st Sem';
                     document.getElementById('infoSemester').textContent = currentSemester;
                     currentSectionId = sectionData.id;
                     currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
                     currentSchoolLevel = sectionData.school_level || 'senior_high';
+                    currentSubject = sectionData.subject || '';
+                    // Load THIS teacher's per-subject grade weights so the breakdown
+                    // uses the percentages the teacher set (not a hardcoded default).
+                    if (window.MJR_loadSubjectConfigs && sectionData.teacher_id) {
+                        try { await window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id); } catch (e) {}
+                    }
                     // College has no AT/PT/QE — hide those columns for college sections.
                     document.body.classList.toggle('hide-tail', currentSchoolLevel === 'college');
                     const qBadge = document.getElementById('infoQuarter');
@@ -885,23 +892,28 @@
         const isFilled = (v) => v !== null && v !== undefined && v !== '';
 
         function componentScores(rec) {
-            let ww = 0, pt = 0;
+            let ww = 0, pt = 0, at = 0;
             const qe = Number(rec.qe) || 0;
             for (const k in rec) {
                 const v = rec[k];
                 if (!isFilled(v)) continue;
-                if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0 || k === 'at') ww += Number(v) || 0;
+                if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0) ww += Number(v) || 0;
+                else if (k === 'at') at += Number(v) || 0;
                 else if (k.indexOf('pt_') === 0) pt += Number(v) || 0;
             }
+            // Written Works = Modules + Activities. The Achievement Test belongs to
+            // the EXAM with the Quarterly Exam (each out of 50 → out of 100).
             return {
                 ww: Math.min(ww, 100),
                 pt: Math.min(pt, 100),
-                qe: Math.min((qe / 50) * 100, 100),
+                qe: Math.min((qe / 50) * 100, 100),   // QE alone (display row)
+                exam: Math.min(at + qe, 100),         // AT + QE (drives the grade)
             };
         }
 
         function finalGrade(comp) {
-            return Math.round(comp.ww * 0.3 + comp.pt * 0.5 + comp.qe * 0.2);
+            var w = (window.MJR_weightsFor && window.MJR_weightsFor(currentSubject)) || { ww: 30, pt: 50, exam: 20 };
+            return Math.round(comp.ww * (w.ww / 100) + comp.pt * (w.pt / 100) + comp.exam * (w.exam / 100));
         }
 
         function quarterBreakdown(studentId) {
@@ -1340,6 +1352,7 @@
 
     </script>
     <script src="smooth-select.js" defer></script>
+    <script src="grading.js" defer></script>
     <script src="mjr-notify.js" defer></script>
     <script src="mjr-guard.js" defer></script>
     <script src="mjr-offline.js" defer></script>
