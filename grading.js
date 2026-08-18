@@ -94,20 +94,26 @@
     /** Passing threshold for a subject (default 75). */
     window.MJR_passingFor = function (subjectName) { return window.MJR_weightsFor(subjectName).passing; };
 
-    /** Component scores (each capped at 100) from a merged record. */
+    /** Component scores (each capped at 100) from a merged record.
+     *  Written Works = Modules + Activities. The Achievement Test (AT) belongs to
+     *  the EXAM with the Quarterly Exam (each out of 50 → combined out of 100),
+     *  NOT Written Works — so the exam component is (AT + QE) as a % of 100. */
     window.MJR_componentScores = function (record) {
-        var totalWW = 0, totalPT = 0, totalQE = num(record && record.qe, 0);
+        var totalWW = 0, totalPT = 0, atTotal = 0, totalQE = num(record && record.qe, 0);
         for (var k in (record || {})) {
             var v = record[k];
             if (v === null || v === undefined || v === '') continue;
-            if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0 || k === 'at') totalWW += num(v, 0);
+            if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0) totalWW += num(v, 0);
+            else if (k === 'at') atTotal += num(v, 0);
             else if (k.indexOf('pt_') === 0) totalPT += num(v, 0);
         }
+        var examRaw = atTotal + totalQE; // AT (/50) + QE (/50) → out of 100
         return {
             ww: Math.min(totalWW, 100),
             pt: Math.min(totalPT, 100),
             qe: Math.min((totalQE / 50) * 100, 100),
-            rawWW: totalWW, rawPT: totalPT, rawQE: totalQE
+            exam: Math.min(examRaw, 100),
+            rawWW: totalWW, rawPT: totalPT, rawQE: totalQE, rawAT: atTotal, rawExam: examRaw
         };
     };
 
@@ -135,7 +141,7 @@
         return Math.round(
             s.ww * (w.ww / 100) +
             s.pt * (w.pt / 100) +
-            s.qe * (w.exam / 100) +
+            s.exam * (w.exam / 100) +
             att * (w.att / 100)
         );
     };
