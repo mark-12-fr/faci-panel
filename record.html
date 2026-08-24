@@ -902,12 +902,16 @@
                 else if (k.indexOf('pt_') === 0) pt += Number(v) || 0;
             }
             // Written Works = Modules + Activities. The Achievement Test belongs to
-            // the EXAM with the Quarterly Exam (each out of 50 → out of 100).
+            // the EXAM with the Quarterly Exam (each out of 50 → out of 100). When
+            // the teacher sets a per-component "perfect score" (total possible),
+            // that component's % is (raw / total) * 100; else raw capped at 100.
+            const w = (window.MJR_weightsFor && window.MJR_weightsFor(currentSubject)) || {};
+            const pct = (raw, total) => (total > 0 ? Math.min((raw / total) * 100, 100) : Math.min(raw, 100));
             return {
-                ww: Math.min(ww, 100),
-                pt: Math.min(pt, 100),
+                ww: pct(ww, Number(w.wwTotal) || 0),
+                pt: pct(pt, Number(w.ptTotal) || 0),
                 qe: Math.min((qe / 50) * 100, 100),   // QE alone (display row)
-                exam: Math.min(at + qe, 100),         // AT + QE (drives the grade)
+                exam: pct(at + qe, Number(w.examTotal) || 0),   // AT + QE (drives the grade)
             };
         }
 

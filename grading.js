@@ -39,7 +39,7 @@
     window.MJR_loadSubjectConfigs = async function (sb, teacherId) {
         if (!teacherId) return window.MJR_SUBJECT_CFG;
         try {
-            var q = sb.from('subjects').select('name, ww_percent, pt_percent, exam_percent, attendance_percent, passing_grade')
+            var q = sb.from('subjects').select('name, ww_percent, pt_percent, exam_percent, attendance_percent, passing_grade, ww_total, pt_total, exam_total')
                 .eq('teacher_id', teacherId);
             var res = await q;
             if (res.error || !res.data) return window.MJR_SUBJECT_CFG;
@@ -50,7 +50,10 @@
                     pt: num(r.pt_percent, DEFAULT.pt),
                     exam: num(r.exam_percent, DEFAULT.exam),
                     att: num(r.attendance_percent, DEFAULT.att),
-                    passing: num(r.passing_grade, DEFAULT.passing)
+                    passing: num(r.passing_grade, DEFAULT.passing),
+                    wwTotal: num(r.ww_total, 0),
+                    ptTotal: num(r.pt_total, 0),
+                    examTotal: num(r.exam_total, 0)
                 };
             });
             window.MJR_SUBJECT_CFG = map;
@@ -87,8 +90,9 @@
         return c ? {
             ww: num(c.ww, DEFAULT.ww), pt: num(c.pt, DEFAULT.pt),
             exam: num(c.exam, DEFAULT.exam), att: num(c.att, DEFAULT.att),
-            passing: num(c.passing, DEFAULT.passing)
-        } : { ww: DEFAULT.ww, pt: DEFAULT.pt, exam: DEFAULT.exam, att: DEFAULT.att, passing: DEFAULT.passing };
+            passing: num(c.passing, DEFAULT.passing),
+            wwTotal: num(c.wwTotal, 0), ptTotal: num(c.ptTotal, 0), examTotal: num(c.examTotal, 0)
+        } : { ww: DEFAULT.ww, pt: DEFAULT.pt, exam: DEFAULT.exam, att: DEFAULT.att, passing: DEFAULT.passing, wwTotal: 0, ptTotal: 0, examTotal: 0 };
     };
 
     /** Passing threshold for a subject (default 75). */
@@ -98,7 +102,7 @@
      *  Written Works = Modules + Activities. The Achievement Test (AT) belongs to
      *  the EXAM with the Quarterly Exam (each out of 50 → combined out of 100),
      *  NOT Written Works — so the exam component is (AT + QE) as a % of 100. */
-    window.MJR_componentScores = function (record) {
+    window.MJR_componentScores = function (record, subjectName) {
         var totalWW = 0, totalPT = 0, atTotal = 0, totalQE = num(record && record.qe, 0);
         for (var k in (record || {})) {
             var v = record[k];
@@ -108,11 +112,15 @@
             else if (k.indexOf('pt_') === 0) totalPT += num(v, 0);
         }
         var examRaw = atTotal + totalQE; // AT (/50) + QE (/50) → out of 100
+        // When a subject sets a per-component "perfect score" (total possible),
+        // that component's % is (raw / total) * 100; else raw capped at 100.
+        var w = (subjectName !== undefined && subjectName !== null) ? window.MJR_weightsFor(subjectName) : null;
+        var pct = function (raw, total) { return total > 0 ? Math.min((raw / total) * 100, 100) : Math.min(raw, 100); };
         return {
-            ww: Math.min(totalWW, 100),
-            pt: Math.min(totalPT, 100),
+            ww: pct(totalWW, w ? w.wwTotal : 0),
+            pt: pct(totalPT, w ? w.ptTotal : 0),
             qe: Math.min((totalQE / 50) * 100, 100),
-            exam: Math.min(examRaw, 100),
+            exam: pct(examRaw, w ? w.examTotal : 0),
             rawWW: totalWW, rawPT: totalPT, rawQE: totalQE, rawAT: atTotal, rawExam: examRaw
         };
     };
@@ -136,7 +144,7 @@
      */
     window.MJR_finalGrade = function (record, subjectName, attScore) {
         var w = window.MJR_weightsFor(subjectName);
-        var s = window.MJR_componentScores(record);
+        var s = window.MJR_componentScores(record, subjectName);
         var att = (attScore === null || attScore === undefined) ? 100 : attScore;
         return Math.round(
             s.ww * (w.ww / 100) +
