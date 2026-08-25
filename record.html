@@ -962,7 +962,7 @@
                             <div class="gb-row"><span>Written Works</span><b>${Math.round(c.comp.ww)}</b></div>
                             <div class="gb-row"><span>Perf. Task</span><b>${Math.round(c.comp.pt)}</b></div>
                             <div class="gb-row"><span>Quarterly Exam</span><b>${Math.round(c.comp.qe)}</b></div>
-                            ${c.inProgress ? '<div style="margin-top:8px;font-size:0.66rem;font-weight:700;color:#b45309;background:rgba(245,158,11,0.15);border-radius:6px;padding:4px 8px;text-align:center;letter-spacing:0.02em;">⏳ NOT YET FINAL · SCORES INCOMPLETE</div>' : ''}
+                            ${c.inProgress ? '<div style="margin-top:8px;font-size:0.66rem;font-weight:700;color:#b45309;background:rgba(245,158,11,0.15);border-radius:6px;padding:4px 8px;text-align:center;letter-spacing:0.02em;">⏳ IN-PROGRESS · NOT YET FINAL</div>' : ''}
                         </div>`;
                 }).join('');
                 return `<div class="gb-sem-title">${sem}</div><div class="gb-grid">${semCards}</div>`;
