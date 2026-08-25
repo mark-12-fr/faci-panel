@@ -146,42 +146,14 @@
         var w = window.MJR_weightsFor(subjectName);
         var s = window.MJR_componentScores(record, subjectName);
         var att = (attScore === null || attScore === undefined) ? 100 : attScore;
-
-        // IN-PROGRESS grading: only components that have actually been GIVEN count.
-        // A component whose columns are all blank is "not handed out yet" — it is
-        // excluded and its weight is redistributed across the given components, so
-        // an empty PT/QE won't drag the grade down before it's administered. A
-        // blank is grace; enter a 0 for a real zero. When every component is
-        // filled the active weights sum to 100 → identical to the plain grade.
-        var has = function (pred) {
-            for (var k in (record || {})) {
-                if (pred(k)) { var v = record[k]; if (v !== null && v !== undefined && v !== '') return true; }
-            }
-            return false;
-        };
-        var wwG = has(function (k) { return k.indexOf('module_') === 0 || k.indexOf('activity_') === 0; });
-        var ptG = has(function (k) { return k.indexOf('pt_') === 0; });
-        var atG = has(function (k) { return k === 'at'; });
-        var qeG = has(function (k) { return k === 'qe'; });
-        var exG = atG || qeG;
-
-        // Exam % from the parts actually given (AT and QE are each half of
-        // examTotal — default 50 each), so an unentered QE doesn't halve the exam.
-        var examPct = s.exam;
-        if (exG) {
-            var partMax = w.examTotal > 0 ? w.examTotal / 2 : 50;
-            var denom = partMax * ((atG ? 1 : 0) + (qeG ? 1 : 0));
-            examPct = denom > 0 ? Math.min(((s.rawAT + s.rawQE) / denom) * 100, 100) : 0;
-        }
-
-        var score = 0, activeW = 0;
-        if (wwG) { score += s.ww * w.ww; activeW += w.ww; }
-        if (ptG) { score += s.pt * w.pt; activeW += w.pt; }
-        if (exG) { score += examPct * w.exam; activeW += w.exam; }
-        if (w.att > 0) { score += att * w.att; activeW += w.att; }
-
-        if (activeW <= 0) return 0; // nothing entered yet
-        return Math.round(score / activeW);
+        // A missing component counts as 0 and drags the grade down until it's
+        // entered — a grade reaches its full value only when everything is filled.
+        return Math.round(
+            s.ww * (w.ww / 100) +
+            s.pt * (w.pt / 100) +
+            s.exam * (w.exam / 100) +
+            att * (w.att / 100)
+        );
     };
 
     /** True when every weighted component has been given (Exam needs BOTH AT and
