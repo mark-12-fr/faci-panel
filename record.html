@@ -929,7 +929,11 @@
                 const hasData = !!rec && scoreFields.some(f => isFilled(rec[f]));
                 if (!hasData) return { ...dq, hasData: false, grade: null, comp: null, delta: null };
                 const comp = componentScores(rec);
-                return { ...dq, hasData: true, grade: finalGrade(comp), comp, delta: null };
+                // Use the shared in-progress grade engine (excludes not-yet-given
+                // components) so the faci breakdown matches the teacher panel;
+                // fall back to the local weighted calc if grading.js isn't loaded.
+                const grade = window.MJR_finalGrade ? window.MJR_finalGrade(rec, currentSubject, null) : finalGrade(comp);
+                return { ...dq, hasData: true, grade, comp, delta: null };
             });
             let prevGrade = null;
             cards.forEach(c => {
