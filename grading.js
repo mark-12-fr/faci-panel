@@ -184,6 +184,22 @@
         return Math.round(score / activeW);
     };
 
+    /** True when every weighted component has been given (Exam needs BOTH AT and
+     *  QE), so MJR_finalGrade is the FINAL grade — used to show an in-progress tag. */
+    window.MJR_isGradeComplete = function (record, subjectName) {
+        var w = window.MJR_weightsFor(subjectName);
+        var has = function (pred) {
+            for (var k in (record || {})) {
+                if (pred(k)) { var v = record[k]; if (v !== null && v !== undefined && v !== '') return true; }
+            }
+            return false;
+        };
+        if (w.ww > 0 && !has(function (k) { return k.indexOf('module_') === 0 || k.indexOf('activity_') === 0; })) return false;
+        if (w.pt > 0 && !has(function (k) { return k.indexOf('pt_') === 0; })) return false;
+        if (w.exam > 0 && !(has(function (k) { return k === 'at'; }) && has(function (k) { return k === 'qe'; }))) return false;
+        return true;
+    };
+
     // Auto-load this teacher's subject configs once the page's Supabase client
     // and identity are available, so every page's grades/AI become dynamic
     // without per-page wiring. Teacher panel keys on user_id; faci on
