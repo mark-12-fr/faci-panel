@@ -955,8 +955,11 @@
             setStat('perfHighest', highest);
             setStat('perfLowest', lowest);
 
+            // Rank by the weighted GRADE (not raw points) so this matches the
+            // teacher panel's Top Students exactly; raw total is only a tiebreaker.
             const ranked = [...scored].sort((a, b) =>
-                (b.total - a.total)
+                (b.grade - a.grade)
+                || (b.total - a.total)
                 || String(a.student.full_name || '').localeCompare(String(b.student.full_name || '')));
             if (!ranked.length || ranked.every(t => t.total === 0)) {
                 list.innerHTML = '<div class="perf-empty">Scores will appear once they\'re entered.</div>';
@@ -968,7 +971,7 @@
                     <div class="perf-row">
                         <div class="perf-rank ${cls}">${i + 1}</div>
                         <div class="perf-name">${escapeHtml(t.student.full_name || 'Unknown')}</div>
-                        <div class="perf-grade">${t.total}</div>
+                        <div class="perf-grade">${t.grade}%</div>
                     </div>`;
             }).join('');
         }
