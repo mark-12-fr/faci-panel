@@ -838,9 +838,13 @@
                     } catch (e) { /* attendance optional */ }
                 }
 
+                // grading.js publishes MJR_MODULE_COUNT (the Module columns both
+                // panels show); the "pending" tallies below must use the same
+                // number or every student looks short by the hidden columns.
+                const moduleCount = Number(window.MJR_MODULE_COUNT) || 15;
                 let modulesDone = 0, activitiesDone = 0;
                 cachedRecords.forEach(record => {
-                    for (let i = 1; i <= 25; i++) {
+                    for (let i = 1; i <= moduleCount; i++) {
                         if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined && record[`module_${i}`] !== '') modulesDone++;
                     }
                     for (let i = 1; i <= 10; i++) {
@@ -848,7 +852,7 @@
                     }
                 });
 
-                const totalPossibleModules = totalStudents * 25;
+                const totalPossibleModules = totalStudents * moduleCount;
                 const totalPossibleActivities = totalStudents * 10;
                 const pendingModules = totalPossibleModules > 0 ? totalPossibleModules - modulesDone : 0;
                 const pendingActivities = totalPossibleActivities > 0 ? totalPossibleActivities - activitiesDone : 0;
@@ -1196,7 +1200,8 @@
             } else if (type === 'missing') {
                 title = 'Missing Scores';
                 const fields = [];
-                for (let i = 1; i <= 25; i++) fields.push({ key: 'module_' + i, label: 'M' + i });
+                const mc = Number(window.MJR_MODULE_COUNT) || 15;
+                for (let i = 1; i <= mc; i++) fields.push({ key: 'module_' + i, label: 'M' + i });
                 for (let i = 1; i <= 10; i++) fields.push({ key: 'activity_' + i, label: 'A' + i });
                 fields.push({ key: 'at', label: 'AT' }, { key: 'pt_1', label: 'PT1' }, { key: 'pt_2', label: 'PT2' }, { key: 'qe', label: 'QE' });
 

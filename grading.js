@@ -22,6 +22,11 @@
 (function () {
     var DEFAULT = { ww: 30, pt: 50, exam: 20, att: 0, passing: 75 };
     window.MJR_GRADE_DEFAULT = DEFAULT;
+    // How many Module columns the panels show. The database still has
+    // module_1..25, so raising this only re-exposes columns that were never
+    // dropped; grades only ever count the module_* values a record actually has.
+    // Keep in sync with MODULE_COUNT in the teacher panel's class-record page.
+    window.MJR_MODULE_COUNT = 15;
     window.MJR_SUBJECT_CFG = window.MJR_SUBJECT_CFG || {};
 
     function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
