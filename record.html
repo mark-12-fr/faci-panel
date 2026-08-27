@@ -1076,7 +1076,18 @@
                 const studUuid = row.dataset.uuid;
                 const recordId = row.dataset.recordid; 
 
-                let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr, quarter: getCurrentQuarter() };
+                // facilitator_id stamps WHO submitted this row. The teacher
+                // panel writes NULL for its own saves, so this is what lets the
+                // backend tell a facilitator's submission apart from the
+                // teacher's own edit — and only the former reaches the teacher's
+                // notification bell.
+                let dataObj = {
+                    student_id: studUuid,
+                    section_id: currentSectionId,
+                    date: dateStr,
+                    quarter: getCurrentQuarter(),
+                    facilitator_id: localStorage.getItem('faci_id') || null,
+                };
                 
                 if (recordId) {
                     dataObj.id = recordId; 
