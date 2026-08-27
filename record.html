@@ -469,7 +469,7 @@
                     <tr>
                         <th class="sticky-col-1" rowspan="2" title="Tick the students who got the score in the selected column"><i class="fa-solid fa-square-check" style="color:var(--text-muted);"></i></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
-                        <th colspan="25" style="background: #f1f5f9;">MODULES</th>
+                        <th colspan="15" style="background: #f1f5f9;">MODULES</th>
                         <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">AT</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 1</th>
@@ -478,8 +478,7 @@
                     </tr>
                     <tr style="font-size: 0.6rem;">
                         <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
-                        <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
-                        <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th>
+                        <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th>
                         <th style="background: #f0f9ff;">1</th><th style="background: #f0f9ff;">2</th><th style="background: #f0f9ff;">3</th><th style="background: #f0f9ff;">4</th><th style="background: #f0f9ff;">5</th>
                         <th style="background: #f0f9ff;">6</th><th style="background: #f0f9ff;">7</th><th style="background: #f0f9ff;">8</th><th style="background: #f0f9ff;">9</th><th style="background: #f0f9ff;">10</th>
                     </tr>
@@ -676,6 +675,12 @@
         let currentSemester = '1st Sem';
         let currentSubject = ''; // the section's subject — picks the grade weights
 
+        // How many Module columns the grid shows. grading.js publishes
+        // MJR_MODULE_COUNT as the shared source of truth for both panels, but it
+        // is a deferred script, so read it when the grid is actually built
+        // rather than while this inline script is being parsed.
+        const moduleCount = () => Number(window.MJR_MODULE_COUNT) || 15;
+
         function getCurrentQuarter() {
             return currentQuarter;
         }
@@ -775,7 +780,7 @@
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + 10 + 4}" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
                     return;
                 }
 
@@ -793,7 +798,7 @@
 
             } catch (error) {
                 console.error("Error loading records:", error);
-                tbody.innerHTML = `<tr><td colspan="41" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + 10 + 4}" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
             } finally {
                 finishLoad();
             }
@@ -860,7 +865,8 @@
                 return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
             };
 
-            for(let i=1; i<=25; i++) html += renderInput(`module_${i}`);
+            const mCount = moduleCount();
+            for(let i=1; i<=mCount; i++) html += renderInput(`module_${i}`);
             for(let i=1; i<=10; i++) html += renderInput(`activity_${i}`);
             const fields = ['at', 'pt_1', 'pt_2', 'qe'];
             fields.forEach(f => html += renderInput(f));
@@ -979,7 +985,7 @@
             const row = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
             if (!row) return;
 
-            const modules = Array.from({length: 25}, (_, i) => `module_${i+1}`);
+            const modules = Array.from({length: moduleCount()}, (_, i) => `module_${i+1}`);
             const activities = Array.from({length: 10}, (_, i) => `activity_${i+1}`);
             const others = ['at', 'pt_1', 'pt_2', 'qe'];
 
@@ -1070,7 +1076,18 @@
                 const studUuid = row.dataset.uuid;
                 const recordId = row.dataset.recordid; 
 
-                let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr, quarter: getCurrentQuarter() };
+                // facilitator_id stamps WHO submitted this row. The teacher
+                // panel writes NULL for its own saves, so this is what lets the
+                // backend tell a facilitator's submission apart from the
+                // teacher's own edit — and only the former reaches the teacher's
+                // notification bell.
+                let dataObj = {
+                    student_id: studUuid,
+                    section_id: currentSectionId,
+                    date: dateStr,
+                    quarter: getCurrentQuarter(),
+                    facilitator_id: localStorage.getItem('faci_id') || null,
+                };
                 
                 if (recordId) {
                     dataObj.id = recordId; 
@@ -1272,7 +1289,7 @@
                 return og;
             };
             const modules = [];
-            for (let i = 1; i <= 25; i++) modules.push(['module_' + i, 'M' + i]);
+            for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + i]);
             const activities = [];
             for (let i = 1; i <= 10; i++) activities.push(['activity_' + i, 'A' + i]);
             const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];

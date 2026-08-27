@@ -105,9 +105,12 @@ function buildAttendancePrompt(roster) {
 
 // Every score-holding field on the class_records table. The client and API
 // both refer to this list to validate what the AI is allowed to return.
+// Keep in sync with MJR_MODULE_COUNT in grading.js — the panels only show (and
+// the scanner may only fill) this many Module columns.
+const MODULE_COUNT = 15;
 const RECORD_FIELDS = (function () {
     const arr = [];
-    for (let i = 1; i <= 25; i++) arr.push('module_' + i);
+    for (let i = 1; i <= MODULE_COUNT; i++) arr.push('module_' + i);
     for (let i = 1; i <= 10; i++) arr.push('activity_' + i);
     arr.push('at', 'pt_1', 'pt_2', 'qe');
     return arr;
@@ -363,7 +366,7 @@ function buildRecordPrompt(roster, targetFields, rosterIds) {
         "COLUMN → FIELD MAPPING (map the header text you see to the exact field key below):\n" +
         "- Under 'MODULES': a column headed with the plain number 'N' → module_N (e.g. '2' → module_2).\n" +
         "  A leading '0' column is Module 0 — ignore it unless you truly need module_0.\n" +
-        "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_25)\n" +
+        "- 'MODULE 1' / 'M1' / 'Mod 1' → module_1  (same pattern up to module_" + MODULE_COUNT + ")\n" +
         "- 'ACTIVITY 1' / 'A1' / 'Act 1' → activity_1  (same pattern up to activity_10)\n" +
         "- 'AT' / 'Attendance' → at\n" +
         "- 'PT 1' / 'PT1' / 'Performance Task 1' → pt_1\n" +
