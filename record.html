@@ -681,6 +681,30 @@
         // rather than while this inline script is being parsed.
         const moduleCount = () => Number(window.MJR_MODULE_COUNT) || 15;
 
+        // Two-finger trackpad swipe scrolls the score grid sideways (matches the
+        // teacher panel), so crossing the module/activity columns doesn't need
+        // the scrollbar. `.horizontal-scroll` already has overflow-x: auto, but a
+        // browser hands a sideways gesture to history navigation ("swipe to go
+        // back") unless the element claims it — so take the horizontal delta and
+        // preventDefault. This container also scrolls vertically, so a plain
+        // vertical wheel is left untouched; only a horizontal (or Shift) gesture
+        // is captured, and it's released at either edge.
+        (function () {
+            var box = document.querySelector('.horizontal-scroll');
+            if (!box) return;
+            box.style.overscrollBehaviorX = 'contain';
+            box.addEventListener('wheel', function (e) {
+                var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+                if (!dx) return;
+                var max = box.scrollWidth - box.clientWidth;
+                if (max <= 0) return;
+                var next = Math.min(Math.max(box.scrollLeft + dx, 0), max);
+                if (next === box.scrollLeft) return; // at an edge — let it through
+                box.scrollLeft = next;
+                e.preventDefault();
+            }, { passive: false });
+        })();
+
         function getCurrentQuarter() {
             return currentQuarter;
         }
