@@ -959,12 +959,14 @@
                 const hasData = !!rec && scoreFields.some(f => isFilled(rec[f]));
                 if (!hasData) return { ...dq, hasData: false, grade: null, comp: null, delta: null };
                 const comp = componentScores(rec);
-                // Use the shared in-progress grade engine (excludes not-yet-given
-                // components) so the faci breakdown matches the teacher panel;
-                // fall back to the local weighted calc if grading.js isn't loaded.
-                const grade = window.MJR_finalGrade ? window.MJR_finalGrade(rec, currentSubject, null) : finalGrade(comp);
-                const inProgress = window.MJR_isGradeComplete ? !window.MJR_isGradeComplete(rec, currentSubject) : false;
-                return { ...dq, hasData: true, grade, comp, delta: null, inProgress };
+                // Shared grade engine: Initial Grade (weighted, 2 dp) transmuted
+                // to the Final Grade, so the faci breakdown matches the teacher
+                // panel exactly. Falls back to the local calc if grading.js isn't
+                // loaded yet.
+                const brk = window.MJR_gradeBreakdown ? window.MJR_gradeBreakdown(rec, currentSubject, null) : null;
+                const grade = brk ? brk.final : (window.MJR_finalGrade ? window.MJR_finalGrade(rec, currentSubject, null) : finalGrade(comp));
+                const initial = brk ? brk.initial : null;
+                return { ...dq, hasData: true, grade, initial, comp, delta: null };
             });
             let prevGrade = null;
             cards.forEach(c => {
@@ -989,10 +991,10 @@
                         <div class="gb-card">
                             <div class="gb-head"><span>${c.label}</span>${deltaHtml}</div>
                             <div class="gb-final ${c.grade >= passMark ? 'gb-pass' : 'gb-fail'}">${c.grade}</div>
+                            ${c.initial != null ? `<div class="gb-row" style="justify-content:center;margin:-2px 0 4px;"><span>Initial Grade</span>&nbsp;<b>${c.initial.toFixed(2)}</b></div>` : ''}
                             <div class="gb-row"><span>Written Works</span><b>${Math.round(c.comp.ww)}</b></div>
                             <div class="gb-row"><span>Perf. Task</span><b>${Math.round(c.comp.pt)}</b></div>
                             <div class="gb-row"><span>Quarterly Exam</span><b>${Math.round(c.comp.qe)}</b></div>
-                            ${c.inProgress ? '<div style="margin-top:8px;font-size:0.66rem;font-weight:700;color:#b45309;background:rgba(245,158,11,0.15);border-radius:6px;padding:4px 8px;text-align:center;letter-spacing:0.02em;">⏳ IN-PROGRESS · NOT YET FINAL</div>' : ''}
                         </div>`;
                 }).join('');
                 return `<div class="gb-sem-title">${sem}</div><div class="gb-grid">${semCards}</div>`;
