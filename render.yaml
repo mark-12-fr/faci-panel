@@ -1,0 +1,54 @@
+# Render Blueprint for the AcadTrack Facilitator API (the FastAPI backend in
+# /backend). This is what the Next.js app in /web talks to once the frontend is
+# promoted from the legacy static site.
+#
+# Deploy:  Render dashboard → New +  →  Blueprint  →  pick this repo  →  Apply.
+# Then fill in the secrets (the `sync: false` vars) in the Render UI — they are
+# intentionally NOT committed here.
+#
+# After it deploys, Render gives the service a URL like
+#   https://faci-panel-api.onrender.com
+# Put THAT url into the faci-panel Vercel project as NEXT_PUBLIC_API_BASE, and
+# make sure it appears in CORS_ORIGINS below (already pre-filled for the known
+# Vercel domains — add your custom domain if you have one).
+services:
+  - type: web
+    name: faci-panel-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/ping
+    envVars:
+      # Pin Python so pydantic-core (Rust) + asyncpg (C) install from prebuilt
+      # cp312 wheels instead of compiling from source.
+      - key: PYTHON_VERSION
+        value: "3.12.9"
+
+      # Supabase Postgres async URL: postgresql+asyncpg://postgres.<ref>:<pw>@<host>:6543/postgres
+      - key: DATABASE_URL
+        sync: false
+
+      # Facilitator JWT signing secret (HS256). Use a long random string.
+      - key: JWT_SECRET
+        sync: false
+
+      # Allowed browser origins for the promoted web app. Add your custom
+      # domain(s) here too if the faci panel is served from one.
+      - key: CORS_ORIGINS
+        value: "https://faci-panel.vercel.app,https://faci-panel-mjrvertex-7104s-projects.vercel.app,https://faci-panel-git-main-mjrvertex-7104s-projects.vercel.app,https://acadtrack.asia,https://www.acadtrack.asia"
+
+      # AI photo-scan providers (optional — the scan feature degrades gracefully
+      # without them; everything else works).
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Web Push (VAPID) — optional.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: "mailto:mjrvertex@gmail.com"
