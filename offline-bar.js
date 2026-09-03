@@ -159,9 +159,7 @@
             iconEl.className = 'mjr-ob-icon';
             textEl.textContent = state.queued > 0
                 ? state.queued + ' ' + plural(state.queued) + ' saved \u2014 will sync when you\u2019re back online'
-                : window.__offlineSync
-                    ? 'You\u2019re offline \u2014 changes will sync when you\u2019re back'
-                    : 'You\u2019re offline \u2014 showing saved data';
+                : 'You\u2019re offline \u2014 changes require internet';
             el.className = 'mjr-ob-show mjr-ob-mode-offline';
         }
     }
@@ -176,24 +174,11 @@
     function onConnectivity() {
         var cameBack = state.online !== navigator.onLine && navigator.onLine;
         state.online = navigator.onLine;
-        if (cameBack && window.__offlineSync
-            && typeof window.__offlineSync.flush === 'function') {
-            try { window.__offlineSync.flush(); } catch (e) {}
-        }
         render();
     }
 
     window.addEventListener('online', onConnectivity);
     window.addEventListener('offline', onConnectivity);
-
-    if (window.__offlineSync) {
-        window.__offlineSync.onchange = function (items) {
-            setQueued(items ? items.length : 0);
-        };
-        window.__offlineSync.pendingCount().then(function (c) {
-            setQueued(c || 0);
-        });
-    }
 
     el.addEventListener('click', function () {
         if (el.className.indexOf('mjr-ob-hidden') !== -1) return;

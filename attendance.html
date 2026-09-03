@@ -19,7 +19,7 @@
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="ui-enhance.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="offlineSyncUtility.js" defer></script>
+
     <script src="offline-bar.js" defer></script>
     <style>
         :root {
@@ -795,15 +795,9 @@
                 return;
             }
 
-            // Offline check — queue to IndexedDB if no connection. The pill on
-            // top (offline-bar.js) reflects the queued count — no duplicate
-            // button message needed.
-            if (!navigator.onLine && window.__offlineSync) {
-                await window.__offlineSync.queue('attendance', attendanceData);
-                if (window.MJR_cacheInvalidate) {
-                    window.MJR_cacheInvalidate('attendance_' + section + '_' + dateStr);
-                    window.MJR_cacheInvalidate('attall_' + section);
-                }
+            // Require internet connection for submission
+            if (!navigator.onLine) {
+                showAlert("No Internet", "You need an internet connection to submit attendance. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
                 return;
             }
 

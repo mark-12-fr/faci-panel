@@ -19,7 +19,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-    <script src="offlineSyncUtility.js" defer></script>
+
     <script src="offline-bar.js" defer></script>
     <script src="mjr-offline.js" defer></script>
     <script>
@@ -484,32 +484,9 @@
             loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
             loginBtn.disabled = true;
 
-            // Offline path: check saved credentials in IndexedDB
+            // Require internet connection for login
             if (!navigator.onLine) {
-                var bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
-                var creds = null;
-                if (bcryptLib && window.__offlineSync) {
-                    creds = await window.__offlineSync.getLocalCreds(accountId);
-                }
-                if (creds && bcryptLib.compareSync(password, creds.passwordHash)) {
-                    var faciData = creds.faciData;
-                    if (rememberMe) { localStorage.setItem('remembered_faci_id', accountId); } else { localStorage.removeItem('remembered_faci_id'); }
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('user_id');
-                    localStorage.removeItem('cached_user_name');
-                    localStorage.removeItem('cached_user_avatar');
-                    localStorage.setItem('faci_id', faciData.id);
-                    localStorage.setItem('faci_name', faciData.full_name);
-                    localStorage.setItem('faci_section', faciData.section);
-                    localStorage.setItem('faci_subject', faciData.subject);
-                    if (faciData.teacher_id) localStorage.setItem('faci_teacher_id', faciData.teacher_id);
-                    else localStorage.removeItem('faci_teacher_id');
-                    loginBtn.style.backgroundColor = '#10b981';
-                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
-                    setTimeout(function () { window.location.href = 'index.html'; }, 800);
-                    return;
-                }
-                showAlert("Offline", "Not connected to the internet and no saved credentials found. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
+                showAlert("No Internet", "You need an internet connection to log in. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
                 loginBtn.innerHTML = 'Login';
                 loginBtn.disabled = false;
                 return;
@@ -532,9 +509,6 @@
                     if (error) throw error;
                     if (row && row.password && bcryptLib.compareSync(password, row.password)) {
                         faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
-                        if (window.__offlineSync) {
-                            window.__offlineSync.saveLocalCreds(accountId, row.password, faciData);
-                        }
                     }
                 } else {
                     const res = await fetch(`${API_URL}/api/faci/login`, {
