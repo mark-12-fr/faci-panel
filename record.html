@@ -684,6 +684,8 @@
         // (set by the teacher on the section). The facilitator only views the count.
         function renderGridHeader() {
             const mc = moduleCount(), ac = activityCount();
+            const mo = Number(window.MJR_MODULE_OFFSET) || 0;   // 2nd-quarter numbering offset
+            const ao = Number(window.MJR_ACTIVITY_OFFSET) || 0;
             const mods = document.getElementById('hdrModules');
             const acts = document.getElementById('hdrActivities');
             const nums = document.getElementById('hdrNumbers');
@@ -691,8 +693,8 @@
             if (acts) acts.colSpan = ac;
             if (nums) {
                 let h = '';
-                for (let i = 1; i <= mc; i++) h += `<th>${i}</th>`;
-                for (let i = 1; i <= ac; i++) h += `<th style="background: #f0f9ff;">${i}</th>`;
+                for (let i = 1; i <= mc; i++) h += `<th>${mo + i}</th>`;
+                for (let i = 1; i <= ac; i++) h += `<th style="background: #f0f9ff;">${ao + i}</th>`;
                 nums.innerHTML = h;
             }
         }
@@ -773,7 +775,7 @@
             renderGridHeader(); // fill the header immediately (defaults), refined once the section loads
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count, module_counts, activity_counts');
                 if(sectionData) {
                     currentSemester = sectionData.semester || '1st Sem';
                     document.getElementById('infoSemester').textContent = currentSemester;
@@ -782,9 +784,24 @@
                     currentSchoolLevel = sectionData.school_level || 'senior_high';
                     currentSubject = sectionData.subject || '';
                     // Module / Activity column counts are set by the teacher on the
-                    // section; mirror them so the faci grid shows the same columns.
-                    window.MJR_MODULE_COUNT = Number(sectionData.module_count) || 15;
-                    window.MJR_ACTIVITY_COUNT = Number(sectionData.activity_count) || 10;
+                    // section (per quarter). Mirror the current quarter's count, and
+                    // its numbering offset — the 2nd quarter of a semester continues
+                    // the 1st's numbering (Q2 after Q1, Q4 after Q3; resets each sem).
+                    const cntFor = (counts, qq, dflt, hi) => {
+                        const n = Number(counts && counts[String(qq)]);
+                        return isFinite(n) && n >= 1 ? Math.min(Math.round(n), hi) : dflt;
+                    };
+                    const mCounts = sectionData.module_counts || {};
+                    const aCounts = sectionData.activity_counts || {};
+                    const mDflt = Number(sectionData.module_count) || 15;
+                    const aDflt = Number(sectionData.activity_count) || 10;
+                    const isCollege = currentSchoolLevel === 'college';
+                    const secondQ = !isCollege && (String(currentQuarter) === '2' || String(currentQuarter) === '4');
+                    const firstQ = String(currentQuarter) === '4' ? '3' : '1';
+                    window.MJR_MODULE_COUNT = cntFor(mCounts, currentQuarter, mDflt, 25);
+                    window.MJR_ACTIVITY_COUNT = cntFor(aCounts, currentQuarter, aDflt, 10);
+                    window.MJR_MODULE_OFFSET = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
+                    window.MJR_ACTIVITY_OFFSET = secondQ ? cntFor(aCounts, firstQ, aDflt, 10) : 0;
                     renderGridHeader();
                     // Load THIS teacher's per-subject grade weights so the breakdown
                     // uses the percentages the teacher set (not a hardcoded default).
