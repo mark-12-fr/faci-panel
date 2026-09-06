@@ -598,7 +598,7 @@
         // Every quarter's raw records for the whole section, cached from the
         // last loadClassRecordData() so the drawer can show a per-quarter
         // grade breakdown for whichever student is tapped — the table itself
-        // only ever displays ONE (carried-forward) row per student.
+        // only ever displays the CURRENT quarter's row per student.
         let _allRecordsCache = [];
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
@@ -834,10 +834,10 @@
                 document.getElementById('infoTotal').textContent = students.length;
                 setLoad(65);
 
-                // Fetch every quarter's record. createInputRow shows the
-                // current quarter's value when present, otherwise carries
-                // over the previous quarter's value so scores never look
-                // wiped after the section's quarter changes.
+                // Cache every quarter's record for the per-quarter grade
+                // breakdown in the drawer. The table itself shows only the
+                // current quarter's scores (createInputRow filters by quarter),
+                // so a new quarter starts with empty, editable columns.
                 _allRecordsCache = existingRecords;
                 setLoad(90);
 
@@ -883,24 +883,6 @@
                             || null;
             if (currentRec && currentRec.id) tr.dataset.recordid = currentRec.id;
 
-            // Rows from OTHER quarters (newest first). When the current
-            // quarter has no value for a field, we display the previous
-            // quarter's value so it doesn't look wiped. These cells are
-            // shown disabled to keep the read-only feel of submitted
-            // scores — the teacher can still edit them via the teacher
-            // panel, which is the source of truth.
-            const fallbackRecs = studentRecs
-                .filter(r => r !== currentRec)
-                .sort((a, b) => Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0));
-
-            function fallbackValue(field) {
-                for (const r of fallbackRecs) {
-                    const v = r[field];
-                    if (v !== null && v !== undefined && v !== '') return v;
-                }
-                return null;
-            }
-
             let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsStampStudent(this)" disabled title="Pick a column first"></td>
@@ -912,20 +894,19 @@
             `;
 
             const renderInput = (field) => {
+                // Each quarter shows only its OWN scores. A submitted score for
+                // this quarter is locked (only the Teacher can change it); an
+                // empty cell stays editable so the faci can enter a new score.
                 const currentVal = currentRec ? currentRec[field] : null;
                 const hasCurrent = (currentVal !== null && currentVal !== undefined && currentVal !== '');
-                const carried = hasCurrent ? null : fallbackValue(field);
-                const displayVal = hasCurrent ? currentVal : (carried !== null ? carried : '');
-                const isDisabled = (hasCurrent || carried !== null) ? 'disabled' : '';
-                const carriedAttr = (!hasCurrent && carried !== null) ? 'data-carried="1"' : '';
+                const displayVal = hasCurrent ? currentVal : '';
+                const isDisabled = hasCurrent ? 'disabled' : '';
                 const titleMsg = hasCurrent
                     ? 'title="Score submitted. Only the Teacher can edit this."'
-                    : (carried !== null
-                        ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
-                        : '');
+                    : '';
 
                 const tdCls = (field === 'at' || field.indexOf('pt_') === 0 || field === 'qe') ? ' class="tail-col"' : '';
-                return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
+                return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${titleMsg}></td>`;
             };
 
             const mCount = moduleCount();
@@ -1161,11 +1142,6 @@
                 }
 
                 row.querySelectorAll('.score-input').forEach(input => {
-                    // Skip values that are only being displayed from a
-                    // previous quarter — they live in another row and we
-                    // don't want to copy them into the current quarter.
-                    if (input.dataset.carried === '1') return;
-
                     const val = input.value.trim();
                     dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
 
@@ -1362,9 +1338,9 @@
         }
 
         // Ticking a student writes the picked score into the picked column for
-        // that student; unticking clears it. Locked cells (submitted / carried
-        // from another quarter) can't be changed here — their tickbox stays
-        // disabled, so onchange never fires for them.
+        // that student; unticking clears it. Locked cells (already submitted)
+        // can't be changed here — their tickbox stays disabled, so onchange
+        // never fires for them.
         function qsStampStudent(cb) {
             const col = document.getElementById('qsFieldSelect')?.value || '';
             const score = document.getElementById('qsScoreSelect')?.value || '';
@@ -1379,7 +1355,7 @@
             if (!input) { cb.checked = false; return; }
             if (input.disabled) {
                 // Reflect reality but never touch a locked cell.
-                cb.checked = input.value.trim() !== '' && input.dataset.carried !== '1';
+                cb.checked = input.value.trim() !== '';
                 return;
             }
             if (cb.checked) {
@@ -1421,12 +1397,11 @@
                 }
                 const input = row.querySelector(`.score-input[data-field="${col}"]`);
                 if (!input) { cb.checked = false; cb.disabled = true; row.classList.remove('selected'); return; }
-                const carried = input.dataset.carried === '1';
-                const hasVal = input.value.trim() !== '' && !carried;
+                const hasVal = input.value.trim() !== '';
                 cb.checked = hasVal;
                 cb.disabled = input.disabled;
                 cb.title = input.disabled
-                    ? 'Already submitted, or carried over from a previous quarter — only the Teacher can change it.'
+                    ? 'Already submitted — only the Teacher can change it.'
                     : 'Tick if this student got ' + (score || 'the score') + ' in ' + REC_FIELD_LABEL(col);
                 row.classList.toggle('selected', hasVal && !input.disabled);
             });
