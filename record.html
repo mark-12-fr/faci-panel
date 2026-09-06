@@ -469,19 +469,17 @@
                     <tr>
                         <th class="sticky-col-1" rowspan="2" title="Tick the students who got the score in the selected column"><i class="fa-solid fa-square-check" style="color:var(--text-muted);"></i></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
-                        <th colspan="15" style="background: #f1f5f9;">MODULES</th>
-                        <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
+                        <th id="hdrModules" colspan="15" style="background: #f1f5f9;">MODULES</th>
+                        <th id="hdrActivities" colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">AT</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 1</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 2</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">QE</th>
                     </tr>
-                    <tr style="font-size: 0.6rem;">
-                        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
-                        <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th>
-                        <th style="background: #f0f9ff;">1</th><th style="background: #f0f9ff;">2</th><th style="background: #f0f9ff;">3</th><th style="background: #f0f9ff;">4</th><th style="background: #f0f9ff;">5</th>
-                        <th style="background: #f0f9ff;">6</th><th style="background: #f0f9ff;">7</th><th style="background: #f0f9ff;">8</th><th style="background: #f0f9ff;">9</th><th style="background: #f0f9ff;">10</th>
-                    </tr>
+                    <!-- Module / Activity number cells are filled by renderGridHeader()
+                         from the section's module_count / activity_count (set by the
+                         teacher; the facilitator only views the count, can't change it). -->
+                    <tr id="hdrNumbers" style="font-size: 0.6rem;"></tr>
                 </thead>
                 <tbody id="recordTableBody" data-skeleton-rows="6" data-skeleton-cols="41"></tbody>
             </table>
@@ -680,6 +678,24 @@
         // is a deferred script, so read it when the grid is actually built
         // rather than while this inline script is being parsed.
         const moduleCount = () => Number(window.MJR_MODULE_COUNT) || 15;
+        const activityCount = () => Number(window.MJR_ACTIVITY_COUNT) || 10;
+
+        // Rebuild the sticky grid header for the current Module / Activity counts
+        // (set by the teacher on the section). The facilitator only views the count.
+        function renderGridHeader() {
+            const mc = moduleCount(), ac = activityCount();
+            const mods = document.getElementById('hdrModules');
+            const acts = document.getElementById('hdrActivities');
+            const nums = document.getElementById('hdrNumbers');
+            if (mods) mods.colSpan = mc;
+            if (acts) acts.colSpan = ac;
+            if (nums) {
+                let h = '';
+                for (let i = 1; i <= mc; i++) h += `<th>${i}</th>`;
+                for (let i = 1; i <= ac; i++) h += `<th style="background: #f0f9ff;">${i}</th>`;
+                nums.innerHTML = h;
+            }
+        }
 
         // Two-finger trackpad swipe scrolls the score grid sideways (matches the
         // teacher panel), so crossing the module/activity columns doesn't need
@@ -754,9 +770,10 @@
         async function loadClassRecordData(sectionTitle) {
             const tbody = document.getElementById('recordTableBody');
             setLoad(8);
+            renderGridHeader(); // fill the header immediately (defaults), refined once the section loads
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count');
                 if(sectionData) {
                     currentSemester = sectionData.semester || '1st Sem';
                     document.getElementById('infoSemester').textContent = currentSemester;
@@ -764,6 +781,11 @@
                     currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
                     currentSchoolLevel = sectionData.school_level || 'senior_high';
                     currentSubject = sectionData.subject || '';
+                    // Module / Activity column counts are set by the teacher on the
+                    // section; mirror them so the faci grid shows the same columns.
+                    window.MJR_MODULE_COUNT = Number(sectionData.module_count) || 15;
+                    window.MJR_ACTIVITY_COUNT = Number(sectionData.activity_count) || 10;
+                    renderGridHeader();
                     // Load THIS teacher's per-subject grade weights so the breakdown
                     // uses the percentages the teacher set (not a hardcoded default).
                     if (window.MJR_loadSubjectConfigs && sectionData.teacher_id) {
@@ -804,7 +826,7 @@
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + 10 + 4}" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + activityCount() + 4}" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
                     return;
                 }
 
@@ -822,7 +844,7 @@
 
             } catch (error) {
                 console.error("Error loading records:", error);
-                tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + 10 + 4}" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + activityCount() + 4}" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
             } finally {
                 finishLoad();
             }
@@ -891,7 +913,7 @@
 
             const mCount = moduleCount();
             for(let i=1; i<=mCount; i++) html += renderInput(`module_${i}`);
-            for(let i=1; i<=10; i++) html += renderInput(`activity_${i}`);
+            for(let i=1, ac=activityCount(); i<=ac; i++) html += renderInput(`activity_${i}`);
             const fields = ['at', 'pt_1', 'pt_2', 'qe'];
             fields.forEach(f => html += renderInput(f));
 
@@ -1012,7 +1034,7 @@
             if (!row) return;
 
             const modules = Array.from({length: moduleCount()}, (_, i) => `module_${i+1}`);
-            const activities = Array.from({length: 10}, (_, i) => `activity_${i+1}`);
+            const activities = Array.from({length: activityCount()}, (_, i) => `activity_${i+1}`);
             const others = ['at', 'pt_1', 'pt_2', 'qe'];
 
             function createGrid(fields, title) {
@@ -1314,7 +1336,7 @@
             const modules = [];
             for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + i]);
             const activities = [];
-            for (let i = 1; i <= 10; i++) activities.push(['activity_' + i, 'A' + i]);
+            for (let i = 1, ac = activityCount(); i <= ac; i++) activities.push(['activity_' + i, 'A' + i]);
             const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));

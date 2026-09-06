@@ -22,11 +22,12 @@
 (function () {
     var DEFAULT = { ww: 30, pt: 50, exam: 20, att: 0, passing: 75 };
     window.MJR_GRADE_DEFAULT = DEFAULT;
-    // How many Module columns the panels show. The database still has
-    // module_1..25, so raising this only re-exposes columns that were never
-    // dropped; grades only ever count the module_* values a record actually has.
-    // Keep in sync with MODULE_COUNT in the teacher panel's class-record page.
+    // Default Module / Activity column counts. The class record overrides these
+    // per section from sections.module_count / activity_count (set by the teacher;
+    // the facilitator only views them). The DB has module_1..25 and activity_1..10,
+    // so a smaller count just hides trailing columns without dropping any scores.
     window.MJR_MODULE_COUNT = 15;
+    window.MJR_ACTIVITY_COUNT = 10;
     window.MJR_SUBJECT_CFG = window.MJR_SUBJECT_CFG || {};
 
     function norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
