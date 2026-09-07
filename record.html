@@ -29,9 +29,6 @@
            Exam. Hide those columns (grid header + body cells) when the section is
            college; the drawer + quick-add "Other" group are skipped in JS. */
         body.hide-tail .tail-col { display: none; }
-        /* When the teacher drops the section to a single Performance Task, the
-           faci hides the PT 2 column (header + every row's cell) to stay in sync. */
-        body.hide-pt2 .pt2-col { display: none; }
         :root {
             --primary-bg: #f8fafc;
             --panel-bg: #ffffff;
@@ -476,7 +473,7 @@
                         <th id="hdrActivities" colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">AT</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 1</th>
-                        <th rowspan="2" style="background: #f8fafc;" class="tail-col pt2-col">PT 2</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 2</th>
                         <th rowspan="2" style="background: #f8fafc;" class="tail-col">QE</th>
                     </tr>
                     <!-- Module / Activity number cells are filled by renderGridHeader()
@@ -682,7 +679,6 @@
         // rather than while this inline script is being parsed.
         const moduleCount = () => Number(window.MJR_MODULE_COUNT) || 15;
         const activityCount = () => Number(window.MJR_ACTIVITY_COUNT) || 10;
-        const ptCount = () => Math.min(Math.max(Number(window.MJR_PT_COUNT) || 2, 1), 2);
 
         // Rebuild the sticky grid header for the current Module / Activity counts
         // (set by the teacher on the section). The facilitator only views the count.
@@ -779,7 +775,7 @@
             renderGridHeader(); // fill the header immediately (defaults), refined once the section loads
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count, module_counts, activity_counts, pt_counts');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count, module_counts, activity_counts');
                 if(sectionData) {
                     currentSemester = sectionData.semester || '1st Sem';
                     document.getElementById('infoSemester').textContent = currentSemester;
@@ -806,10 +802,6 @@
                     window.MJR_ACTIVITY_COUNT = cntFor(aCounts, currentQuarter, aDflt, 10);
                     window.MJR_MODULE_OFFSET = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
                     window.MJR_ACTIVITY_OFFSET = secondQ ? cntFor(aCounts, firstQ, aDflt, 10) : 0;
-                    // Performance Task count for this quarter (default 2). The teacher
-                    // can drop it to 1; the faci then hides the PT 2 column (read-only).
-                    window.MJR_PT_COUNT = cntFor(sectionData.pt_counts || {}, currentQuarter, 2, 2);
-                    document.body.classList.toggle('hide-pt2', ptCount() < 2);
                     renderGridHeader();
                     // Load THIS teacher's per-subject grade weights so the breakdown
                     // uses the percentages the teacher set (not a hardcoded default).
@@ -913,8 +905,7 @@
                     ? 'title="Score submitted. Only the Teacher can edit this."'
                     : '';
 
-                const isTail = (field === 'at' || field.indexOf('pt_') === 0 || field === 'qe');
-                const tdCls = isTail ? ` class="tail-col${field === 'pt_2' ? ' pt2-col' : ''}"` : '';
+                const tdCls = (field === 'at' || field.indexOf('pt_') === 0 || field === 'qe') ? ' class="tail-col"' : '';
                 return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${titleMsg}></td>`;
             };
 
@@ -1042,7 +1033,7 @@
 
             const modules = Array.from({length: moduleCount()}, (_, i) => `module_${i+1}`);
             const activities = Array.from({length: activityCount()}, (_, i) => `activity_${i+1}`);
-            const others = ['at', ...Array.from({length: ptCount()}, (_, i) => `pt_${i+1}`), 'qe'];
+            const others = ['at', 'pt_1', 'pt_2', 'qe'];
 
             function createGrid(fields, title) {
                 let html = `<div class="drawer-section-title">${title}</div><div class="drawer-grid">`;
@@ -1339,7 +1330,7 @@
             for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + i]);
             const activities = [];
             for (let i = 1, ac = activityCount(); i <= ac; i++) activities.push(['activity_' + i, 'A' + i]);
-            const others = [['at', 'AT'], ...Array.from({length: ptCount()}, (_, i) => [`pt_${i+1}`, `PT ${i+1}`]), ['qe', 'QE']];
+            const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));
             if (currentSchoolLevel !== 'college') sel.appendChild(group('Other', others));
