@@ -424,6 +424,10 @@
             // Not logged in: fill over the splash's ~2s, then it fades to the form.
             startFill(1900);
 
+            // Warm the login backend while the user reads the splash / types, so
+            // the first (server-verified) login doesn't wait on a cold start.
+            try { fetch(`${API_URL}/api/ping`, { method: 'GET', mode: 'cors' }).catch(() => {}); } catch (e) {}
+
             // Check if Faci ID was remembered
             const rememberedId = localStorage.getItem('remembered_faci_id');
             if (rememberedId) {
@@ -493,14 +497,51 @@
             }
 
             try {
-                // Fast path: verify the login in the browser with bcrypt.js, so we
-                // don't wait on the (sleepy free-tier) backend to wake up. Only the
-                // one matching account's row is read. Falls back to the server
-                // endpoint if the crypto library didn't load.
+                // Verify on the SERVER first (POST /api/faci/login) so the bcrypt
+                // password hash never has to be read into the browser. If the
+                // backend is unreachable or slow (free-tier cold start), fall back
+                // to the in-browser bcrypt check so a sleepy backend can't lock
+                // anyone out. A 401 from the server is authoritative (bad
+                // credentials) and skips the fallback. The in-browser fallback is
+                // retired once the server path is confirmed live and anon read
+                // access to the password column is revoked.
                 const bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
                 let faciData = null;
+                let serverRejected = false;
+                let loggedInViaServer = false;
 
-                if (bcryptLib) {
+                try {
+                    const ctrl = new AbortController();
+                    const timer = setTimeout(() => ctrl.abort(), 8000);
+                    let res;
+                    try {
+                        res = await fetch(`${API_URL}/api/faci/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ account_id: accountId, password: password }),
+                            signal: ctrl.signal
+                        });
+                    } finally {
+                        clearTimeout(timer);
+                    }
+                    if (res.status === 401) {
+                        serverRejected = true;              // authoritative: bad credentials
+                    } else if (res.ok) {
+                        const result = await res.json().catch(() => ({}));
+                        if (result && result.faci) {
+                            faciData = result.faci;
+                            loggedInViaServer = true;
+                            if (result.token) localStorage.setItem('faci_token', result.token);
+                        }
+                    }
+                    // any other status (5xx / CORS) → leave faciData null, try fallback
+                } catch (e) {
+                    // network error / abort / backend asleep → try the fallback
+                }
+
+                // Fallback: in-browser bcrypt, only when the server gave no
+                // authoritative answer and the crypto library loaded.
+                if (!faciData && !serverRejected && bcryptLib) {
                     const { data: row, error } = await supabaseClient
                         .from('facilitators')
                         .select('id, full_name, section, subject, teacher_id, password')
@@ -510,14 +551,6 @@
                     if (row && row.password && bcryptLib.compareSync(password, row.password)) {
                         faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
                     }
-                } else {
-                    const res = await fetch(`${API_URL}/api/faci/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ account_id: accountId, password: password })
-                    });
-                    const result = await res.json().catch(() => ({}));
-                    if (res.ok) faciData = result.faci;
                 }
 
                 if (!faciData) {
@@ -571,8 +604,11 @@
                 }
 
                 // UI Success state
-                loginBtn.style.backgroundColor = '#10b981'; 
-                loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
+                loginBtn.style.backgroundColor = '#10b981';
+                loginBtn.innerHTML = loggedInViaServer
+                    ? '<i class="fa-solid fa-lock"></i> Secure login successful'
+                    : '<i class="fa-solid fa-check"></i> Login successful';
+                try { sessionStorage.setItem('faci_login_via', loggedInViaServer ? 'server' : 'client'); } catch (e) {}
                 
                 setTimeout(() => {
                     window.location.href = 'index.html'; 
