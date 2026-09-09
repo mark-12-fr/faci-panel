@@ -867,6 +867,15 @@
             }
         }
 
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function createInputRow(student, index, existingRecords) {
             const tr = document.createElement('tr');
             tr.className = 'student-data-row';
@@ -883,12 +892,11 @@
                             || null;
             if (currentRec && currentRec.id) tr.dataset.recordid = currentRec.id;
 
-            let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsStampStudent(this)" disabled title="Pick a column first"></td>
                 <td class="td-sticky-2 search-target">
-                    <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
-                        ${student.full_name}
+                    <strong class="clickable-name" onclick="openDrawer('${student.id}')">
+                        ${escapeHtml(student.full_name)}
                     </strong>
                 </td>
             `;
@@ -1022,9 +1030,14 @@
             return `<div class="gb-wrap">${semBlock('1st Sem')}${semBlock('2nd Sem')}</div>`;
         }
 
-        function openDrawer(studentId, studentName) {
+        function openDrawer(studentId) {
             currentRowIdForDrawer = studentId;
-            document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
+            const nameRow = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
+            const nameEl = nameRow ? nameRow.querySelector('.clickable-name') : null;
+            const studentName = nameEl ? nameEl.textContent.trim() : '';
+            const drawerNameEl = document.getElementById('drawerStudentName');
+            drawerNameEl.innerHTML = '<i class="fa-solid fa-user-pen"></i> ';
+            drawerNameEl.append(studentName);
             
             const drawerBody = document.getElementById('drawerBody');
             drawerBody.innerHTML = '';
