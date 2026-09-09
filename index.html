@@ -716,7 +716,7 @@
             try {
                 const { data: profile, error } = await MJR_cachedQuery('profile_' + faciId, supabaseClient
                     .from('facilitators')
-                    .select('*')
+                    .select('id, full_name, section, subject, account_id, created_at, teacher_id, avatar_url, last_login, status')
                     .or(`id.eq.${faciId},account_id.eq.${faciId}`)
                     .single());
 
