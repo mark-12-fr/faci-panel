@@ -424,9 +424,9 @@
             // Not logged in: fill over the splash's ~2s, then it fades to the form.
             startFill(1900);
 
-            // Warm the login backend while the user reads the splash / types, so
+            // Warm the login function while the user reads the splash / types, so
             // the first (server-verified) login doesn't wait on a cold start.
-            try { fetch(`${API_URL}/api/ping`, { method: 'GET', mode: 'cors' }).catch(() => {}); } catch (e) {}
+            try { fetch(`${SUPABASE_URL}/functions/v1/faci-login`, { method: 'OPTIONS' }).catch(() => {}); } catch (e) {}
 
             // Check if Faci ID was remembered
             const rememberedId = localStorage.getItem('remembered_faci_id');
@@ -497,11 +497,13 @@
             }
 
             try {
-                // Verify on the SERVER first (POST /api/faci/login) so the bcrypt
-                // password hash never has to be read into the browser. If the
-                // backend is unreachable or slow (free-tier cold start), fall back
-                // to the in-browser bcrypt check so a sleepy backend can't lock
-                // anyone out. A 401 from the server is authoritative (bad
+                // Verify on the SERVER first, via the Supabase Edge Function
+                // `faci-login`, so the bcrypt password hash never has to be read
+                // into the browser. The function runs in the same always-on
+                // Supabase infrastructure the app already uses and verifies with
+                // the same bcryptjs the client uses. If it's unreachable or slow
+                // (cold start), fall back to the in-browser bcrypt check so a
+                // hiccup can't lock anyone out. A 401 is authoritative (bad
                 // credentials) and skips the fallback. The in-browser fallback is
                 // retired once the server path is confirmed live and anon read
                 // access to the password column is revoked.
@@ -512,12 +514,16 @@
 
                 try {
                     const ctrl = new AbortController();
-                    const timer = setTimeout(() => ctrl.abort(), 8000);
+                    const timer = setTimeout(() => ctrl.abort(), 10000);
                     let res;
                     try {
-                        res = await fetch(`${API_URL}/api/faci/login`, {
+                        res = await fetch(`${SUPABASE_URL}/functions/v1/faci-login`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                            },
                             body: JSON.stringify({ account_id: accountId, password: password }),
                             signal: ctrl.signal
                         });
@@ -531,7 +537,6 @@
                         if (result && result.faci) {
                             faciData = result.faci;
                             loggedInViaServer = true;
-                            if (result.token) localStorage.setItem('faci_token', result.token);
                         }
                     }
                     // any other status (5xx / CORS) → leave faciData null, try fallback
