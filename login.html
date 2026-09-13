@@ -18,7 +18,6 @@
     <script>(function(){var i=0,id=setInterval(function(){var b=document.getElementById("uiStatusBadge");if(b)b.remove();if(++i>25)clearInterval(id);},200);})();</script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
 
     <script src="offline-bar.js" defer></script>
     <script src="mjr-offline.js" defer></script>
@@ -497,24 +496,17 @@
             }
 
             try {
-                // Verify on the SERVER first, via the Supabase Edge Function
-                // `faci-login`, so the bcrypt password hash never has to be read
-                // into the browser. The function runs in the same always-on
-                // Supabase infrastructure the app already uses and verifies with
-                // the same bcryptjs the client uses. If it's unreachable or slow
-                // (cold start), fall back to the in-browser bcrypt check so a
-                // hiccup can't lock anyone out. A 401 is authoritative (bad
-                // credentials) and skips the fallback. The in-browser fallback is
-                // retired once the server path is confirmed live and anon read
-                // access to the password column is revoked.
-                const bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
+                // Verify on the server via the Supabase Edge Function `faci-login`
+                // so the bcrypt password hash is never read into the browser. The
+                // function runs in the same always-on Supabase infrastructure the
+                // app already uses and verifies with the same bcryptjs. A 401 means
+                // bad credentials; a network/timeout error is a connection problem.
                 let faciData = null;
                 let serverRejected = false;
-                let loggedInViaServer = false;
 
                 try {
                     const ctrl = new AbortController();
-                    const timer = setTimeout(() => ctrl.abort(), 10000);
+                    const timer = setTimeout(() => ctrl.abort(), 12000);
                     let res;
                     try {
                         res = await fetch(`${SUPABASE_URL}/functions/v1/faci-login`, {
@@ -534,38 +526,28 @@
                         serverRejected = true;              // authoritative: bad credentials
                     } else if (res.ok) {
                         const result = await res.json().catch(() => ({}));
-                        if (result && result.faci) {
-                            faciData = result.faci;
-                            loggedInViaServer = true;
-                        }
+                        if (result && result.faci) faciData = result.faci;
                     }
-                    // any other status (5xx / CORS) → leave faciData null, try fallback
                 } catch (e) {
-                    // network error / abort / backend asleep → try the fallback
-                }
-
-                // Fallback: in-browser bcrypt, only when the server gave no
-                // authoritative answer and the crypto library loaded.
-                if (!faciData && !serverRejected && bcryptLib) {
-                    const { data: row, error } = await supabaseClient
-                        .from('facilitators')
-                        .select('id, full_name, section, subject, teacher_id, password')
-                        .eq('account_id', accountId)
-                        .maybeSingle();
-                    if (error) throw error;
-                    if (row && row.password && bcryptLib.compareSync(password, row.password)) {
-                        faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
-                    }
+                    // network error / abort → handled as a connection problem below
                 }
 
                 if (!faciData) {
-                    // Invalid Credentials
-                    showAlert(
-                        "Login Failed",
-                        "We couldn't find an account with those details. Please check your ID and password.",
-                        "fa-circle-xmark",
-                        "#ef4444"
-                    );
+                    if (serverRejected) {
+                        showAlert(
+                            "Login Failed",
+                            "We couldn't find an account with those details. Please check your ID and password.",
+                            "fa-circle-xmark",
+                            "#ef4444"
+                        );
+                    } else {
+                        showAlert(
+                            "Connection Problem",
+                            "We couldn't reach the login service. Please check your internet connection and try again.",
+                            "fa-wifi",
+                            "#f59e0b"
+                        );
+                    }
                     loginBtn.innerHTML = 'Login';
                     loginBtn.disabled = false;
                     return;
@@ -610,10 +592,7 @@
 
                 // UI Success state
                 loginBtn.style.backgroundColor = '#10b981';
-                loginBtn.innerHTML = loggedInViaServer
-                    ? '<i class="fa-solid fa-lock"></i> Secure login successful'
-                    : '<i class="fa-solid fa-check"></i> Login successful';
-                try { sessionStorage.setItem('faci_login_via', loggedInViaServer ? 'server' : 'client'); } catch (e) {}
+                loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
                 
                 setTimeout(() => {
                     window.location.href = 'index.html'; 
