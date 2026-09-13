@@ -502,7 +502,7 @@
                 // app already uses and verifies with the same bcryptjs. A 401 means
                 // bad credentials; a network/timeout error is a connection problem.
                 let faciData = null;
-                let serverRejected = false;
+                let loginError = null;   // { title, message, icon, color } when the server gave a definite answer
 
                 try {
                     const ctrl = new AbortController();
@@ -522,32 +522,41 @@
                     } finally {
                         clearTimeout(timer);
                     }
-                    if (res.status === 401) {
-                        serverRejected = true;              // authoritative: bad credentials
-                    } else if (res.ok) {
-                        const result = await res.json().catch(() => ({}));
-                        if (result && result.faci) faciData = result.faci;
+                    const result = await res.json().catch(() => ({}));
+                    if (res.ok && result && result.faci) {
+                        faciData = result.faci;
+                    } else if (res.status === 429) {
+                        // Locked out after too many wrong attempts. The 5-minute
+                        // cooldown runs on the server; we never show a live timer.
+                        loginError = {
+                            title: "Too Many Attempts",
+                            message: "For your security, this account has been temporarily locked after several incorrect attempts. Please try again after 5 minutes.",
+                            icon: "fa-lock",
+                            color: "#f59e0b"
+                        };
+                    } else if (res.status === 401) {
+                        let msg = "Incorrect ID or password. Please try again.";
+                        if (result && typeof result.remaining === 'number') {
+                            const tries = result.remaining === 1 ? "1 attempt" : (result.remaining + " attempts");
+                            msg = "Incorrect ID or password. You have " + tries + " left before this account is locked.";
+                        }
+                        loginError = { title: "Login Failed", message: msg, icon: "fa-circle-xmark", color: "#ef4444" };
                     }
+                    // any other status → leave both null → connection problem below
                 } catch (e) {
-                    // network error / abort → handled as a connection problem below
+                    // network error / abort → connection problem below
                 }
 
                 if (!faciData) {
-                    if (serverRejected) {
-                        showAlert(
-                            "Login Failed",
-                            "We couldn't find an account with those details. Please check your ID and password.",
-                            "fa-circle-xmark",
-                            "#ef4444"
-                        );
-                    } else {
-                        showAlert(
-                            "Connection Problem",
-                            "We couldn't reach the login service. Please check your internet connection and try again.",
-                            "fa-wifi",
-                            "#f59e0b"
-                        );
+                    if (!loginError) {
+                        loginError = {
+                            title: "Connection Problem",
+                            message: "We couldn't reach the login service. Please check your internet connection and try again.",
+                            icon: "fa-wifi",
+                            color: "#f59e0b"
+                        };
                     }
+                    showAlert(loginError.title, loginError.message, loginError.icon, loginError.color);
                     loginBtn.innerHTML = 'Login';
                     loginBtn.disabled = false;
                     return;
