@@ -798,9 +798,13 @@
                     const isCollege = currentSchoolLevel === 'college';
                     const secondQ = !isCollege && (String(currentQuarter) === '2' || String(currentQuarter) === '4');
                     const firstQ = String(currentQuarter) === '4' ? '3' : '1';
-                    window.MJR_MODULE_COUNT = cntFor(mCounts, currentQuarter, mDflt, 25);
-                    window.MJR_ACTIVITY_COUNT = cntFor(aCounts, currentQuarter, aDflt, 10);
-                    window.MJR_MODULE_OFFSET = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
+                    const mOffset = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
+                    // Q2 caps (match the teacher panel): modules continue from Q1 but the
+                    // numbering never passes 25, so cap at the slots left below 25;
+                    // activities restart at 1 and show at most 5 per quarter.
+                    window.MJR_MODULE_COUNT = Math.min(cntFor(mCounts, currentQuarter, mDflt, 25), secondQ ? Math.max(0, 25 - mOffset) : 25);
+                    window.MJR_ACTIVITY_COUNT = Math.min(cntFor(aCounts, currentQuarter, aDflt, 10), secondQ ? 5 : 10);
+                    window.MJR_MODULE_OFFSET = mOffset;
                     // Activities restart at 1 every quarter (no carry-over from the
                     // 1st quarter) — matches the teacher panel's class-record page.
                     window.MJR_ACTIVITY_OFFSET = 0;
