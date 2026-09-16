@@ -847,9 +847,14 @@
                 // grading.js publishes MJR_MODULE_COUNT (the Module columns both
                 // panels show); the "pending" tallies below must use the same
                 // number or every student looks short by the hidden columns.
+                // Count only the section's ACTIVE quarter, so "Modules Done" /
+                // "Activities" and their pending tallies reset when the teacher
+                // advances the quarter instead of still showing Q1's totals.
+                const dashActiveQ = window.FACI_ACTIVE_QUARTER || '1';
+                const activeQuarterRecords = cachedRecords.filter(r => faciNormQ(r.quarter) === dashActiveQ);
                 const moduleCount = Number(window.MJR_MODULE_COUNT) || 15;
                 let modulesDone = 0, activitiesDone = 0;
-                cachedRecords.forEach(record => {
+                activeQuarterRecords.forEach(record => {
                     for (let i = 1; i <= moduleCount; i++) {
                         if (record[`module_${i}`] !== null && record[`module_${i}`] !== undefined && record[`module_${i}`] !== '') modulesDone++;
                     }
@@ -904,20 +909,12 @@
         let cachedAttendanceToday = [];
 
         function studentRecord(studentId) {
-            // Merge ALL of a student's records across quarters (latest non-empty
-            // value wins per field) — same as gradeFor() and the Class Record
-            // grid's carry-over. Using a single record (.find) wrongly flagged
-            // items as "missing" when they were entered in a different quarter.
-            const recs = cachedRecords
-                .filter(r => r.student_id === studentId)
-                .sort((a, b) => Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0));
-            if (!recs.length) return null;
-            return recs.reduce((acc, curr) => {
-                Object.keys(curr).forEach(k => {
-                    if (curr[k] !== null && curr[k] !== undefined && curr[k] !== '') acc[k] = curr[k];
-                });
-                return acc;
-            }, {});
+            // The section's ACTIVE quarter row only (mirrors gradeFor + the
+            // teacher panel). The dashboard tiles and Quick Actions drawers then
+            // reflect the CURRENT quarter's encoding and reset when the teacher
+            // advances the quarter, instead of carrying Q1's scores forward.
+            const activeQ = window.FACI_ACTIVE_QUARTER || '1';
+            return cachedRecords.find(r => r.student_id === studentId && faciNormQ(r.quarter) === activeQ) || null;
         }
 
         // Normalize a quarter value the same way the teacher panel does:
