@@ -1060,7 +1060,13 @@
                     const tableInput = row.querySelector(`input[data-field="${f}"]`);
                     const val = tableInput.value;
                     const isDisabled = tableInput.disabled ? 'disabled' : '';
-                    const label = f.replace('module_', 'M').replace('activity_', 'A').toUpperCase().replace('_', ' ');
+                    // Match the table header numbering: modules carry the 2nd-
+                    // quarter offset (M13..M25), activities restart at 1; AT/PT/QE
+                    // keep their plain labels.
+                    const mm = f.match(/^module_(\d+)$/), aa = f.match(/^activity_(\d+)$/);
+                    const label = mm ? ('M' + ((Number(window.MJR_MODULE_OFFSET) || 0) + Number(mm[1])))
+                                : aa ? ('A' + ((Number(window.MJR_ACTIVITY_OFFSET) || 0) + Number(aa[1])))
+                                : f.toUpperCase().replace('_', ' ');
                     
                     html += `
                         <div class="drawer-input-group">
@@ -1350,10 +1356,16 @@
                 });
                 return og;
             };
+            // Label the columns to MATCH the table header: modules carry the
+            // 2nd-quarter numbering offset (e.g. Q1 stopped at 12 -> Q2 picker
+            // shows M13..M25), activities restart at 1 (offset 0). The stored
+            // field stays module_i / activity_i for the current quarter.
+            const mo = Number(window.MJR_MODULE_OFFSET) || 0;
+            const ao = Number(window.MJR_ACTIVITY_OFFSET) || 0;
             const modules = [];
-            for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + i]);
+            for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + (mo + i)]);
             const activities = [];
-            for (let i = 1, ac = activityCount(); i <= ac; i++) activities.push(['activity_' + i, 'A' + i]);
+            for (let i = 1, ac = activityCount(); i <= ac; i++) activities.push(['activity_' + i, 'A' + (ao + i)]);
             const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));
