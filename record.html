@@ -1325,11 +1325,16 @@
         }
 
         // ── Quick-score: pick a column + score, then tick who got it ──────
-        // Fill the "which column" dropdown once, grouped as Modules / Activities
-        // / Other with M1../A1../AT/PT/QE labels matching the table headers.
+        // Fill the "which column" dropdown, grouped as Modules / Activities /
+        // Other with M1../A1../AT/PT/QE labels matching the table headers.
+        // Rebuilt on every load (not just once) so it always matches the current
+        // quarter's Module / Activity column counts — e.g. after the teacher
+        // switches the section to another quarter, the picker follows.
         function _qsPopulateFieldSelect() {
             const sel = document.getElementById('qsFieldSelect');
-            if (!sel || sel.dataset.populated) return;
+            if (!sel) return;
+            const prev = sel.value; // keep the current pick if it still exists
+            Array.from(sel.querySelectorAll('optgroup')).forEach((og) => og.remove());
             const group = (label, entries) => {
                 const og = document.createElement('optgroup');
                 og.label = label;
@@ -1349,7 +1354,7 @@
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));
             if (currentSchoolLevel !== 'college') sel.appendChild(group('Other', others));
-            sel.dataset.populated = '1';
+            sel.value = (prev && sel.querySelector('option[value="' + prev + '"]')) ? prev : '';
         }
 
         // Ticking a student writes the picked score into the picked column for
