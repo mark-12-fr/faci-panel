@@ -801,7 +801,9 @@
                     window.MJR_MODULE_COUNT = cntFor(mCounts, currentQuarter, mDflt, 25);
                     window.MJR_ACTIVITY_COUNT = cntFor(aCounts, currentQuarter, aDflt, 10);
                     window.MJR_MODULE_OFFSET = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
-                    window.MJR_ACTIVITY_OFFSET = secondQ ? cntFor(aCounts, firstQ, aDflt, 10) : 0;
+                    // Activities restart at 1 every quarter (no carry-over from the
+                    // 1st quarter) — matches the teacher panel's class-record page.
+                    window.MJR_ACTIVITY_OFFSET = 0;
                     renderGridHeader();
                     // Load THIS teacher's per-subject grade weights so the breakdown
                     // uses the percentages the teacher set (not a hardcoded default).
