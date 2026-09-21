@@ -1,9 +1,9 @@
 """
 main.py — AcadTrack Facilitator API (FastAPI).
 =============================================
-The FastAPI replacement for the old Flask `/api/faci/*` endpoints and the
-Vercel `vision-analyze` serverless function. Talks to the same Supabase
-Postgres database, so no data migration is needed.
+The FastAPI replacement for the old Flask `/api/faci/*` endpoints.
+Talks to the same Supabase Postgres database, so no data migration
+is needed.
 
 Run locally:
     uvicorn app.main:app --reload --port 5000
@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, data, push, session, vision
+from .routers import auth, data, push, session
 
 app = FastAPI(
     title="AcadTrack Facilitator API",
@@ -32,7 +32,6 @@ app.include_router(auth.router)
 app.include_router(data.router)
 app.include_router(session.router)
 app.include_router(push.router)
-app.include_router(vision.router)
 
 
 @app.get("/")

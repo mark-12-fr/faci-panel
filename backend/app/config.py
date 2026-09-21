@@ -45,14 +45,6 @@ class Settings(BaseSettings):
         ]
     )
 
-    # ── AI / Vision providers (optional — features degrade gracefully) ───────
-    GROQ_API_KEY: str = Field(default="")
-    GROQ_MODEL: str = Field(default="")
-    GROQ_VISION_MODEL: str = Field(default="")
-    GEMINI_API_KEY: str = Field(default="")
-    GEMINI_MODEL: str = Field(default="")
-    GEMINI_VISION_MODEL: str = Field(default="")
-
     # ── Web Push (VAPID) — optional ─────────────────────────────────────────
     VAPID_PUBLIC_KEY: str = Field(default="")
     VAPID_PRIVATE_KEY: str = Field(default="")
