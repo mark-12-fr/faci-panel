@@ -21,10 +21,14 @@
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="ui-enhance.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="offlineSyncUtility.js" defer></script>
+
     <script src="offline-bar.js" defer></script>
     
     <style>
+        /* College sections have no Achievement Test / Performance Task / Quarterly
+           Exam. Hide those columns (grid header + body cells) when the section is
+           college; the drawer + quick-add "Other" group are skipped in JS. */
+        body.hide-tail .tail-col { display: none; }
         :root {
             --primary-bg: #f8fafc;
             --panel-bg: #ffffff;
@@ -465,20 +469,17 @@
                     <tr>
                         <th class="sticky-col-1" rowspan="2" title="Tick the students who got the score in the selected column"><i class="fa-solid fa-square-check" style="color:var(--text-muted);"></i></th>
                         <th class="sticky-col-2" rowspan="2">STUDENT NAME</th>
-                        <th colspan="25" style="background: #f1f5f9;">MODULES</th>
-                        <th colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
-                        <th rowspan="2" style="background: #f8fafc;">AT</th>
-                        <th rowspan="2" style="background: #f8fafc;">PT 1</th>
-                        <th rowspan="2" style="background: #f8fafc;">PT 2</th>
-                        <th rowspan="2" style="background: #f8fafc;">QE</th>
+                        <th id="hdrModules" colspan="15" style="background: #f1f5f9;">MODULES</th>
+                        <th id="hdrActivities" colspan="10" style="background: #e0f2fe;">ACTIVITIES</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">AT</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 1</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">PT 2</th>
+                        <th rowspan="2" style="background: #f8fafc;" class="tail-col">QE</th>
                     </tr>
-                    <tr style="font-size: 0.6rem;">
-                        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
-                        <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
-                        <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th>
-                        <th style="background: #f0f9ff;">1</th><th style="background: #f0f9ff;">2</th><th style="background: #f0f9ff;">3</th><th style="background: #f0f9ff;">4</th><th style="background: #f0f9ff;">5</th>
-                        <th style="background: #f0f9ff;">6</th><th style="background: #f0f9ff;">7</th><th style="background: #f0f9ff;">8</th><th style="background: #f0f9ff;">9</th><th style="background: #f0f9ff;">10</th>
-                    </tr>
+                    <!-- Module / Activity number cells are filled by renderGridHeader()
+                         from the section's module_count / activity_count (set by the
+                         teacher; the facilitator only views the count, can't change it). -->
+                    <tr id="hdrNumbers" style="font-size: 0.6rem;"></tr>
                 </thead>
                 <tbody id="recordTableBody" data-skeleton-rows="6" data-skeleton-cols="41"></tbody>
             </table>
@@ -597,7 +598,7 @@
         // Every quarter's raw records for the whole section, cached from the
         // last loadClassRecordData() so the drawer can show a per-quarter
         // grade breakdown for whichever student is tapped — the table itself
-        // only ever displays ONE (carried-forward) row per student.
+        // only ever displays the CURRENT quarter's row per student.
         let _allRecordsCache = [];
 
         function showAlert(title, message, iconColor = 'var(--accent-blue)', callback = null) {
@@ -670,6 +671,57 @@
         let currentQuarter = '1';
         let currentSchoolLevel = 'senior_high';
         let currentSemester = '1st Sem';
+        let currentSubject = ''; // the section's subject — picks the grade weights
+
+        // How many Module columns the grid shows. grading.js publishes
+        // MJR_MODULE_COUNT as the shared source of truth for both panels, but it
+        // is a deferred script, so read it when the grid is actually built
+        // rather than while this inline script is being parsed.
+        const moduleCount = () => Number(window.MJR_MODULE_COUNT) || 15;
+        const activityCount = () => Number(window.MJR_ACTIVITY_COUNT) || 10;
+
+        // Rebuild the sticky grid header for the current Module / Activity counts
+        // (set by the teacher on the section). The facilitator only views the count.
+        function renderGridHeader() {
+            const mc = moduleCount(), ac = activityCount();
+            const mo = Number(window.MJR_MODULE_OFFSET) || 0;   // 2nd-quarter numbering offset
+            const ao = Number(window.MJR_ACTIVITY_OFFSET) || 0;
+            const mods = document.getElementById('hdrModules');
+            const acts = document.getElementById('hdrActivities');
+            const nums = document.getElementById('hdrNumbers');
+            if (mods) mods.colSpan = mc;
+            if (acts) acts.colSpan = ac;
+            if (nums) {
+                let h = '';
+                for (let i = 1; i <= mc; i++) h += `<th>${mo + i}</th>`;
+                for (let i = 1; i <= ac; i++) h += `<th style="background: #f0f9ff;">${ao + i}</th>`;
+                nums.innerHTML = h;
+            }
+        }
+
+        // Two-finger trackpad swipe scrolls the score grid sideways (matches the
+        // teacher panel), so crossing the module/activity columns doesn't need
+        // the scrollbar. `.horizontal-scroll` already has overflow-x: auto, but a
+        // browser hands a sideways gesture to history navigation ("swipe to go
+        // back") unless the element claims it — so take the horizontal delta and
+        // preventDefault. This container also scrolls vertically, so a plain
+        // vertical wheel is left untouched; only a horizontal (or Shift) gesture
+        // is captured, and it's released at either edge.
+        (function () {
+            var box = document.querySelector('.horizontal-scroll');
+            if (!box) return;
+            box.style.overscrollBehaviorX = 'contain';
+            box.addEventListener('wheel', function (e) {
+                var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+                if (!dx) return;
+                var max = box.scrollWidth - box.clientWidth;
+                if (max <= 0) return;
+                var next = Math.min(Math.max(box.scrollLeft + dx, 0), max);
+                if (next === box.scrollLeft) return; // at an edge — let it through
+                box.scrollLeft = next;
+                e.preventDefault();
+            }, { passive: false });
+        })();
 
         function getCurrentQuarter() {
             return currentQuarter;
@@ -720,15 +772,50 @@
         async function loadClassRecordData(sectionTitle) {
             const tbody = document.getElementById('recordTableBody');
             setLoad(8);
+            renderGridHeader(); // fill the header immediately (defaults), refined once the section loads
 
             try {
-                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id');
+                const sectionData = await window.MJR_resolveFaciSection(supabaseClient, sectionTitle, 'id, semester, quarter, school_level, teacher_id, subject, module_count, activity_count, module_counts, activity_counts');
                 if(sectionData) {
                     currentSemester = sectionData.semester || '1st Sem';
                     document.getElementById('infoSemester').textContent = currentSemester;
                     currentSectionId = sectionData.id;
                     currentQuarter = sectionData.quarter ? String(sectionData.quarter) : '1';
                     currentSchoolLevel = sectionData.school_level || 'senior_high';
+                    currentSubject = sectionData.subject || '';
+                    // Module / Activity column counts are set by the teacher on the
+                    // section (per quarter). Mirror the current quarter's count, and
+                    // its numbering offset — the 2nd quarter of a semester continues
+                    // the 1st's numbering (Q2 after Q1, Q4 after Q3; resets each sem).
+                    const cntFor = (counts, qq, dflt, hi) => {
+                        const n = Number(counts && counts[String(qq)]);
+                        return isFinite(n) && n >= 1 ? Math.min(Math.round(n), hi) : dflt;
+                    };
+                    const mCounts = sectionData.module_counts || {};
+                    const aCounts = sectionData.activity_counts || {};
+                    const mDflt = Number(sectionData.module_count) || 15;
+                    const aDflt = Number(sectionData.activity_count) || 10;
+                    const isCollege = currentSchoolLevel === 'college';
+                    const secondQ = !isCollege && (String(currentQuarter) === '2' || String(currentQuarter) === '4');
+                    const firstQ = String(currentQuarter) === '4' ? '3' : '1';
+                    const mOffset = secondQ ? cntFor(mCounts, firstQ, mDflt, 25) : 0;
+                    // Q2 caps (match the teacher panel): modules continue from Q1 but the
+                    // numbering never passes 25, so cap at the slots left below 25;
+                    // activities restart at 1 and show at most 5 per quarter.
+                    window.MJR_MODULE_COUNT = Math.min(cntFor(mCounts, currentQuarter, mDflt, 25), secondQ ? Math.max(0, 25 - mOffset) : 25);
+                    window.MJR_ACTIVITY_COUNT = Math.min(cntFor(aCounts, currentQuarter, aDflt, 10), secondQ ? 5 : 10);
+                    window.MJR_MODULE_OFFSET = mOffset;
+                    // Activities restart at 1 every quarter (no carry-over from the
+                    // 1st quarter) — matches the teacher panel's class-record page.
+                    window.MJR_ACTIVITY_OFFSET = 0;
+                    renderGridHeader();
+                    // Load THIS teacher's per-subject grade weights so the breakdown
+                    // uses the percentages the teacher set (not a hardcoded default).
+                    if (window.MJR_loadSubjectConfigs && sectionData.teacher_id) {
+                        try { await window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id); } catch (e) {}
+                    }
+                    // College has no AT/PT/QE — hide those columns for college sections.
+                    document.body.classList.toggle('hide-tail', currentSchoolLevel === 'college');
                     const qBadge = document.getElementById('infoQuarter');
                     if (qBadge) qBadge.textContent = quarterLabel();
                 }
@@ -753,16 +840,16 @@
                 document.getElementById('infoTotal').textContent = students.length;
                 setLoad(65);
 
-                // Fetch every quarter's record. createInputRow shows the
-                // current quarter's value when present, otherwise carries
-                // over the previous quarter's value so scores never look
-                // wiped after the section's quarter changes.
+                // Cache every quarter's record for the per-quarter grade
+                // breakdown in the drawer. The table itself shows only the
+                // current quarter's scores (createInputRow filters by quarter),
+                // so a new quarter starts with empty, editable columns.
                 _allRecordsCache = existingRecords;
                 setLoad(90);
 
                 tbody.innerHTML = '';
                 if (students.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="41" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + activityCount() + 4}" style="color:var(--text-muted); text-align:center; padding: 20px;">No students assigned yet.</td></tr>`;
                     return;
                 }
 
@@ -780,10 +867,19 @@
 
             } catch (error) {
                 console.error("Error loading records:", error);
-                tbody.innerHTML = `<tr><td colspan="41" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + activityCount() + 4}" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
             } finally {
                 finishLoad();
             }
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function createInputRow(student, index, existingRecords) {
@@ -802,52 +898,34 @@
                             || null;
             if (currentRec && currentRec.id) tr.dataset.recordid = currentRec.id;
 
-            // Rows from OTHER quarters (newest first). When the current
-            // quarter has no value for a field, we display the previous
-            // quarter's value so it doesn't look wiped. These cells are
-            // shown disabled to keep the read-only feel of submitted
-            // scores — the teacher can still edit them via the teacher
-            // panel, which is the source of truth.
-            const fallbackRecs = studentRecs
-                .filter(r => r !== currentRec)
-                .sort((a, b) => Number(String(b.quarter||0).replace(/[^1-4]/g,'')||0) - Number(String(a.quarter||0).replace(/[^1-4]/g,'')||0));
-
-            function fallbackValue(field) {
-                for (const r of fallbackRecs) {
-                    const v = r[field];
-                    if (v !== null && v !== undefined && v !== '') return v;
-                }
-                return null;
-            }
-
-            let safeName = student.full_name.replace(/'/g, "\\'");
             let html = `
                 <td class="td-sticky-1"><input type="checkbox" class="row-checkbox" data-uuid="${student.id}" onchange="qsStampStudent(this)" disabled title="Pick a column first"></td>
                 <td class="td-sticky-2 search-target">
-                    <strong class="clickable-name" onclick="openDrawer('${student.id}', '${safeName}')">
-                        ${student.full_name}
+                    <strong class="clickable-name" onclick="openDrawer('${student.id}')">
+                        ${escapeHtml(student.full_name)}
                     </strong>
                 </td>
             `;
 
             const renderInput = (field) => {
+                // Each quarter shows only its OWN scores. A submitted score for
+                // this quarter is locked (only the Teacher can change it); an
+                // empty cell stays editable so the faci can enter a new score.
                 const currentVal = currentRec ? currentRec[field] : null;
                 const hasCurrent = (currentVal !== null && currentVal !== undefined && currentVal !== '');
-                const carried = hasCurrent ? null : fallbackValue(field);
-                const displayVal = hasCurrent ? currentVal : (carried !== null ? carried : '');
-                const isDisabled = (hasCurrent || carried !== null) ? 'disabled' : '';
-                const carriedAttr = (!hasCurrent && carried !== null) ? 'data-carried="1"' : '';
+                const displayVal = hasCurrent ? currentVal : '';
+                const isDisabled = hasCurrent ? 'disabled' : '';
                 const titleMsg = hasCurrent
                     ? 'title="Score submitted. Only the Teacher can edit this."'
-                    : (carried !== null
-                        ? 'title="Carried over from a previous quarter. Edit via the teacher panel."'
-                        : '');
+                    : '';
 
-                return `<td><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${carriedAttr} ${titleMsg}></td>`;
+                const tdCls = (field === 'at' || field.indexOf('pt_') === 0 || field === 'qe') ? ' class="tail-col"' : '';
+                return `<td${tdCls}><input type="number" class="score-input" data-field="${field}" value="${displayVal}" ${isDisabled} ${titleMsg}></td>`;
             };
 
-            for(let i=1; i<=25; i++) html += renderInput(`module_${i}`);
-            for(let i=1; i<=10; i++) html += renderInput(`activity_${i}`);
+            const mCount = moduleCount();
+            for(let i=1; i<=mCount; i++) html += renderInput(`module_${i}`);
+            for(let i=1, ac=activityCount(); i<=ac; i++) html += renderInput(`activity_${i}`);
             const fields = ['at', 'pt_1', 'pt_2', 'qe'];
             fields.forEach(f => html += renderInput(f));
 
@@ -878,23 +956,32 @@
         const isFilled = (v) => v !== null && v !== undefined && v !== '';
 
         function componentScores(rec) {
-            let ww = 0, pt = 0;
+            let ww = 0, pt = 0, at = 0;
             const qe = Number(rec.qe) || 0;
             for (const k in rec) {
                 const v = rec[k];
                 if (!isFilled(v)) continue;
-                if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0 || k === 'at') ww += Number(v) || 0;
+                if (k.indexOf('module_') === 0 || k.indexOf('activity_') === 0) ww += Number(v) || 0;
+                else if (k === 'at') at += Number(v) || 0;
                 else if (k.indexOf('pt_') === 0) pt += Number(v) || 0;
             }
+            // Written Works = Modules + Activities. The Achievement Test belongs to
+            // the EXAM with the Quarterly Exam (each out of 50 → out of 100). When
+            // the teacher sets a per-component "perfect score" (total possible),
+            // that component's % is (raw / total) * 100; else raw capped at 100.
+            const w = (window.MJR_weightsFor && window.MJR_weightsFor(currentSubject)) || {};
+            const pct = (raw, total) => (total > 0 ? Math.min((raw / total) * 100, 100) : Math.min(raw, 100));
             return {
-                ww: Math.min(ww, 100),
-                pt: Math.min(pt, 100),
-                qe: Math.min((qe / 50) * 100, 100),
+                ww: pct(ww, Number(w.wwTotal) || 0),
+                pt: pct(pt, Number(w.ptTotal) || 0),
+                qe: Math.min((qe / 50) * 100, 100),   // QE alone (display row)
+                exam: pct(at + qe, Number(w.examTotal) || 0),   // AT + QE (drives the grade)
             };
         }
 
         function finalGrade(comp) {
-            return Math.round(comp.ww * 0.3 + comp.pt * 0.5 + comp.qe * 0.2);
+            var w = (window.MJR_weightsFor && window.MJR_weightsFor(currentSubject)) || { ww: 30, pt: 50, exam: 20 };
+            return Math.round(comp.ww * (w.ww / 100) + comp.pt * (w.pt / 100) + comp.exam * (w.exam / 100));
         }
 
         function quarterBreakdown(studentId) {
@@ -906,7 +993,14 @@
                 const hasData = !!rec && scoreFields.some(f => isFilled(rec[f]));
                 if (!hasData) return { ...dq, hasData: false, grade: null, comp: null, delta: null };
                 const comp = componentScores(rec);
-                return { ...dq, hasData: true, grade: finalGrade(comp), comp, delta: null };
+                // Shared grade engine: Initial Grade (weighted, 2 dp) transmuted
+                // to the Final Grade, so the faci breakdown matches the teacher
+                // panel exactly. Falls back to the local calc if grading.js isn't
+                // loaded yet.
+                const brk = window.MJR_gradeBreakdown ? window.MJR_gradeBreakdown(rec, currentSubject, null) : null;
+                const grade = brk ? brk.final : (window.MJR_finalGrade ? window.MJR_finalGrade(rec, currentSubject, null) : finalGrade(comp));
+                const initial = brk ? brk.initial : null;
+                return { ...dq, hasData: true, grade, initial, comp, delta: null };
             });
             let prevGrade = null;
             cards.forEach(c => {
@@ -931,6 +1025,7 @@
                         <div class="gb-card">
                             <div class="gb-head"><span>${c.label}</span>${deltaHtml}</div>
                             <div class="gb-final ${c.grade >= passMark ? 'gb-pass' : 'gb-fail'}">${c.grade}</div>
+                            ${c.initial != null ? `<div class="gb-row" style="justify-content:center;margin:-2px 0 4px;"><span>Initial Grade</span>&nbsp;<b>${c.initial.toFixed(2)}</b></div>` : ''}
                             <div class="gb-row"><span>Written Works</span><b>${Math.round(c.comp.ww)}</b></div>
                             <div class="gb-row"><span>Perf. Task</span><b>${Math.round(c.comp.pt)}</b></div>
                             <div class="gb-row"><span>Quarterly Exam</span><b>${Math.round(c.comp.qe)}</b></div>
@@ -941,17 +1036,22 @@
             return `<div class="gb-wrap">${semBlock('1st Sem')}${semBlock('2nd Sem')}</div>`;
         }
 
-        function openDrawer(studentId, studentName) {
+        function openDrawer(studentId) {
             currentRowIdForDrawer = studentId;
-            document.getElementById('drawerStudentName').innerHTML = `<i class="fa-solid fa-user-pen"></i> ${studentName}`;
+            const nameRow = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
+            const nameEl = nameRow ? nameRow.querySelector('.clickable-name') : null;
+            const studentName = nameEl ? nameEl.textContent.trim() : '';
+            const drawerNameEl = document.getElementById('drawerStudentName');
+            drawerNameEl.innerHTML = '<i class="fa-solid fa-user-pen"></i> ';
+            drawerNameEl.append(studentName);
             
             const drawerBody = document.getElementById('drawerBody');
             drawerBody.innerHTML = '';
             const row = document.querySelector(`.student-data-row[data-uuid="${studentId}"]`);
             if (!row) return;
 
-            const modules = Array.from({length: 25}, (_, i) => `module_${i+1}`);
-            const activities = Array.from({length: 10}, (_, i) => `activity_${i+1}`);
+            const modules = Array.from({length: moduleCount()}, (_, i) => `module_${i+1}`);
+            const activities = Array.from({length: activityCount()}, (_, i) => `activity_${i+1}`);
             const others = ['at', 'pt_1', 'pt_2', 'qe'];
 
             function createGrid(fields, title) {
@@ -960,7 +1060,13 @@
                     const tableInput = row.querySelector(`input[data-field="${f}"]`);
                     const val = tableInput.value;
                     const isDisabled = tableInput.disabled ? 'disabled' : '';
-                    const label = f.replace('module_', 'M').replace('activity_', 'A').toUpperCase().replace('_', ' ');
+                    // Match the table header numbering: modules carry the 2nd-
+                    // quarter offset (M13..M25), activities restart at 1; AT/PT/QE
+                    // keep their plain labels.
+                    const mm = f.match(/^module_(\d+)$/), aa = f.match(/^activity_(\d+)$/);
+                    const label = mm ? ('M' + ((Number(window.MJR_MODULE_OFFSET) || 0) + Number(mm[1])))
+                                : aa ? ('A' + ((Number(window.MJR_ACTIVITY_OFFSET) || 0) + Number(aa[1])))
+                                : f.toUpperCase().replace('_', ' ');
                     
                     html += `
                         <div class="drawer-input-group">
@@ -977,7 +1083,7 @@
             // intentionally hidden from them (grades live in the teacher panel).
             let finalHtml = createGrid(modules, 'Modules');
             finalHtml += createGrid(activities, 'Activities');
-            finalHtml += createGrid(others, 'Assessments');
+            if (currentSchoolLevel !== 'college') finalHtml += createGrid(others, 'Assessments');
 
             drawerBody.innerHTML = finalHtml;
 
@@ -1041,7 +1147,18 @@
                 const studUuid = row.dataset.uuid;
                 const recordId = row.dataset.recordid; 
 
-                let dataObj = { student_id: studUuid, section_id: currentSectionId, date: dateStr, quarter: getCurrentQuarter() };
+                // facilitator_id stamps WHO submitted this row. The teacher
+                // panel writes NULL for its own saves, so this is what lets the
+                // backend tell a facilitator's submission apart from the
+                // teacher's own edit — and only the former reaches the teacher's
+                // notification bell.
+                let dataObj = {
+                    student_id: studUuid,
+                    section_id: currentSectionId,
+                    date: dateStr,
+                    quarter: getCurrentQuarter(),
+                    facilitator_id: localStorage.getItem('faci_id') || null,
+                };
                 
                 if (recordId) {
                     dataObj.id = recordId; 
@@ -1050,11 +1167,6 @@
                 }
 
                 row.querySelectorAll('.score-input').forEach(input => {
-                    // Skip values that are only being displayed from a
-                    // previous quarter — they live in another row and we
-                    // don't want to copy them into the current quarter.
-                    if (input.dataset.carried === '1') return;
-
                     const val = input.value.trim();
                     dataObj[input.dataset.field] = val === "" ? null : parseFloat(val);
 
@@ -1071,12 +1183,9 @@
                 return;
             }
 
-            // Offline check — queue to IndexedDB if no connection. The pill on
-            // top (offline-bar.js) reflects the queued count — no duplicate
-            // button message needed.
-            if (!navigator.onLine && window.__offlineSync) {
-                await window.__offlineSync.queue('class_record', recordData);
-                if (window.MJR_cacheInvalidate) window.MJR_cacheInvalidate('records_' + currentSectionId);
+            // Require internet connection for submission
+            if (!navigator.onLine) {
+                showAlert("No Internet", "You need an internet connection to submit scores. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
                 return;
             }
 
@@ -1226,11 +1335,16 @@
         }
 
         // ── Quick-score: pick a column + score, then tick who got it ──────
-        // Fill the "which column" dropdown once, grouped as Modules / Activities
-        // / Other with M1../A1../AT/PT/QE labels matching the table headers.
+        // Fill the "which column" dropdown, grouped as Modules / Activities /
+        // Other with M1../A1../AT/PT/QE labels matching the table headers.
+        // Rebuilt on every load (not just once) so it always matches the current
+        // quarter's Module / Activity column counts — e.g. after the teacher
+        // switches the section to another quarter, the picker follows.
         function _qsPopulateFieldSelect() {
             const sel = document.getElementById('qsFieldSelect');
-            if (!sel || sel.dataset.populated) return;
+            if (!sel) return;
+            const prev = sel.value; // keep the current pick if it still exists
+            Array.from(sel.querySelectorAll('optgroup')).forEach((og) => og.remove());
             const group = (label, entries) => {
                 const og = document.createElement('optgroup');
                 og.label = label;
@@ -1242,21 +1356,27 @@
                 });
                 return og;
             };
+            // Label the columns to MATCH the table header: modules carry the
+            // 2nd-quarter numbering offset (e.g. Q1 stopped at 12 -> Q2 picker
+            // shows M13..M25), activities restart at 1 (offset 0). The stored
+            // field stays module_i / activity_i for the current quarter.
+            const mo = Number(window.MJR_MODULE_OFFSET) || 0;
+            const ao = Number(window.MJR_ACTIVITY_OFFSET) || 0;
             const modules = [];
-            for (let i = 1; i <= 25; i++) modules.push(['module_' + i, 'M' + i]);
+            for (let i = 1, mc = moduleCount(); i <= mc; i++) modules.push(['module_' + i, 'M' + (mo + i)]);
             const activities = [];
-            for (let i = 1; i <= 10; i++) activities.push(['activity_' + i, 'A' + i]);
+            for (let i = 1, ac = activityCount(); i <= ac; i++) activities.push(['activity_' + i, 'A' + (ao + i)]);
             const others = [['at', 'AT'], ['pt_1', 'PT 1'], ['pt_2', 'PT 2'], ['qe', 'QE']];
             sel.appendChild(group('Modules', modules));
             sel.appendChild(group('Activities', activities));
-            sel.appendChild(group('Other', others));
-            sel.dataset.populated = '1';
+            if (currentSchoolLevel !== 'college') sel.appendChild(group('Other', others));
+            sel.value = (prev && sel.querySelector('option[value="' + prev + '"]')) ? prev : '';
         }
 
         // Ticking a student writes the picked score into the picked column for
-        // that student; unticking clears it. Locked cells (submitted / carried
-        // from another quarter) can't be changed here — their tickbox stays
-        // disabled, so onchange never fires for them.
+        // that student; unticking clears it. Locked cells (already submitted)
+        // can't be changed here — their tickbox stays disabled, so onchange
+        // never fires for them.
         function qsStampStudent(cb) {
             const col = document.getElementById('qsFieldSelect')?.value || '';
             const score = document.getElementById('qsScoreSelect')?.value || '';
@@ -1271,7 +1391,7 @@
             if (!input) { cb.checked = false; return; }
             if (input.disabled) {
                 // Reflect reality but never touch a locked cell.
-                cb.checked = input.value.trim() !== '' && input.dataset.carried !== '1';
+                cb.checked = input.value.trim() !== '';
                 return;
             }
             if (cb.checked) {
@@ -1313,12 +1433,11 @@
                 }
                 const input = row.querySelector(`.score-input[data-field="${col}"]`);
                 if (!input) { cb.checked = false; cb.disabled = true; row.classList.remove('selected'); return; }
-                const carried = input.dataset.carried === '1';
-                const hasVal = input.value.trim() !== '' && !carried;
+                const hasVal = input.value.trim() !== '';
                 cb.checked = hasVal;
                 cb.disabled = input.disabled;
                 cb.title = input.disabled
-                    ? 'Already submitted, or carried over from a previous quarter — only the Teacher can change it.'
+                    ? 'Already submitted — only the Teacher can change it.'
                     : 'Tick if this student got ' + (score || 'the score') + ' in ' + REC_FIELD_LABEL(col);
                 row.classList.toggle('selected', hasVal && !input.disabled);
             });
@@ -1333,6 +1452,7 @@
 
     </script>
     <script src="smooth-select.js" defer></script>
+    <script src="grading.js" defer></script>
     <script src="mjr-notify.js" defer></script>
     <script src="mjr-guard.js" defer></script>
     <script src="mjr-offline.js" defer></script>

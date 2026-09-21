@@ -18,8 +18,7 @@
     <script>(function(){var i=0,id=setInterval(function(){var b=document.getElementById("uiStatusBadge");if(b)b.remove();if(++i>25)clearInterval(id);},200);})();</script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-    <script src="offlineSyncUtility.js" defer></script>
+
     <script src="offline-bar.js" defer></script>
     <script src="mjr-offline.js" defer></script>
     <script>
@@ -425,6 +424,10 @@
             // Not logged in: fill over the splash's ~2s, then it fades to the form.
             startFill(1900);
 
+            // Warm the login function while the user reads the splash / types, so
+            // the first (server-verified) login doesn't wait on a cold start.
+            try { fetch(`${SUPABASE_URL}/functions/v1/faci-login`, { method: 'OPTIONS' }).catch(() => {}); } catch (e) {}
+
             // Check if Faci ID was remembered
             const rememberedId = localStorage.getItem('remembered_faci_id');
             if (rememberedId) {
@@ -485,76 +488,76 @@
             loginBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
             loginBtn.disabled = true;
 
-            // Offline path: check saved credentials in IndexedDB
+            // Require internet connection for login
             if (!navigator.onLine) {
-                var bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
-                var creds = null;
-                if (bcryptLib && window.__offlineSync) {
-                    creds = await window.__offlineSync.getLocalCreds(accountId);
-                }
-                if (creds && bcryptLib.compareSync(password, creds.passwordHash)) {
-                    var faciData = creds.faciData;
-                    if (rememberMe) { localStorage.setItem('remembered_faci_id', accountId); } else { localStorage.removeItem('remembered_faci_id'); }
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('user_id');
-                    localStorage.removeItem('cached_user_name');
-                    localStorage.removeItem('cached_user_avatar');
-                    localStorage.setItem('faci_id', faciData.id);
-                    localStorage.setItem('faci_name', faciData.full_name);
-                    localStorage.setItem('faci_section', faciData.section);
-                    localStorage.setItem('faci_subject', faciData.subject);
-                    if (faciData.teacher_id) localStorage.setItem('faci_teacher_id', faciData.teacher_id);
-                    else localStorage.removeItem('faci_teacher_id');
-                    loginBtn.style.backgroundColor = '#10b981';
-                    loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
-                    setTimeout(function () { window.location.href = 'index.html'; }, 800);
-                    return;
-                }
-                showAlert("Offline", "Not connected to the internet and no saved credentials found. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
+                showAlert("No Internet", "You need an internet connection to log in. Please connect and try again.", "fa-wifi-slash", "#f59e0b");
                 loginBtn.innerHTML = 'Login';
                 loginBtn.disabled = false;
                 return;
             }
 
             try {
-                // Fast path: verify the login in the browser with bcrypt.js, so we
-                // don't wait on the (sleepy free-tier) backend to wake up. Only the
-                // one matching account's row is read. Falls back to the server
-                // endpoint if the crypto library didn't load.
-                const bcryptLib = (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt;
+                // Verify on the server via the Supabase Edge Function `faci-login`
+                // so the bcrypt password hash is never read into the browser. The
+                // function runs in the same always-on Supabase infrastructure the
+                // app already uses and verifies with the same bcryptjs. A 401 means
+                // bad credentials; a network/timeout error is a connection problem.
                 let faciData = null;
+                let loginError = null;   // { title, message, icon, color } when the server gave a definite answer
 
-                if (bcryptLib) {
-                    const { data: row, error } = await supabaseClient
-                        .from('facilitators')
-                        .select('id, full_name, section, subject, teacher_id, password')
-                        .eq('account_id', accountId)
-                        .maybeSingle();
-                    if (error) throw error;
-                    if (row && row.password && bcryptLib.compareSync(password, row.password)) {
-                        faciData = { id: row.id, full_name: row.full_name, section: row.section, subject: row.subject, teacher_id: row.teacher_id };
-                        if (window.__offlineSync) {
-                            window.__offlineSync.saveLocalCreds(accountId, row.password, faciData);
-                        }
+                try {
+                    const ctrl = new AbortController();
+                    const timer = setTimeout(() => ctrl.abort(), 12000);
+                    let res;
+                    try {
+                        res = await fetch(`${SUPABASE_URL}/functions/v1/faci-login`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                            },
+                            body: JSON.stringify({ account_id: accountId, password: password }),
+                            signal: ctrl.signal
+                        });
+                    } finally {
+                        clearTimeout(timer);
                     }
-                } else {
-                    const res = await fetch(`${API_URL}/api/faci/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ account_id: accountId, password: password })
-                    });
                     const result = await res.json().catch(() => ({}));
-                    if (res.ok) faciData = result.faci;
+                    if (res.ok && result && result.faci) {
+                        faciData = result.faci;
+                    } else if (res.status === 429) {
+                        // Locked out after too many wrong attempts. The 5-minute
+                        // cooldown runs on the server; we never show a live timer.
+                        loginError = {
+                            title: "Too Many Attempts",
+                            message: "For your security, this account has been temporarily locked after several incorrect attempts. Please try again after 5 minutes.",
+                            icon: "fa-lock",
+                            color: "#f59e0b"
+                        };
+                    } else if (res.status === 401) {
+                        let msg = "Incorrect ID or password. Please try again.";
+                        if (result && typeof result.remaining === 'number') {
+                            const tries = result.remaining === 1 ? "1 attempt" : (result.remaining + " attempts");
+                            msg = "Incorrect ID or password. You have " + tries + " left before this account is locked.";
+                        }
+                        loginError = { title: "Login Failed", message: msg, icon: "fa-circle-xmark", color: "#ef4444" };
+                    }
+                    // any other status → leave both null → connection problem below
+                } catch (e) {
+                    // network error / abort → connection problem below
                 }
 
                 if (!faciData) {
-                    // Invalid Credentials
-                    showAlert(
-                        "Login Failed",
-                        "We couldn't find an account with those details. Please check your ID and password.",
-                        "fa-circle-xmark",
-                        "#ef4444"
-                    );
+                    if (!loginError) {
+                        loginError = {
+                            title: "Connection Problem",
+                            message: "We couldn't reach the login service. Please check your internet connection and try again.",
+                            icon: "fa-wifi",
+                            color: "#f59e0b"
+                        };
+                    }
+                    showAlert(loginError.title, loginError.message, loginError.icon, loginError.color);
                     loginBtn.innerHTML = 'Login';
                     loginBtn.disabled = false;
                     return;
@@ -598,7 +601,7 @@
                 }
 
                 // UI Success state
-                loginBtn.style.backgroundColor = '#10b981'; 
+                loginBtn.style.backgroundColor = '#10b981';
                 loginBtn.innerHTML = '<i class="fa-solid fa-check"></i> Login successful';
                 
                 setTimeout(() => {
