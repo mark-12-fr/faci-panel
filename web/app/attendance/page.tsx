@@ -8,6 +8,8 @@ import { setupPush, armPermissionOnGesture } from "@/lib/notify";
 import { haptic } from "@/lib/haptic";
 import { enqueue, isNetworkError, startAutoFlush } from "@/lib/offline-queue";
 import { useAlert } from "@/components/CustomAlert";
+import { AttendanceSkeleton } from "@/components/Skeleton";
+import { getCached, setCache, getCacheKey } from "@/lib/api-cache";
 import BottomNav from "@/components/BottomNav";
 import "./attendance.css";
 
@@ -421,11 +423,7 @@ export default function AttendancePage() {
       )}
 
       <div className="fade-in-up delay-4">
-        {loadState === "loading" && (
-          <div style={{ textAlign: "center", padding: 20 }}>
-            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "2rem" }} />
-          </div>
-        )}
+        {loadState === "loading" && <AttendanceSkeleton />}
         {loadState === "nosection" && (
           <div style={{ textAlign: "center", padding: 20, color: "red" }}>
             Error: Section not found or restricted.

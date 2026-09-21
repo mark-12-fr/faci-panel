@@ -41,7 +41,12 @@
         try {
             var q = sb.from('subjects').select('name, ww_percent, pt_percent, exam_percent, attendance_percent, passing_grade')
                 .eq('teacher_id', teacherId);
-            var res = await q;
+            // Cache the teacher's subject configs (stale-while-revalidate) so
+            // every page open resolves grade weights instantly on repeat
+            // visits instead of burning another network round-trip up front.
+            var res = (window.MJR_cachedQuery)
+                ? await window.MJR_cachedQuery('subjects_' + teacherId, q)
+                : await q;
             if (res.error || !res.data) return window.MJR_SUBJECT_CFG;
             var map = {};
             res.data.forEach(function (r) {

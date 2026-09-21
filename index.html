@@ -489,11 +489,11 @@
     
     <div class="dashboard-header fade-in-up">
         <div class="header-content">
-            <p class="date" id="currentDate">Loading Date...</p>
+            <p class="date" id="currentDate" data-skeleton-bar="150px">Loading Date...</p>
             <h1 id="faciGreeting">Good day,<br>Facilitator! <span class="hand-emoji">👋</span></h1>
             <div class="tag-row">
-                <span class="tag tag-primary" id="faciSectionTag">Section</span>
-                <span class="tag tag-secondary" id="faciSubjectTag" data-skeleton-bar="84px"></span>
+                <span class="tag tag-primary" id="faciSectionTag" data-skeleton-badge="110px">Section</span>
+                <span class="tag tag-secondary" id="faciSubjectTag" data-skeleton-badge="96px"></span>
             </div>
         </div>
         <div class="profile-avatar">
@@ -505,38 +505,38 @@
         <div class="stat-card blue fade-in-up delay-1" onclick="openDrawer('students')">
             <h2 id="dashTotalStudents" data-skeleton-bar="48px"></h2>
             <p class="stat-label">My Students</p>
-            <p class="stat-sub" id="faciSectionStat">Section</p>
+            <p class="stat-sub" id="faciSectionStat" data-skeleton-bar="90px">Section</p>
         </div>
         <div class="stat-card green fade-in-up delay-1" onclick="openDrawer('attendance')">
             <h2 id="dashPresent" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Present Today</p>
-            <p class="absent" id="dashAbsent">0 absent/late</p>
+            <p class="absent" id="dashAbsent" data-skeleton-bar="96px">0 absent/late</p>
         </div>
 
         <div class="stat-card yellow fade-in-up delay-2" onclick="openDrawer('modules')">
             <h2 id="dashModules" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Modules Done</p>
-            <p class="pending" id="dashModulesSub">Calculating...</p>
+            <p class="pending" id="dashModulesSub" data-skeleton-bar="84px">Calculating...</p>
         </div>
         <div class="stat-card purple fade-in-up delay-2" onclick="openDrawer('activities')">
             <h2 id="dashActivities" data-skeleton-bar="48px"></h2>
             <p class="stat-label">Activities</p>
-            <p class="done" id="dashActivitiesSub">Waiting</p>
+            <p class="done" id="dashActivitiesSub" data-skeleton-bar="72px">Waiting</p>
         </div>
     </div>
 
     <div class="section-title fade-in-up delay-3">Section Overview</div>
     <div class="overview-panel fade-in-up delay-3">
         <div class="overview-item">
-            <h3 id="faciSemesterOverview">1st</h3>
+            <h3 id="faciSemesterOverview" data-skeleton-bar="34px">1st</h3>
             <p>Semester</p>
         </div>
         <div class="overview-item">
-            <h3 id="faciQuarterOverview">1</h3>
+            <h3 id="faciQuarterOverview" data-skeleton-bar="34px">1</h3>
             <p>Quarter</p>
         </div>
         <div class="overview-item">
-            <h3 id="faciTotalStudentsOverview">0</h3>
+            <h3 id="faciTotalStudentsOverview" data-skeleton-bar="34px">0</h3>
             <p>Students</p>
         </div>
     </div>
@@ -577,11 +577,11 @@
     <div class="performance-panel fade-in-up delay-4">
         <div class="perf-stats perf-stats-two">
             <div class="perf-stat">
-                <span class="perf-val" id="perfHighest">0</span>
+                <span class="perf-val" id="perfHighest" data-skeleton-bar="40px">0</span>
                 <span class="perf-label">Highest</span>
             </div>
             <div class="perf-stat">
-                <span class="perf-val perf-val-low" id="perfLowest">0</span>
+                <span class="perf-val perf-val-low" id="perfLowest" data-skeleton-bar="40px">0</span>
                 <span class="perf-label">Lowest</span>
             </div>
         </div>
@@ -712,39 +712,43 @@
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options).toUpperCase();
 
-            // 1. FETCH LIVE PROFILE DATA 
-            try {
-                const { data: profile, error } = await MJR_cachedQuery('profile_' + faciId, supabaseClient
-                    .from('facilitators')
-                    .select('*')
-                    .or(`id.eq.${faciId},account_id.eq.${faciId}`)
-                    .single());
+            // 1. FETCH LIVE PROFILE DATA (fire-and-forget — never blocks the
+            //    dashboard's section/students queries below; the cached name +
+            //    avatar already rendered from localStorage during parse).
+            (async () => {
+                try {
+                    const { data: profile, error } = await MJR_cachedQuery('profile_' + faciId, supabaseClient
+                        .from('facilitators')
+                        .select('*')
+                        .or(`id.eq.${faciId},account_id.eq.${faciId}`)
+                        .single());
 
-                if (error) throw error;
+                    if (error) throw error;
 
-                if (profile) {
-                    const firstName = profile.full_name.split(' ')[0];
-                    const hr = new Date().getHours();
-                    const partOfDay = hr < 12 ? 'Good morning'
-                                    : hr < 18 ? 'Good afternoon'
-                                    :           'Good evening';
-                    document.getElementById('faciGreeting').innerHTML = `${partOfDay},<br>${firstName}! <span class="hand-emoji">👋</span>`;
-                    document.getElementById('faciSectionTag').textContent = profile.section;
-                    document.getElementById('faciSubjectTag').textContent = profile.subject || 'Subject';
-                    document.getElementById('faciSectionStat').textContent = profile.section;
+                    if (profile) {
+                        const firstName = profile.full_name.split(' ')[0];
+                        const hr = new Date().getHours();
+                        const partOfDay = hr < 12 ? 'Good morning'
+                                        : hr < 18 ? 'Good afternoon'
+                                        :           'Good evening';
+                        document.getElementById('faciGreeting').innerHTML = `${partOfDay},<br>${firstName}! <span class="hand-emoji">👋</span>`;
+                        document.getElementById('faciSectionTag').textContent = profile.section;
+                        document.getElementById('faciSubjectTag').textContent = profile.subject || 'Subject';
+                        document.getElementById('faciSectionStat').textContent = profile.section;
 
-                    const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
+                        const imgUrl = profile.profile_img || profile.avatar_url || profile.profile_picture || profile.photo || profile.image_url;
 
-                    if (imgUrl && imgUrl.trim() !== "") {
-                        document.getElementById('faciProfileImg').src = imgUrl;
-                        localStorage.setItem('faci_img_url', imgUrl); 
-                    } else {
-                        document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name)}&background=1e3a8a&color=fff`;
+                        if (imgUrl && imgUrl.trim() !== "") {
+                            document.getElementById('faciProfileImg').src = imgUrl;
+                            localStorage.setItem('faci_img_url', imgUrl); 
+                        } else {
+                            document.getElementById('faciProfileImg').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name)}&background=1e3a8a&color=fff`;
+                        }
                     }
+                } catch (err) { 
+                    console.error("Error fetching profile:", err); 
                 }
-            } catch (err) { 
-                console.error("Error fetching profile:", err); 
-            }
+            })();
 
             try {
                 const sectionData = await window.MJR_resolveFaciSection(supabaseClient, section, 'id, semester, quarter, school_level, teacher_id');
@@ -792,19 +796,27 @@
 
                 // Dynamic grading: load THIS subject's weights (set by the teacher
                 // in the Grading System) so the faci's grades match the teacher's.
+                // Launched CONCURRENTLY with students/records — weights are only
+                // needed for the final grade pass, never to start loading, so a
+                // slow subjects round-trip no longer holds up the dashboard.
                 window.FACI_SUBJECT = localStorage.getItem('faci_subject') || '';
-                await window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id);
+                const pSubjects = window.MJR_loadSubjectConfigs(supabaseClient, sectionData.teacher_id);
                 window.FACI_ATT_RATE = {};
-                const _fw = window.MJR_weightsFor(window.FACI_SUBJECT);
 
-                const pAttAll = (_fw.att > 0) ? MJR_cachedQuery('attall_' + section, supabaseClient.from('attendance')
-                    .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id)) : Promise.resolve(null);
                 const pAttToday = MJR_cachedQuery('atttoday_' + section + '_' + exactTodayDate, supabaseClient
                     .from('attendance')
                     .select('student_id_no, student_name, status, remarks')
                     .eq('section', section)
                     .eq('teacher_id', sectionData.teacher_id)
                     .eq('date', exactTodayDate));
+
+                // Attendance rate only matters when this subject weights
+                // attendance (>0) — resolve weights first, then fire the
+                // (larger) all-time attendance query ONLY when needed.
+                await pSubjects;
+                const _fw = window.MJR_weightsFor(window.FACI_SUBJECT);
+                const pAttAll = (_fw.att > 0) ? MJR_cachedQuery('attall_' + section, supabaseClient.from('attendance')
+                    .select('student_id_no, student_name, status').eq('section', section).eq('teacher_id', sectionData.teacher_id)) : Promise.resolve(null);
 
                 const { data: students } = await pStudents;
                 cachedStudents = students || [];

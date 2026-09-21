@@ -15,6 +15,8 @@ import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
 import { useAlert } from "@/components/CustomAlert";
 import BottomNav from "@/components/BottomNav";
+import { DashboardSkeleton, SkeletonBar } from "@/components/Skeleton";
+import { getCached, setCache, getCacheKey } from "@/lib/api-cache";
 import "./page.css";
 
 // ── helpers (ported from index.html) ─────────────────────────────────────────
@@ -51,6 +53,7 @@ export default function DashboardPage() {
   const { alert, showAlert } = useAlert();
 
   const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("Good day,\nFacilitator!");
   const [sectionTag, setSectionTag] = useState("Section");
   const [subjectTag, setSubjectTag] = useState("");
@@ -98,6 +101,30 @@ export default function DashboardPage() {
         .toUpperCase()
     );
 
+    // Show cached data instantly if available
+    const cacheKey = getCacheKey("dashboard", getItem("faci_section") || undefined);
+    const cached = getCached<{
+      students: any[];
+      records: any[];
+      attendanceToday: any[];
+      attRate: Record<string, number>;
+      semester: string;
+      quarter: string;
+      faciSubject: string;
+    }>(cacheKey);
+
+    if (cached) {
+      setStudents(cached.students);
+      setRecords(cached.records);
+      setAttendanceToday(cached.attendanceToday);
+      setAttRate(cached.attRate);
+      setSemester(cached.semester);
+      setQuarter(cached.quarter);
+      setFaciSubject(cached.faciSubject);
+      setLoading(false);
+      setReady(true);
+    }
+
     (async () => {
       // 1. Live profile
       try {
@@ -135,6 +162,7 @@ export default function DashboardPage() {
             "Your assigned section is no longer available — it may have been removed by your teacher. Please contact them to be assigned to a new section.",
             "#f59e0b"
           );
+          setLoading(false);
           setReady(true);
           return;
         }
@@ -168,11 +196,6 @@ export default function DashboardPage() {
               const idk = a.student_id_no ? "id:" + String(a.student_id_no).trim() : null;
               const nmk = a.student_name ? "nm:" + String(a.student_name).trim().toLowerCase() : null;
               if (!idk && !nmk) return;
-              // One bucket per student, registered under BOTH keys: rows saved
-              // with an id_no and rows saved with only a name (or an id_no that
-              // was later edited) must land in the same counts — otherwise the
-              // absences silently vanish and attScore() defaults the student to
-              // a perfect attendance component in the grade.
               const bucket =
                 (idk && agg[idk]) || (nmk && agg[nmk]) || { present: 0, late: 0, total: 0 };
               if (idk) agg[idk] = bucket;
@@ -195,11 +218,26 @@ export default function DashboardPage() {
 
         // Today's attendance
         const todayResp = await apiGet(`/api/faci/attendance?date=${encodeURIComponent(exactTodayDate)}`);
-        setAttendanceToday(todayResp.attendance || []);
+        const todayData = todayResp.attendance || [];
+        setAttendanceToday(todayData);
+
+        // Cache the data for instant load next time
+        setCache(cacheKey, {
+          students: studs,
+          records: recs,
+          attendanceToday: todayData,
+          attRate: rate,
+          semester: (String(section.semester || "1st Sem").replace(/\s*sem(ester)?\.?\s*$/i, "").trim()) || "1st",
+          quarter: String(section.quarter || "1"),
+          faciSubject: subject,
+        });
+
+        setLoading(false);
         setReady(true);
       } catch (e) {
         console.error("Error fetching stats:", e);
         setStatsError(true);
+        setLoading(false);
         setReady(true);
       }
     })();
@@ -534,7 +572,7 @@ export default function DashboardPage() {
   };
 
   const statNum = (v: number | string) =>
-    ready ? v : <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1rem" }} />;
+    loading ? <SkeletonBar width="36px" height="26px" style={{ display: "inline-block", verticalAlign: "middle" }} /> : v;
 
   // One local reminder per day if attendance isn't done yet and the faci has
   // already granted notification permission (no nagging, no backend scheduler).
@@ -552,6 +590,12 @@ export default function DashboardPage() {
       }
     } catch {}
   }, [noSection, totalStudents, attendanceToday]);
+
+  if (loading && !isLoggedIn()) return null;
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="dashboard-page">
@@ -699,7 +743,9 @@ export default function DashboardPage() {
         <div className="perf-top">
           {!ready ? (
             <div className="perf-empty">
-              <i className="fa-solid fa-spinner fa-spin" /> Loading ranking...
+              <SkeletonBar width="80%" height="14px" style={{ marginBottom: 8 }} />
+              <SkeletonBar width="65%" height="14px" style={{ marginBottom: 8 }} />
+              <SkeletonBar width="75%" height="14px" />
             </div>
           ) : statsError ? (
             <div className="perf-empty">Could not load ranking. Please refresh.</div>

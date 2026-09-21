@@ -1,0 +1,132 @@
+/* Skeleton.css — shimmer placeholders that layout like the real content.
+   Mirrors the static app's ui-enhance.js skeleton system so both UIs feel
+   identical while data is loading. */
+
+.sk-bar {
+  height: 15px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+.sk-block {
+  background: #e2e8f0;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.sk-badge {
+  height: 22px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+.sk-circle {
+  border-radius: 50%;
+  background: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+.sk-text {
+  height: 12px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+  display: block;
+  margin-bottom: 7px;
+}
+.sk-bar::after,
+.sk-block::after,
+.sk-badge::after,
+.sk-circle::after,
+.sk-text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: uiShimmer 1.3s infinite;
+}
+@keyframes uiShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.sk-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+.sk-text-wrap {
+  display: block;
+}
+.skeleton-row td {
+  padding: 9px 4px;
+}
+.skeleton-row .sk-bar {
+  width: 80%;
+  margin: 0 auto;
+}
+.skeleton-row td:first-child .sk-bar,
+.skeleton-row td:nth-child(2) .sk-bar {
+  width: 90%;
+  margin-left: 6px;
+}
+
+/* ── Page-specific skeleton wrappers ────────────────────────────────────────── */
+
+.sk-dashboard-header {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sk-stat-card {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 4px solid #e2e8f0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.sk-section-title {
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  margin: 25px 0 10px 5px;
+  font-weight: 800;
+  height: 12px;
+  width: 120px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.sk-section-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: uiShimmer 1.3s infinite;
+}
+
+.sk-overview {
+  background-color: #ffffff;
+  padding: 18px 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}

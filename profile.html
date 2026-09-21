@@ -244,17 +244,17 @@
 
     <div class="profile-header fade-in-up">
         <div class="profile-avatar-container" onclick="document.getElementById('avatarUpload').click()" title="Click to change profile picture">
-            <img src="" id="faciAvatar" class="profile-avatar" alt="Avatar">
+            <img src="" id="faciAvatar" class="profile-avatar sk-avatar" alt="Avatar">
             <div class="profile-overlay">
                 <i class="fa-solid fa-camera" style="margin-bottom: 3px;"></i> Change
             </div>
             <input type="file" id="avatarUpload" style="display: none;" accept="image/png, image/jpeg" onchange="uploadAvatar(event)">
         </div>
-        <h2 class="profile-name" id="faciName">Loading...</h2>
+        <h2 class="profile-name" id="faciName" data-skeleton-bar="150px">Loading...</h2>
         <p class="profile-role">Student Facilitator</p>
         <div class="badge-container">
-            <span class="badge badge-blue" id="badgeSection">...</span>
-            <span class="badge badge-purple" id="badgeSubject">...</span>
+            <span class="badge badge-blue" id="badgeSection" data-skeleton-badge="100px">...</span>
+            <span class="badge badge-purple" id="badgeSubject" data-skeleton-badge="80px">...</span>
         </div>
     </div>
 

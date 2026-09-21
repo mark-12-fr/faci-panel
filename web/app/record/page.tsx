@@ -11,6 +11,7 @@ import { haptic } from "@/lib/haptic";
 import { enqueue, isNetworkError, startAutoFlush } from "@/lib/offline-queue";
 import { setSubjectConfigs, finalGrade, passingFor, attScore } from "@/lib/grading";
 import { useAlert } from "@/components/CustomAlert";
+import { RecordSkeleton } from "@/components/Skeleton";
 import BottomNav from "@/components/BottomNav";
 import "./record.css";
 
@@ -774,6 +775,10 @@ export default function RecordPage() {
 
   return (
     <div className="record-page">
+      {loadState === "loading" && <RecordSkeleton />}
+
+      {loadState !== "loading" && (
+        <>
       <div className="header-section fade-in-up">
         <div className="status-lock">
           <i className="fa-solid fa-lock" /> Class Record
@@ -858,13 +863,6 @@ export default function RecordPage() {
               </tr>
             </thead>
             <tbody ref={tableRef}>
-              {loadState === "loading" && (
-                <tr>
-                  <td colSpan={42} style={{ textAlign: "center", padding: 30 }}>
-                    <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "2rem" }} />
-                  </td>
-                </tr>
-              )}
               {loadState === "empty" && (
                 <tr>
                   <td colSpan={42} style={{ color: "var(--text-sub)", textAlign: "center", padding: 20 }}>
@@ -1260,6 +1258,8 @@ export default function RecordPage() {
       </div>
 
       {alert}
+        </>
+      )}
     </div>
   );
 }

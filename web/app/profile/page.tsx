@@ -8,6 +8,7 @@ import { getToken } from "@/lib/session";
 import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
 import { useAlert } from "@/components/CustomAlert";
+import { ProfileSkeleton } from "@/components/Skeleton";
 import BottomNav from "@/components/BottomNav";
 import "./profile.css";
 
@@ -29,6 +30,7 @@ export default function ProfilePage() {
   const [coError, setCoError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,6 +77,8 @@ export default function ProfilePage() {
         setCoFacis(list);
       } catch {
         setCoError(true);
+      } finally {
+        setProfileLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,6 +159,10 @@ export default function ProfilePage() {
 
   return (
     <div className="profile-page">
+      {profileLoading && <ProfileSkeleton />}
+
+      {!profileLoading && (
+        <>
       <div className="profile-header fade-in-up">
         <div
           className="profile-avatar-container"
@@ -286,6 +294,8 @@ export default function ProfilePage() {
 
       <BottomNav active="profile" />
       {alert}
+        </>
+      )}
     </div>
   );
 }

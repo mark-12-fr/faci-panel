@@ -413,11 +413,12 @@
             };
             const activeFaciId = localStorage.getItem('faci_id');
             if (activeFaciId) {
-                startFill(1600); // reaches full just before the 1750ms redirect
-
+                startFill(900); // quick fill — the dashboard loads its own
+                                // cached data instantly, so don't keep a
+                                // returning user waiting on the splash.
                 setTimeout(() => {
                     window.location.href = 'index.html';
-                }, 1750);
+                }, 1000);
                 return;
             }
 
