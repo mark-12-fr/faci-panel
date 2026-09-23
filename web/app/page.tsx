@@ -15,7 +15,12 @@ import { useFaciSession } from "@/hooks/useFaciSession";
 import { setupPush, armPermissionOnGesture } from "@/lib/notify";
 import { useAlert } from "@/components/CustomAlert";
 import BottomNav from "@/components/BottomNav";
-import { DashboardSkeleton, SkeletonBar } from "@/components/Skeleton";
+import {
+  DashboardSkeleton,
+  SkeletonBadge,
+  SkeletonBar,
+  SkeletonBlock,
+} from "@/components/Skeleton";
 import { getCached, setCache, getCacheKey } from "@/lib/api-cache";
 import "./page.css";
 
@@ -126,27 +131,30 @@ export default function DashboardPage() {
     }
 
     (async () => {
-      // 1. Live profile
-      try {
-        const me = await apiGet("/api/faci/me");
-        if (me) {
-          const firstName = String(me.full_name || "Facilitator").split(" ")[0];
-          const hr = new Date().getHours();
-          const partOfDay = hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
-          setGreeting(`${partOfDay},\n${firstName}!`);
-          setSectionTag(me.section || "");
-          setSubjectTag(me.subject || "Subject");
-          if (me.avatar_url && String(me.avatar_url).trim() !== "") {
-            setAvatar(me.avatar_url);
-          } else {
-            setAvatar(
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(me.full_name || "User")}&background=1e3a8a&color=fff`
-            );
+      // 1. Live profile — fire-and-forget so the section/stats load below is
+      //    never gated behind this round-trip (the cached name/avatar above
+      //    already rendered during setup).
+      const pMe = apiGet("/api/faci/me")
+        .then((me) => {
+          if (me) {
+            const firstName = String(me.full_name || "Facilitator").split(" ")[0];
+            const hr = new Date().getHours();
+            const partOfDay = hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+            setGreeting(`${partOfDay},\n${firstName}!`);
+            setSectionTag(me.section || "");
+            setSubjectTag(me.subject || "Subject");
+            if (me.avatar_url && String(me.avatar_url).trim() !== "") {
+              setAvatar(me.avatar_url);
+            } else {
+              setAvatar(
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(me.full_name || "User")}&background=1e3a8a&color=fff`
+              );
+            }
           }
-        }
-      } catch {
-        /* keep cached */
-      }
+        })
+        .catch(() => {
+          /* keep cached */
+        });
 
       // 2. Section + stats
       try {
@@ -240,6 +248,10 @@ export default function DashboardPage() {
         setLoading(false);
         setReady(true);
       }
+      // The profile round-trip may still be in flight — resolve it before the
+      // IIFE finishes so no promise is left dangling (pure state setter, so
+      // ordering vs. the stats above doesn't matter).
+      await pMe;
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
