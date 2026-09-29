@@ -118,16 +118,76 @@
                 // Query returned an error — prefer a cached snapshot if we have one.
                 var onErr = window.MJR_cacheGet(key);
                 if (onErr !== undefined) return { data: onErr, error: null, fromCache: true };
+                // No snapshot AND the failure looks transient (dropped connection /
+                // 5xx): the page is about to render "0 students" from empty data, so
+                // surface a retry notice (and auto-reload on reconnect). RLS/404-type
+                // errors are NOT flagged — a retry can't fix those.
+                if (window.MJR_isTransient && window.MJR_isTransient(res) && window.MJR_markLoadFailed) window.MJR_markLoadFailed();
                 return res;
             } catch (e) {
                 var onThrow = window.MJR_cacheGet(key);
                 if (onThrow !== undefined) return { data: onThrow, error: null, fromCache: true };
+                if (window.MJR_markLoadFailed) window.MJR_markLoadFailed();
                 return { data: null, error: { message: String((e && e.message) || e) } };
             }
         }
         // Offline: skip the network entirely and serve the last snapshot.
         var offline = window.MJR_cacheGet(key);
         if (offline !== undefined) return { data: offline, error: null, fromCache: true };
+        if (window.MJR_markLoadFailed) window.MJR_markLoadFailed();
         return { data: null, error: { message: 'offline: no cached data for ' + key } };
+    };
+})();
+
+/*
+ * Network-resilient writes — MJR_withRetry / MJR_isTransient.
+ *
+ * A facilitator submitting scores or attendance on a shaky mobile connection used
+ * to get ONE attempt: a dropped packet or a 502 while the API restarts meant an
+ * error alert and a manual re-submit. These helpers retry a write a couple of
+ * times before giving up.
+ *
+ * Only ever wrap an IDEMPOTENT unit of work — running it twice must give the same
+ * result as once. That is true for the score upsert (every row carries its own
+ * pre-generated id) and for attendance's delete-then-insert pair (re-running the
+ * pair first clears anything a lost-response first attempt may have written).
+ * A bare insert without such a guard must NOT be wrapped: a retry could duplicate.
+ *
+ * (This is NOT the old offline write queue, which stayed removed on purpose: that
+ * one replayed stale data hours later and overwrote the teacher's edits. Retries
+ * here happen within seconds, with the same payload, while the page is open.)
+ */
+(function () {
+    // HTTP statuses that mean "try again", not "your request is wrong". 0 = the
+    // request never got an answer (dropped connection / timeout).
+    var TRANSIENT_STATUS = { 0: 1, 408: 1, 429: 1, 500: 1, 502: 1, 503: 1, 504: 1, 522: 1, 524: 1 };
+    var NETWORK_MESSAGE = /failed to fetch|networkerror|network request failed|load failed|timeout|timed out|econn|socket|aborted/i;
+
+    // res: a Supabase-style result ({ data, error, status }).
+    window.MJR_isTransient = function (res) {
+        if (!res || !res.error) return false;
+        if (typeof res.status === 'number' && TRANSIENT_STATUS[res.status]) return true;
+        var msg = String((res.error && (res.error.message || res.error.details)) || res.error || '');
+        return NETWORK_MESSAGE.test(msg);
+    };
+
+    // fn: () => Promise<Supabase-style result>. Resolves to the LAST result, so the
+    // caller keeps its existing `if (error) throw error` handling unchanged.
+    window.MJR_withRetry = async function (fn, opts) {
+        opts = opts || {};
+        var delays = opts.delays || [700, 1800];
+        var last;
+        for (var attempt = 0; ; attempt++) {
+            try {
+                last = await fn(attempt);
+            } catch (e) {
+                last = { data: null, error: { message: String((e && e.message) || e) }, status: 0 };
+            }
+            if (!(last && last.error && window.MJR_isTransient(last))) return last;
+            // Out of retries, or the device is genuinely offline (retrying can't help).
+            if (attempt >= delays.length || navigator.onLine === false) return last;
+            if (typeof opts.onRetry === 'function') { try { opts.onRetry(attempt + 1); } catch (e) {} }
+            await new Promise(function (resolve) { setTimeout(resolve, delays[attempt]); });
+        }
     };
 })();

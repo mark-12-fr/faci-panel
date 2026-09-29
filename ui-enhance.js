@@ -175,4 +175,99 @@
   document.addEventListener("touchmove", function (e) {
     if (e.touches.length > 1) e.preventDefault();
   }, { passive: false });
+
+  /* ── Self-recovery: stuck-loading watchdog + reload on reconnect ─────── */
+  // A page that is still showing its loading skeletons after STUCK_MS (a hung
+  // request, a script error before the data arrived) used to leave the
+  // facilitator staring at grey bars with no way forward. Now it says so and
+  // offers a one-tap retry; and when the connection comes back after a failed or
+  // stuck load, the page reloads ITSELF once. Reloads are rate-limited (15 s) so
+  // a page that keeps failing can never loop, and a page that loaded fine is
+  // never reloaded (typed-but-unsubmitted input is safe).
+  var STUCK_MS = 15000;
+  var RELOAD_KEY = "mjr_auto_reload_at";
+  var SKELETON_SEL = ".sk-bar, .sk-block, .sk-text, .sk-badge, .sk-circle, .skeleton-row";
+  var recoverBar = null;
+  var recoverHideTimer = null;
+
+  function skeletonsVisible() {
+    var els = document.querySelectorAll(SKELETON_SEL);
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].getClientRects().length) return true; // actually on screen, not display:none
+    }
+    return false;
+  }
+
+  function safeReload(force) {
+    try {
+      var last = +sessionStorage.getItem(RELOAD_KEY) || 0;
+      if (!force && Date.now() - last < 15000) return false;
+      sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+    } catch (e) {}
+    window.location.reload();
+    return true;
+  }
+
+  function showRecoverBar(text, autoHideMs) {
+    if (!document.body) return;
+    if (!recoverBar) {
+      recoverBar = document.createElement("div");
+      recoverBar.id = "mjr-recover-bar";
+      recoverBar.setAttribute("role", "status");
+      recoverBar.style.cssText =
+        "position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:2147482999;display:flex;" +
+        "align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:9px 10px 9px 16px;border-radius:999px;" +
+        "background:#0f172a;color:#fff;font-family:inherit;font-size:13px;font-weight:600;line-height:1.3;" +
+        "box-shadow:0 10px 30px rgba(15,23,42,.25);border:1px solid rgba(251,191,36,.55)";
+      var msg = document.createElement("span");
+      msg.id = "mjr-recover-text";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Retry";
+      btn.style.cssText =
+        "border:none;border-radius:999px;padding:6px 14px;background:#fbbf24;color:#111827;" +
+        "font-family:inherit;font-size:12px;font-weight:700;cursor:pointer";
+      btn.addEventListener("click", function () { safeReload(true); });
+      recoverBar.appendChild(msg);
+      recoverBar.appendChild(btn);
+      document.body.appendChild(recoverBar);
+    }
+    recoverBar.querySelector("#mjr-recover-text").textContent = text;
+    recoverBar.style.display = "flex";
+    if (recoverHideTimer) clearTimeout(recoverHideTimer);
+    if (autoHideMs) recoverHideTimer = setTimeout(hideRecoverBar, autoHideMs);
+  }
+
+  function hideRecoverBar() {
+    if (recoverBar) recoverBar.style.display = "none";
+  }
+
+  // Pages call this from their "failed to load" catch block.
+  window.MJR_markLoadFailed = function () {
+    window.__mjrLoadFailedAt = Date.now();
+    showRecoverBar(
+      navigator.onLine === false ? "You're offline — this page will reload when you're back." : "Couldn't load your data.",
+      12000
+    );
+  };
+
+  function watchdog() {
+    if (navigator.onLine === false || !skeletonsVisible()) return;
+    window.__mjrStuckAt = Date.now();
+    showRecoverBar("Taking longer than usual…");
+    // Keep watching and drop the notice the moment the data does arrive.
+    var iv = setInterval(function () {
+      if (!skeletonsVisible()) {
+        clearInterval(iv);
+        window.__mjrStuckAt = 0;
+        hideRecoverBar();
+      }
+    }, 1000);
+  }
+  document.addEventListener("DOMContentLoaded", function () { setTimeout(watchdog, STUCK_MS); });
+
+  window.addEventListener("online", function () {
+    var failedRecently = window.__mjrLoadFailedAt && Date.now() - window.__mjrLoadFailedAt < 120000;
+    if (failedRecently || window.__mjrStuckAt || skeletonsVisible()) safeReload(false);
+  });
 })();

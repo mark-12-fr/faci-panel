@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <title>Facilitator Attendance</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -18,7 +17,7 @@
     <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="ui-enhance.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="vendor/supabase-js-2.117.2.js"></script>
 
     <script src="offline-bar.js" defer></script>
     <style>
@@ -596,6 +595,8 @@
 
             } catch (error) {
                 console.error("Error fetching students:", error);
+                // Offer a one-tap retry (and reload by itself once the connection is back).
+                if (window.MJR_markLoadFailed) window.MJR_markLoadFailed();
                 container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">Failed to load students. Please check your connection.</div>';
             }
         }
@@ -814,12 +815,22 @@
                 const faciTid = window.MJR_getFaciTeacherId
                     ? await window.MJR_getFaciTeacherId(supabaseClient)
                     : localStorage.getItem('faci_teacher_id');
-                let delQ = supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
-                if (faciTid) delQ = delQ.eq('teacher_id', faciTid);
-                await delQ;
+                // Delete + insert are retried TOGETHER on a dropped connection / 5xx
+                // blip. Re-running the pair is idempotent — the delete first clears
+                // anything a lost-response earlier attempt may have written — so a
+                // retry can never duplicate rows (a bare insert retry could).
+                const withRetry = window.MJR_withRetry || ((fn) => fn());
+                const { error } = await withRetry(async () => {
+                    let delQ = supabaseClient.from('attendance').delete().eq('section', section).eq('date', dateStr);
+                    if (faciTid) delQ = delQ.eq('teacher_id', faciTid);
+                    const del = await delQ;
+                    // A transient delete failure: retry the whole pair. Any other
+                    // delete error is ignored exactly as before.
+                    if (del && del.error && window.MJR_isTransient && window.MJR_isTransient(del)) return del;
 
-                // Insert the new records directly to Supabase
-                const { error } = await supabaseClient.from('attendance').insert(attendanceData);
+                    // Insert the new records directly to Supabase
+                    return await supabaseClient.from('attendance').insert(attendanceData);
+                }, { onRetry: () => { btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Retrying...'; } });
 
                 // Re-mark so the realtime echo of this submit is treated as our
                 // own change (keeps the list from refreshing multiple times).

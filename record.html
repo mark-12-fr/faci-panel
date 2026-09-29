@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <title>Class Record</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/jpeg" href="logo.jpg">
@@ -16,11 +15,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script>(function(){var i=0,id=setInterval(function(){var b=document.getElementById("uiStatusBadge");if(b)b.remove();if(++i>25)clearInterval(id);},200);})();</script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Offline read-cache fallback (see index.html): overwritten by mjr-offline.js when fresh. -->
     <script>window.MJR_cacheGet=window.MJR_cacheGet||function(){return undefined};window.MJR_cacheSet=window.MJR_cacheSet||function(){};window.MJR_cachedQuery=window.MJR_cachedQuery||async function(k,t){return await t;};</script>
     <script src="ui-enhance.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="vendor/supabase-js-2.117.2.js"></script>
 
     <script src="offline-bar.js" defer></script>
     
@@ -867,6 +865,8 @@
 
             } catch (error) {
                 console.error("Error loading records:", error);
+                // Offer a one-tap retry (and reload by itself once the connection is back).
+                if (window.MJR_markLoadFailed) window.MJR_markLoadFailed();
                 tbody.innerHTML = `<tr><td colspan="${2 + moduleCount() + activityCount() + 4}" style="color:red; text-align:center;">Failed to load data.</td></tr>`;
             } finally {
                 finishLoad();
@@ -1195,7 +1195,15 @@
             if (window.MJR_markLocalSave) window.MJR_markLocalSave();
 
             try {
-                const { error: saveError } = await supabaseClient.from('class_records').upsert(recordData);
+                // Retry a couple of times on a dropped connection / 5xx blip instead of
+                // failing on the first hiccup. Safe to repeat: every row already
+                // carries its own id (existing id, or one generated above), so the
+                // upsert is idempotent — a retry after a lost response can't duplicate.
+                const withRetry = window.MJR_withRetry || ((fn) => fn());
+                const { error: saveError } = await withRetry(
+                    () => supabaseClient.from('class_records').upsert(recordData),
+                    { onRetry: () => { btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Retrying...'; } }
+                );
                 if (saveError) throw saveError;
                 // The snapshot we just rendered is now outdated — drop it so
                 // the reload below (and the next visit) reads fresh from Supabase.
