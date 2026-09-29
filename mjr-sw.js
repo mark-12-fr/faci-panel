@@ -61,7 +61,7 @@
  *      (instant load); they aren't navigations, so the restriction can't bite.
  */
 
-var CACHE_NAME = 'acadtrack-faci-shell-v23';
+var CACHE_NAME = 'acadtrack-faci-shell-v24';
 
 // Same-origin app shell — ONLY canonical, non-redirecting paths. Never list
 // a ".html" path here: Vercel's cleanUrls 308-redirects it, and fetch()
@@ -84,6 +84,9 @@ var SHELL_URLS = [
     '/offlineSyncUtility.js',
     '/smooth-select.js',
     '/ui-enhance.js',
+    // Self-hosted Supabase client (was a blocking unpkg/jsdelivr <script> on the
+    // critical path of every page). Same-origin, so it is precached with the shell.
+    '/vendor/supabase-js-2.117.2.js',
     '/manifest.json',
     '/logo.jpg',
     '/logo-192.png'
@@ -99,16 +102,14 @@ function canonicalPath(pathname) {
     return m ? (m[1] || '/') : pathname;
 }
 
-// Cross-origin vendor scripts the pages depend on just to boot (bcrypt for
-// offline login, the Supabase client, icons). Precached once at install and
-// served cache-first after that — the one deliberate exception to "never
-// touch cross-origin traffic" below, because without them the shell HTML
-// loads but immediately breaks with no network to fetch them fresh.
+// Cross-origin vendor assets the pages depend on just to render. Precached once
+// at install and served cache-first after that — the one deliberate exception to
+// "never touch cross-origin traffic" below, because without them the shell HTML
+// loads but its icons are missing with no network to fetch them fresh.
+// (The Supabase client used to be listed here from jsdelivr/unpkg, together with
+// bcryptjs and lucide; the client is now self-hosted under /vendor and precached
+// via SHELL_URLS, bcryptjs is no longer loaded, and lucide's 4 icons are inline.)
 var VENDOR_URLS = [
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-    'https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js',
-    'https://unpkg.com/@supabase/supabase-js@2',
-    'https://unpkg.com/lucide@latest',
     // Font Awesome powers the bottom-nav + button icons. Precache the stylesheet
     // and its solid/regular webfonts; the FONT_AWESOME_PREFIX rule in fetch()
     // also catches any other glyph file the CSS pulls, so icons render offline.
